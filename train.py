@@ -1,11 +1,46 @@
+"""!
+@file train.py
+@brief Main training script for the PyTorch Training Framework.
+
+@details This script provides the entry point for training deep learning models
+on various datasets (CIFAR-10, CIFAR-100, MNIST, Fashion-MNIST) using different
+architectures (ResNet, VGG, MobileNet).
+
+@usage
+    python train.py --config configs/<config>.yaml
+
+@author PyTorch Training Framework
+@version 1.0
+"""
+
+from __future__ import annotations
+
 import argparse
+from typing import Any, Dict
 
 from datasets import get_dataset
 from models import get_model
 from utils import get_device, load_config, Trainer, set_seed
 
 
-def main():
+def main() -> None:
+    """!
+    @brief Main entry point for training.
+    
+    @details Parses command-line arguments, loads configuration, initializes
+    the dataset and model, and starts the training process.
+    
+    The function performs the following steps:
+    1. Parse command-line arguments for config file path
+    2. Load YAML configuration
+    3. Set random seed for reproducibility (if enabled)
+    4. Setup compute device (CUDA/MPS/CPU)
+    5. Load and prepare dataset with data loaders
+    6. Create model based on configuration
+    7. Initialize trainer and start training loop
+    
+    @return None
+    """
     parser = argparse.ArgumentParser(description="Training Framework")
     parser.add_argument(
         "--config",
@@ -16,13 +51,13 @@ def main():
     args = parser.parse_args()
 
     # Load configuration
-    config = load_config(args.config)
+    config: Dict[str, Any] = load_config(args.config)
 
     # Set seed for reproducibility
-    seed_config = config.get("seed", {})
+    seed_config: Dict[str, Any] = config.get("seed", {})
     if seed_config.get("enabled", False):
-        seed = seed_config.get("value", 42)
-        deterministic = seed_config.get("deterministic", False)
+        seed: int = seed_config.get("value", 42)
+        deterministic: bool = seed_config.get("deterministic", False)
         set_seed(seed, deterministic)
         print(f"Random seed: {seed} (deterministic: {deterministic})")
 

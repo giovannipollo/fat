@@ -1,8 +1,16 @@
-"""Metrics logging utilities for TensorBoard, console, and file output."""
+"""!
+@file utils/logging.py
+@brief Metrics logging utilities for training.
+
+@details Provides unified logging to TensorBoard, console, and text files
+for tracking training progress and metrics.
+"""
+
+from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Dict, Any, TextIO
+from typing import Any, Dict, List, Optional, TextIO, Type
 
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -13,14 +21,20 @@ except ImportError:
 
 
 class MetricsLogger:
-    """
-    Handles logging of training metrics to TensorBoard, console, and file.
+    """!
+    @brief Handles logging of training metrics to multiple outputs.
     
-    Features:
-    - TensorBoard scalar logging
-    - Console output formatting
-    - Text file logging (training_log.txt)
-    - Epoch summary logging
+    @details Provides unified interface for logging to:
+    - TensorBoard (scalar metrics)
+    - Console (formatted epoch summaries)
+    - Text file (training_log.txt)
+    
+    @par Usage
+    @code{.py}
+    logger = MetricsLogger.from_config(config, tensorboard_dir, experiment_dir)
+    logger.log_epoch(epoch, total_epochs, lr, train_loss, train_acc, val_loss, val_acc)
+    logger.close()
+    @endcode
     """
 
     def __init__(
@@ -31,15 +45,14 @@ class MetricsLogger:
         file_logging_enabled: bool = False,
         experiment_dir: Optional[Path] = None,
     ):
-        """
-        Initialize the metrics logger.
+        """!
+        @brief Initialize the metrics logger.
         
-        Args:
-            tensorboard_enabled: Whether to enable TensorBoard logging
-            log_dir: Directory for TensorBoard logs
-            console_enabled: Whether to print metrics to console
-            file_logging_enabled: Whether to log to a text file
-            experiment_dir: Directory for the log file
+        @param tensorboard_enabled Whether to enable TensorBoard logging
+        @param log_dir Directory for TensorBoard logs
+        @param console_enabled Whether to print metrics to console
+        @param file_logging_enabled Whether to log to a text file
+        @param experiment_dir Directory for the log file
         """
         self.console_enabled = console_enabled
         self.tensorboard_enabled = tensorboard_enabled
@@ -67,8 +80,10 @@ class MetricsLogger:
             self.log_file = open(self.log_file_path, "w")
             self._write_file_header()
 
-    def _write_file_header(self):
-        """Write header information to the log file."""
+    def _write_file_header(self) -> None:
+        """!
+        @brief Write header information to the log file.
+        """
         if self.log_file is None:
             return
         
@@ -77,31 +92,33 @@ class MetricsLogger:
         self.log_file.write("=" * 80 + "\n\n")
         self.log_file.flush()
 
-    def _write_to_file(self, message: str):
-        """Write a message to the log file."""
+    def _write_to_file(self, message: str) -> None:
+        """!
+        @brief Write a message to the log file.
+        
+        @param message Message string to write
+        """
         if self.log_file is not None:
             self.log_file.write(message + "\n")
             self.log_file.flush()
 
-    def log_scalar(self, tag: str, value: float, step: int):
-        """
-        Log a scalar value.
+    def log_scalar(self, tag: str, value: float, step: int) -> None:
+        """!
+        @brief Log a scalar value to TensorBoard.
         
-        Args:
-            tag: Name of the metric
-            value: Value to log
-            step: Current step/epoch
+        @param tag Name of the metric
+        @param value Value to log
+        @param step Current step/epoch
         """
         if self.writer is not None:
             self.writer.add_scalar(tag, value, step)
 
-    def log_scalars(self, metrics: Dict[str, float], step: int):
-        """
-        Log multiple scalar values.
+    def log_scalars(self, metrics: Dict[str, float], step: int) -> None:
+        """!
+        @brief Log multiple scalar values to TensorBoard.
         
-        Args:
-            metrics: Dictionary of metric names to values
-            step: Current step/epoch
+        @param metrics Dictionary of metric names to values
+        @param step Current step/epoch
         """
         for tag, value in metrics.items():
             self.log_scalar(tag, value, step)
@@ -118,21 +135,20 @@ class MetricsLogger:
         eval_name: str = "Val",
         test_loss: Optional[float] = None,
         test_acc: Optional[float] = None,
-    ):
-        """
-        Log metrics for an epoch.
+    ) -> None:
+        """!
+        @brief Log metrics for an epoch.
         
-        Args:
-            epoch: Current epoch (0-indexed)
-            total_epochs: Total number of epochs
-            lr: Current learning rate
-            train_loss: Training loss
-            train_acc: Training accuracy
-            eval_loss: Evaluation loss (validation or test)
-            eval_acc: Evaluation accuracy (validation or test)
-            eval_name: Name of the evaluation set ("Val" or "Test")
-            test_loss: Optional test loss (when using validation set)
-            test_acc: Optional test accuracy (when using validation set)
+        @param epoch Current epoch (0-indexed)
+        @param total_epochs Total number of epochs
+        @param lr Current learning rate
+        @param train_loss Training loss
+        @param train_acc Training accuracy (%)
+        @param eval_loss Evaluation loss (validation or test)
+        @param eval_acc Evaluation accuracy (%)
+        @param eval_name Name of evaluation set ("Val" or "Test")
+        @param test_loss Optional test loss (when using validation)
+        @param test_acc Optional test accuracy (when using validation)
         """
         # Build log message
         log_msg = (
@@ -168,14 +184,13 @@ class MetricsLogger:
                 self.writer.add_scalar("Loss/test", test_loss, epoch)
                 self.writer.add_scalar("Accuracy/test", test_acc, epoch)
 
-    def log_final_test(self, loss: float, accuracy: float, epoch: int):
-        """
-        Log final test results.
+    def log_final_test(self, loss: float, accuracy: float, epoch: int) -> None:
+        """!
+        @brief Log final test results.
         
-        Args:
-            loss: Final test loss
-            accuracy: Final test accuracy
-            epoch: Final epoch number
+        @param loss Final test loss
+        @param accuracy Final test accuracy (%)
+        @param epoch Final epoch number
         """
         msg = f"Final Test Loss: {loss:.4f} | Final Test Accuracy: {accuracy:.2f}%"
         
@@ -193,14 +208,13 @@ class MetricsLogger:
         epoch: int,
         val_acc: float,
         test_acc: Optional[float] = None,
-    ):
-        """
-        Log when a new best model is saved.
+    ) -> None:
+        """!
+        @brief Log when a new best model is saved.
         
-        Args:
-            epoch: Epoch number (0-indexed)
-            val_acc: Validation accuracy (or test if no validation set)
-            test_acc: Optional test accuracy (when using validation set)
+        @param epoch Epoch number (0-indexed)
+        @param val_acc Validation accuracy (or test if no validation)
+        @param test_acc Optional test accuracy (when using validation)
         """
         if test_acc is not None:
             msg = f"  -> New best model saved at epoch {epoch + 1}! (val: {val_acc:.2f}%, test: {test_acc:.2f}%)"
@@ -218,20 +232,19 @@ class MetricsLogger:
         has_validation: bool = False,
         use_amp: bool = False,
         experiment_dir: Optional[Path] = None,
-    ):
-        """
-        Log training start information.
+    ) -> None:
+        """!
+        @brief Log training start information.
         
-        Args:
-            model_name: Name of the model
-            epochs: Number of epochs
-            device: Device being used
-            has_validation: Whether validation set is available
-            use_amp: Whether AMP is enabled
-            experiment_dir: Experiment directory path
+        @param model_name Name of the model
+        @param epochs Number of epochs
+        @param device Device being used
+        @param has_validation Whether validation set is available
+        @param use_amp Whether AMP is enabled
+        @param experiment_dir Experiment directory path
         """
         # Build messages
-        messages = [
+        messages: List[str] = [
             f"\nStarting training {model_name} for {epochs} epochs...",
             f"Using device: {device}",
         ]
@@ -254,13 +267,12 @@ class MetricsLogger:
         for msg in messages:
             self._write_to_file(msg)
 
-    def log_training_complete(self, best_acc: float, eval_name: str = "Val"):
-        """
-        Log training completion message.
+    def log_training_complete(self, best_acc: float, eval_name: str = "Val") -> None:
+        """!
+        @brief Log training completion message.
         
-        Args:
-            best_acc: Best accuracy achieved
-            eval_name: Name of the evaluation set
+        @param best_acc Best accuracy achieved (%)
+        @param eval_name Name of the evaluation set
         """
         msg = f"\nTraining complete! Best {eval_name} accuracy: {best_acc:.2f}%"
         
@@ -269,8 +281,10 @@ class MetricsLogger:
         
         self._write_to_file(msg)
 
-    def close(self):
-        """Close the TensorBoard writer and log file."""
+    def close(self) -> None:
+        """!
+        @brief Close the TensorBoard writer and log file.
+        """
         if self.writer is not None:
             self.writer.close()
             self.writer = None
@@ -279,44 +293,54 @@ class MetricsLogger:
             self.log_file.close()
             self.log_file = None
 
-    def __enter__(self):
-        """Context manager entry."""
+    def __enter__(self) -> MetricsLogger:
+        """!
+        @brief Context manager entry.
+        @return Self
+        """
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit - close the writer."""
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[Any],
+    ) -> bool:
+        """!
+        @brief Context manager exit - closes the writer.
+        @return False (don't suppress exceptions)
+        """
         self.close()
         return False
 
     @classmethod
     def from_config(
-        cls,
-        config: dict,
+        cls: Type[MetricsLogger],
+        config: Dict[str, Any],
         tensorboard_dir: Optional[Path] = None,
         experiment_dir: Optional[Path] = None,
-    ) -> "MetricsLogger":
-        """
-        Create a MetricsLogger from configuration.
+    ) -> MetricsLogger:
+        """!
+        @brief Create a MetricsLogger from configuration.
         
-        Args:
-            config: Full configuration dictionary
-            tensorboard_dir: Override directory for TensorBoard logs
-            experiment_dir: Directory for file logging
-            
-        Returns:
-            Configured MetricsLogger instance
+        @param config Full configuration dictionary
+        @param tensorboard_dir Override directory for TensorBoard logs
+        @param experiment_dir Directory for file logging
+        @return Configured MetricsLogger instance
         """
-        tensorboard_config = config.get("tensorboard", {})
-        progress_config = config.get("progress", {})
-        logging_config = config.get("logging", {})
+        tensorboard_config: Dict[str, Any] = config.get("tensorboard", {})
+        progress_config: Dict[str, Any] = config.get("progress", {})
+        logging_config: Dict[str, Any] = config.get("logging", {})
         
         # Determine log directory
-        log_dir = tensorboard_dir
+        log_dir: Optional[Path] = tensorboard_dir
         if log_dir is None and tensorboard_config.get("enabled", False):
             log_dir = Path(tensorboard_config.get("log_dir", "./runs"))
         
         # File logging is enabled by default if experiment_dir is provided
-        file_logging_enabled = logging_config.get("file_enabled", experiment_dir is not None)
+        file_logging_enabled: bool = logging_config.get(
+            "file_enabled", experiment_dir is not None
+        )
         
         return cls(
             tensorboard_enabled=tensorboard_config.get("enabled", False),

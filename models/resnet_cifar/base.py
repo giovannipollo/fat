@@ -1,21 +1,32 @@
-"""
-ResNet base classes for CIFAR-specific architectures.
+"""!
+@file models/resnet_cifar/base.py
+@brief ResNet base classes for CIFAR-specific architectures.
 
-Reference:
-    Deep Residual Learning for Image Recognition
-    https://arxiv.org/abs/1512.03385
-    Section 4.2: CIFAR-10 analysis
+@details Implements the CIFAR-specific ResNet architecture from the original paper
+(Section 4.2), which differs from the ImageNet version in structure and size.
+
+@see https://arxiv.org/abs/1512.03385 "Deep Residual Learning"
 """
+
+from __future__ import annotations
+
+from typing import ClassVar, List, Optional
 
 import torch
 import torch.nn as nn
-from typing import Optional
 
 
 class BasicBlock(nn.Module):
-    """Basic residual block for CIFAR ResNets."""
+    """!
+    @brief Basic residual block for CIFAR ResNets.
+    
+    @details Two 3x3 convolutions with batch normalization and skip connection.
+    No channel expansion (expansion = 1).
+    """
 
-    expansion = 1
+    ## @var expansion
+    #  @brief Output channel expansion factor (1 for basic block)
+    expansion: ClassVar[int] = 1
 
     def __init__(
         self,
@@ -24,6 +35,14 @@ class BasicBlock(nn.Module):
         stride: int = 1,
         downsample: Optional[nn.Module] = None,
     ):
+        """!
+        @brief Initialize basic residual block.
+        
+        @param in_planes Number of input channels
+        @param planes Number of output channels
+        @param stride Stride for first convolution (for downsampling)
+        @param downsample Optional downsampling layer for skip connection
+        """
         super().__init__()
         self.conv1 = nn.Conv2d(
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
@@ -37,9 +56,15 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
+        """!
+        @brief Forward pass with residual connection.
+        
+        @param x Input tensor
+        @return Output tensor with skip connection added
+        """
+        identity: torch.Tensor = x
 
-        out = self.conv1(x)
+        out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -56,14 +81,19 @@ class BasicBlock(nn.Module):
 
 
 class ResNetCIFAR(nn.Module):
-    """
-    CIFAR-specific ResNet architecture.
+    """!
+    @brief CIFAR-specific ResNet architecture.
     
-    This follows the original paper's CIFAR-10 architecture:
-    - Initial conv: 3x3, 16 filters
+    @details Follows the original paper's CIFAR-10 architecture:
+    - Initial conv: 3x3, 16 filters, no pooling
     - 3 stages with filter counts: 16 -> 32 -> 64
     - Each stage has n blocks (total layers = 6n + 2)
     - Global average pooling + FC layer
+    
+    @par Architecture Summary
+    - Stage 1: n blocks at 16 channels (stride=1)
+    - Stage 2: n blocks at 32 channels (stride=2)
+    - Stage 3: n blocks at 64 channels (stride=2)
     """
 
     def __init__(
@@ -72,16 +102,15 @@ class ResNetCIFAR(nn.Module):
         num_classes: int = 10,
         in_channels: int = 3,
     ):
-        """
-        Initialize CIFAR ResNet.
+        """!
+        @brief Initialize CIFAR ResNet.
         
-        Args:
-            num_blocks: Number of blocks per stage (n in the paper)
-            num_classes: Number of output classes
-            in_channels: Number of input channels (3 for RGB, 1 for grayscale)
+        @param num_blocks Number of blocks per stage (n in the paper)
+        @param num_classes Number of output classes
+        @param in_channels Number of input channels (3=RGB, 1=grayscale)
         """
         super().__init__()
-        self.in_planes = 16
+        self.in_planes: int = 16
 
         # Initial convolution
         self.conv1 = nn.Conv2d(
@@ -103,7 +132,15 @@ class ResNetCIFAR(nn.Module):
         self._initialize_weights()
 
     def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
-        downsample = None
+        """!
+        @brief Build a stage of residual blocks.
+        
+        @param planes Number of output channels
+        @param num_blocks Number of blocks in the stage
+        @param stride Stride for the first block (downsampling)
+        @return Sequential container of residual blocks
+        """
+        downsample: Optional[nn.Module] = None
         if stride != 1 or self.in_planes != planes:
             downsample = nn.Sequential(
                 nn.Conv2d(
@@ -112,7 +149,7 @@ class ResNetCIFAR(nn.Module):
                 nn.BatchNorm2d(planes),
             )
 
-        layers = []
+        layers: List[nn.Module] = []
         layers.append(BasicBlock(self.in_planes, planes, stride, downsample))
         self.in_planes = planes
         for _ in range(1, num_blocks):
@@ -120,7 +157,10 @@ class ResNetCIFAR(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def _initialize_weights(self):
+    def _initialize_weights(self) -> None:
+        """!
+        @brief Initialize weights using Kaiming initialization.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -129,7 +169,13 @@ class ResNetCIFAR(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.conv1(x)
+        """!
+        @brief Forward pass through ResNet.
+        
+        @param x Input tensor of shape (N, C, H, W)
+        @return Output logits of shape (N, num_classes)
+        """
+        out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 

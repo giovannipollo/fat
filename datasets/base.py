@@ -1,18 +1,31 @@
+"""!
+@file datasets/base.py
+@brief Abstract base class for all dataset implementations.
+
+@details Provides a unified interface for dataset loading, transformation,
+and data loader creation. Subclasses must implement dataset-specific
+metadata and the _load_dataset method.
+"""
+
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from torch.utils.data import DataLoader, Dataset, random_split
+from torch.utils.data import DataLoader, Dataset, Subset, random_split
 from torchvision import transforms
-from typing import Tuple, Optional
+from typing import Any, List, Tuple, Optional, ClassVar, Union
 import torch
 import numpy as np
 import random
 
 
-def _worker_init_fn(worker_id: int):
-    """
-    Initialize worker with deterministic seed based on worker_id.
+def _worker_init_fn(worker_id: int) -> None:
+    """!
+    @brief Initialize data loader worker with deterministic seed.
     
-    This ensures reproducibility when using num_workers > 0.
-    The base seed comes from the main process's random state.
+    @details Ensures reproducibility when using num_workers > 0 by
+    seeding each worker based on the main process's random state.
+    
+    @param worker_id The ID of the worker process
     """
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
@@ -20,38 +33,61 @@ def _worker_init_fn(worker_id: int):
 
 
 class BaseDataset(ABC):
+    """!
+    @brief Abstract base class for all datasets.
+
+    @details Subclasses must implement dataset-specific metadata and the
+    _load_dataset method. The class provides automatic handling of:
+    - Train/validation/test splits
+    - Data transformations
+    - DataLoader creation with reproducibility support
+    
+    @par Required Class Attributes
+    - name: Dataset identifier string
+    - num_classes: Number of output classes
+    - in_channels: Number of input channels (1=grayscale, 3=RGB)
+    - image_size: Tuple of (height, width)
+    - mean: Tuple of channel means for normalization
+    - std: Tuple of channel stds for normalization
+    
+    @par Example
+    @code{.py}
+    class MyDataset(BaseDataset):
+        name = "my_dataset"
+        num_classes = 10
+        in_channels = 3
+        image_size = (32, 32)
+        mean = (0.5, 0.5, 0.5)
+        std = (0.5, 0.5, 0.5)
+
+        def _load_dataset(self, root, train, download, transform):
+            return MyTorchDataset(root=root, train=train, transform=transform)
+    @endcode
     """
-    Abstract base class for all datasets.
 
-    Subclasses must implement:
-        - name: Dataset identifier
-        - num_classes: Number of output classes
-        - in_channels: Number of input channels (1 for grayscale, 3 for RGB)
-        - image_size: Tuple of (height, width)
-        - mean: Tuple of mean values for normalization
-        - std: Tuple of std values for normalization
-        - _load_dataset(): Method to load the actual dataset
-
-    Example:
-        class MyCustomDataset(BaseDataset):
-            name = "my_dataset"
-            num_classes = 10
-            in_channels = 3
-            image_size = (32, 32)
-            mean = (0.5, 0.5, 0.5)
-            std = (0.5, 0.5, 0.5)
-
-            def _load_dataset(self, root, train, download, transform):
-                return MyTorchDataset(root=root, train=train, download=download, transform=transform)
-    """
-
-    # Dataset metadata (must be defined by subclasses)
-    name: str = None
-    num_classes: int = None
-    in_channels: int = None
-    image_size: Tuple[int, int] = None
-    mean: Tuple[float, ...] = None
-    std: Tuple[float, ...] = None
+    ## @var name
+    #  @brief Dataset identifier string (must be defined by subclasses)
+    name: ClassVar[str]
+    
+    ## @var num_classes
+    #  @brief Number of classification classes
+    num_classes: ClassVar[int]
+    
+    ## @var in_channels  
+    #  @brief Number of input image channels
+    in_channels: ClassVar[int]
+    
+    ## @var image_size
+    #  @brief Input image dimensions as (height, width)
+    image_size: ClassVar[Tuple[int, int]]
+    
+    ## @var mean
+    #  @brief Per-channel means for normalization
+    mean: ClassVar[Tuple[float, ...]]
+    
+    ## @var std
+    #  @brief Per-channel standard deviations for normalization
+    std: ClassVar[Tuple[float, ...]]
 
     def __init__(
         self,
@@ -62,36 +98,43 @@ class BaseDataset(ABC):
         val_split: Optional[float] = None,
         seed: int = 42,
     ):
+        """!
+        @brief Initialize the dataset.
+        
+        @param root Root directory for dataset storage
+        @param batch_size Batch size for data loaders
+        @param num_workers Number of worker processes for data loading
+        @param download Whether to download dataset if not present
+        @param val_split Fraction of training data for validation (0.0-1.0), None to disable
+        @param seed Random seed for reproducible validation split
         """
-        Initialize dataset.
+        self.root: str = root
+        self.batch_size: int = batch_size
+        self.num_workers: int = num_workers
+        self.download: bool = download
+        self.val_split: Optional[float] = val_split
+        self.seed: int = seed
 
-        Args:
-            root: Root directory for dataset storage
-            batch_size: Batch size for dataloaders
-            num_workers: Number of workers for data loading
-            download: Whether to download the dataset if not present
-            val_split: Fraction of training data to use for validation (0.0-1.0).
-                       If None, no validation split is created.
-            seed: Random seed for reproducible validation split
-        """
-        self.root = root
-        self.batch_size = batch_size
-        self.num_workers = num_workers
-        self.download = download
-        self.val_split = val_split
-        self.seed = seed
+        # Dataset instances (set by _load_all_datasets)
+        self.train_dataset: Union[Dataset[Any], Subset[Any]]
+        self.val_dataset: Optional[Union[Dataset[Any], Subset[Any]]] = None
+        self.test_dataset: Dataset[Any]
 
         # Build transforms
-        self.train_transform = self._build_train_transform()
-        self.test_transform = self._build_test_transform()
+        self.train_transform: transforms.Compose = self._build_train_transform()
+        self.test_transform: transforms.Compose = self._build_test_transform()
 
         # Load datasets
         self._load_all_datasets()
 
-    def _load_all_datasets(self):
-        """Load train, validation, and test datasets."""
+    def _load_all_datasets(self) -> None:
+        """!
+        @brief Load train, validation, and test datasets.
+        
+        @details Handles validation split creation if val_split is specified.
+        """
         # Load full training dataset
-        full_train_dataset = self._load_dataset(
+        full_train_dataset: Dataset[Any] = self._load_dataset(
             root=self.root,
             train=True,
             download=self.download,
@@ -101,12 +144,12 @@ class BaseDataset(ABC):
         # Handle validation split
         if self.val_split is not None and self.val_split > 0:
             # Calculate split sizes
-            total_size = len(full_train_dataset)
-            val_size = int(total_size * self.val_split)
-            train_size = total_size - val_size
+            total_size: int = len(full_train_dataset)  # type: ignore[arg-type]
+            val_size: int = int(total_size * self.val_split)
+            train_size: int = total_size - val_size
 
             # Create reproducible split
-            generator = torch.Generator().manual_seed(self.seed)
+            generator: torch.Generator = torch.Generator().manual_seed(self.seed)
             self.train_dataset, val_dataset_raw = random_split(
                 full_train_dataset,
                 [train_size, val_size],
@@ -128,15 +171,18 @@ class BaseDataset(ABC):
             transform=self.test_transform,
         )
 
-    def _create_val_dataset_with_transform(self, val_subset) -> Dataset:
-        """
-        Create validation dataset with test transforms.
-
-        This reloads the training data with test transforms and selects
+    def _create_val_dataset_with_transform(self, val_subset: Subset[Any]) -> Subset[Any]:
+        """!
+        @brief Create validation dataset with test transforms.
+        
+        @details Reloads training data with test transforms and selects
         the same indices as the validation split.
+        
+        @param val_subset The validation subset from random_split
+        @return Dataset with test transforms applied
         """
         # Load training data again with test transforms
-        train_with_test_transform = self._load_dataset(
+        train_with_test_transform: Dataset[Any] = self._load_dataset(
             root=self.root,
             train=True,
             download=False,  # Already downloaded
@@ -144,15 +190,16 @@ class BaseDataset(ABC):
         )
 
         # Create a subset with the same indices
-        return torch.utils.data.Subset(train_with_test_transform, val_subset.indices)
+        return Subset(train_with_test_transform, val_subset.indices)
 
     def _build_train_transform(self) -> transforms.Compose:
-        """
-        Build training data transforms.
-        Override this method to customize training augmentations.
-
-        Returns:
-            transforms.Compose: Composed transforms for training data
+        """!
+        @brief Build training data transforms.
+        
+        @details Override this method to customize training augmentations.
+        Default implementation applies ToTensor and normalization.
+        
+        @return Composed transforms for training data
         """
         return transforms.Compose(
             [
@@ -162,12 +209,13 @@ class BaseDataset(ABC):
         )
 
     def _build_test_transform(self) -> transforms.Compose:
-        """
-        Build test/validation data transforms.
-        Override this method to customize test transforms.
-
-        Returns:
-            transforms.Compose: Composed transforms for test data
+        """!
+        @brief Build test/validation data transforms.
+        
+        @details Override this method to customize test transforms.
+        Default implementation applies ToTensor and normalization.
+        
+        @return Composed transforms for test/validation data
         """
         return transforms.Compose(
             [
@@ -183,35 +231,35 @@ class BaseDataset(ABC):
         train: bool,
         download: bool,
         transform: transforms.Compose,
-    ) -> Dataset:
-        """
-        Load the actual dataset.
-
-        Args:
-            root: Root directory for dataset storage
-            train: Whether to load training or test set
-            download: Whether to download the dataset
-            transform: Transforms to apply
-
-        Returns:
-            Dataset: PyTorch dataset instance
+    ) -> Dataset[Any]:
+        """!
+        @brief Load the actual dataset (abstract method).
+        
+        @details Must be implemented by subclasses to return a PyTorch Dataset.
+        
+        @param root Root directory for dataset storage
+        @param train Whether to load training or test set
+        @param download Whether to download the dataset if not present
+        @param transform Transforms to apply to the data
+        @return PyTorch Dataset instance
         """
         pass
 
-    def get_loaders(self) -> Tuple[DataLoader, Optional[DataLoader], DataLoader]:
-        """
-        Get train, validation, and test dataloaders.
-
-        Returns:
-            Tuple[DataLoader, Optional[DataLoader], DataLoader]:
-                (train_loader, val_loader, test_loader)
-                val_loader is None if val_split was not specified
+    def get_loaders(self) -> Tuple[DataLoader[Any], Optional[DataLoader[Any]], DataLoader[Any]]:
+        """!
+        @brief Get train, validation, and test data loaders.
+        
+        @details Creates DataLoader instances with proper shuffling and
+        worker initialization for reproducibility.
+        
+        @return Tuple of (train_loader, val_loader, test_loader)
+        @note val_loader is None if val_split was not specified
         """
         # Create a seeded generator for reproducible shuffling
         # This ensures the same batch order across runs with num_workers > 0
-        generator = torch.Generator().manual_seed(self.seed)
+        generator: torch.Generator = torch.Generator().manual_seed(self.seed)
         
-        train_loader = DataLoader(
+        train_loader: DataLoader[Any] = DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
@@ -220,7 +268,7 @@ class BaseDataset(ABC):
             worker_init_fn=_worker_init_fn,
         )
 
-        val_loader = None
+        val_loader: Optional[DataLoader[Any]] = None
         if self.val_dataset is not None:
             val_loader = DataLoader(
                 self.val_dataset,
@@ -230,7 +278,7 @@ class BaseDataset(ABC):
                 worker_init_fn=_worker_init_fn,
             )
 
-        test_loader = DataLoader(
+        test_loader: DataLoader[Any] = DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
             shuffle=False,
@@ -242,11 +290,14 @@ class BaseDataset(ABC):
 
     @property
     def has_validation(self) -> bool:
-        """Check if validation set is available."""
+        """!
+        @brief Check if validation set is available.
+        @return True if validation dataset exists
+        """
         return self.val_dataset is not None
 
     def __repr__(self) -> str:
-        val_info = f", val_split={self.val_split}" if self.val_split else ""
+        val_info: str = f", val_split={self.val_split}" if self.val_split else ""
         return (
             f"{self.__class__.__name__}("
             f"name={self.name}, "

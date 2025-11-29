@@ -1,0 +1,48 @@
+# ResNet-56 on CIFAR-10
+# Medium-sized CIFAR model (~0.85M params)
+# Expected accuracy: ~93-94% after 200 epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar100"
+  root: "./data"
+  download: true
+  num_workers: 4
+  # val_split: 0.1
+
+model:
+  name: "resnet56"
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true

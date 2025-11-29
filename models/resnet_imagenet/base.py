@@ -1,21 +1,33 @@
-"""
-ResNet base classes and building blocks for ImageNet-style architectures.
+"""!
+@file models/resnet_imagenet/base.py
+@brief ResNet base classes and building blocks for ImageNet-style architectures.
 
-Reference:
-    Deep Residual Learning for Image Recognition
-    https://arxiv.org/abs/1512.03385
+@details Provides BasicBlock, Bottleneck, and ResNetBase classes for building
+ResNet-18 through ResNet-152 models adapted for small image inputs.
+
+@see https://arxiv.org/abs/1512.03385 "Deep Residual Learning for Image Recognition"
 """
+
+from __future__ import annotations
+
+from abc import ABC
+from typing import ClassVar, List, Optional, Type, Union
 
 import torch
 import torch.nn as nn
-from typing import Type, List, Optional, Union
-from abc import ABC
 
 
 class BasicBlock(nn.Module):
-    """Basic residual block for ResNet-18 and ResNet-34."""
+    """!
+    @brief Basic residual block for ResNet-18 and ResNet-34.
+    
+    @details Two 3x3 convolutions with batch normalization and skip connection.
+    No channel expansion (expansion = 1).
+    """
 
-    expansion = 1
+    ## @var expansion
+    #  @brief Output channel expansion factor
+    expansion: ClassVar[int] = 1
 
     def __init__(
         self,
@@ -24,6 +36,14 @@ class BasicBlock(nn.Module):
         stride: int = 1,
         downsample: Optional[nn.Module] = None,
     ):
+        """!
+        @brief Initialize basic residual block.
+        
+        @param in_planes Number of input channels
+        @param planes Number of output channels
+        @param stride Stride for first convolution
+        @param downsample Optional downsampling layer for skip connection
+        """
         super().__init__()
         self.conv1 = nn.Conv2d(
             in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
@@ -35,12 +55,18 @@ class BasicBlock(nn.Module):
         )
         self.bn2 = nn.BatchNorm2d(planes)
         self.downsample = downsample
-        self.stride = stride
+        self.stride: int = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
+        """!
+        @brief Forward pass with residual connection.
+        
+        @param x Input tensor
+        @return Output tensor
+        """
+        identity: torch.Tensor = x
 
-        out = self.conv1(x)
+        out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -57,9 +83,16 @@ class BasicBlock(nn.Module):
 
 
 class Bottleneck(nn.Module):
-    """Bottleneck residual block for ResNet-50, ResNet-101, and ResNet-152."""
+    """!
+    @brief Bottleneck residual block for ResNet-50, ResNet-101, and ResNet-152.
+    
+    @details Three convolutions (1x1 -> 3x3 -> 1x1) with channel expansion.
+    The 1x1 convolutions reduce and restore dimensions for efficiency.
+    """
 
-    expansion = 4
+    ## @var expansion
+    #  @brief Output channel expansion factor (4x for bottleneck)
+    expansion: ClassVar[int] = 4
 
     def __init__(
         self,
@@ -68,6 +101,14 @@ class Bottleneck(nn.Module):
         stride: int = 1,
         downsample: Optional[nn.Module] = None,
     ):
+        """!
+        @brief Initialize bottleneck residual block.
+        
+        @param in_planes Number of input channels
+        @param planes Number of intermediate channels (output = planes * 4)
+        @param stride Stride for 3x3 convolution
+        @param downsample Optional downsampling layer for skip connection
+        """
         super().__init__()
         self.conv1 = nn.Conv2d(in_planes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
@@ -81,12 +122,18 @@ class Bottleneck(nn.Module):
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
-        self.stride = stride
+        self.stride: int = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        identity = x
+        """!
+        @brief Forward pass with residual connection.
+        
+        @param x Input tensor
+        @return Output tensor
+        """
+        identity: torch.Tensor = x
 
-        out = self.conv1(x)
+        out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -107,20 +154,30 @@ class Bottleneck(nn.Module):
 
 
 class ResNetBase(nn.Module, ABC):
-    """
-    Base ResNet model adapted for CIFAR-10/100 (32x32 images) and MNIST (28x28 images).
-
-    The architecture is modified from the original ImageNet version:
-    - Initial conv has kernel_size=3, stride=1, padding=1 (vs 7x7, stride 2 in ImageNet)
-    - No max pooling after initial conv (preserves resolution for small images)
-    - Supports both RGB (3-channel) and grayscale (1-channel) inputs
+    """!
+    @brief Base ResNet model adapted for small images (CIFAR, MNIST).
+    
+    @details Modified from the original ImageNet architecture:
+    - Initial conv: 3x3, stride=1, padding=1 (vs 7x7, stride=2)
+    - No max pooling after initial conv (preserves resolution)
+    - Supports both RGB and grayscale inputs
+    
+    @par Architecture
+    - Initial 3x3 conv -> 64 channels
+    - 4 stages: [64, 128, 256, 512] base channels
+    - Global average pooling + FC classifier
     
     Subclasses must define:
     - block: The block type (BasicBlock or Bottleneck)
     - layers: List of layer counts [layer1, layer2, layer3, layer4]
     """
 
+    ## @var block
+    #  @brief Block type to use (BasicBlock or Bottleneck)
     block: Type[Union[BasicBlock, Bottleneck]]
+    
+    ## @var layers
+    #  @brief Number of blocks in each of the 4 stages
     layers: List[int]
 
     def __init__(
@@ -128,9 +185,15 @@ class ResNetBase(nn.Module, ABC):
         num_classes: int = 10,
         in_channels: int = 3,
     ):
+        """!
+        @brief Initialize ResNet base model.
+        
+        @param num_classes Number of output classes
+        @param in_channels Number of input channels (3=RGB, 1=grayscale)
+        """
         super().__init__()
-        self.in_planes = 64
-        self.in_channels = in_channels
+        self.in_planes: int = 64
+        self.in_channels: int = in_channels
 
         # Initial convolution layer
         # NOTE: Smaller kernel and no stride/pooling for 32x32 inputs
@@ -160,7 +223,15 @@ class ResNetBase(nn.Module, ABC):
         num_blocks: int,
         stride: int = 1,
     ) -> nn.Sequential:
-        downsample = None
+        """!
+        @brief Build a stage of residual blocks.
+        
+        @param planes Base number of output channels
+        @param num_blocks Number of blocks in the stage
+        @param stride Stride for the first block (downsampling)
+        @return Sequential container of residual blocks
+        """
+        downsample: Optional[nn.Module] = None
         if stride != 1 or self.in_planes != planes * self.block.expansion:
             downsample = nn.Sequential(
                 nn.Conv2d(
@@ -173,7 +244,7 @@ class ResNetBase(nn.Module, ABC):
                 nn.BatchNorm2d(planes * self.block.expansion),
             )
 
-        layers = []
+        layers: List[nn.Module] = []
         layers.append(self.block(self.in_planes, planes, stride, downsample))
         self.in_planes = planes * self.block.expansion
         for _ in range(1, num_blocks):
@@ -181,7 +252,10 @@ class ResNetBase(nn.Module, ABC):
 
         return nn.Sequential(*layers)
 
-    def _initialize_weights(self):
+    def _initialize_weights(self) -> None:
+        """!
+        @brief Initialize weights using Kaiming initialization.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -190,7 +264,13 @@ class ResNetBase(nn.Module, ABC):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.conv1(x)
+        """!
+        @brief Forward pass through ResNet.
+        
+        @param x Input tensor of shape (N, C, H, W)
+        @return Output logits of shape (N, num_classes)
+        """
+        out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 

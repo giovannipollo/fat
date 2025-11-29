@@ -1,16 +1,30 @@
-"""Reproducibility utilities for setting random seeds."""
+"""!
+@file utils/seed.py
+@brief Reproducibility utilities for setting random seeds.
+
+@details Provides comprehensive seeding for Python, NumPy, and PyTorch
+to ensure reproducible training results.
+"""
+
+from __future__ import annotations
 
 import random
+
 import torch
 
 
 def set_seed(seed: int, deterministic: bool = False) -> None:
-    """
-    Set random seeds for reproducibility.
+    """!
+    @brief Set random seeds for reproducibility.
     
-    Args:
-        seed: The random seed to use
-        deterministic: If True, use deterministic algorithms (may impact performance)
+    @details Seeds Python's random, NumPy (if available), and PyTorch
+    random number generators. Optionally enables deterministic algorithms.
+    
+    @param seed The random seed to use
+    @param deterministic If True, use deterministic algorithms (may reduce performance)
+    
+    @note When deterministic=True, cuDNN benchmark mode is disabled and
+    deterministic algorithms are enforced, which may slow down training.
     """
     random.seed(seed)
     

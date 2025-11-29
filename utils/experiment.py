@@ -1,53 +1,75 @@
-"""Experiment manager for handling checkpoints, config saving, and experiment organization."""
+"""!
+@file utils/experiment.py
+@brief Experiment manager for checkpoints and experiment organization.
+
+@details Handles experiment directory structure, checkpoint saving/loading,
+and configuration persistence for reproducibility.
+"""
+
+from __future__ import annotations
 
 import shutil
-import torch
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any, Dict, Optional, Tuple, Union
+
+import torch
 
 try:
     import yaml
-    YAML_AVAILABLE = True
+    YAML_AVAILABLE: bool = True
 except ImportError:
     YAML_AVAILABLE = False
 
 
 class ExperimentManager:
-    """
-    Manages experiment directories, checkpoints, and configuration saving.
+    """!
+    @brief Manages experiment directories, checkpoints, and configuration saving.
     
-    Features:
-    - Auto-generated experiment names based on model/dataset/timestamp
-    - Organized directory structure: experiments/<name>/checkpoints/, tensorboard/
+    @details Provides organized experiment tracking with:
+    - Auto-generated experiment names (model_dataset_timestamp)
+    - Directory structure: experiments/<name>/checkpoints/, tensorboard/
     - Config saving for reproducibility
     - Checkpoint saving/loading with best model tracking
+    
+    @par Directory Structure
+    @code
+    experiments/
+      resnet18_cifar10_20240101_120000/
+        config.yaml
+        training_log.txt
+        checkpoints/
+          best.pt
+          latest.pt
+          epoch_0010.pt
+        tensorboard/
+          events.out.tfevents.*
+    @endcode
     """
 
     def __init__(
         self,
-        config: dict,
+        config: Dict[str, Any],
         enabled: bool = True,
         base_dir: str = "./experiments",
         experiment_name: Optional[str] = None,
         save_frequency: int = 10,
         save_best: bool = True,
-    ):
-        """
-        Initialize the experiment manager.
+    ) -> None:
+        """!
+        @brief Initialize the experiment manager.
         
-        Args:
-            config: Full configuration dictionary
-            enabled: Whether checkpointing is enabled
-            base_dir: Base directory for experiments
-            experiment_name: Optional custom experiment name
-            save_frequency: How often to save periodic checkpoints (in epochs)
-            save_best: Whether to save the best model
+        @param config Full configuration dictionary
+        @param enabled Whether checkpointing is enabled
+        @param base_dir Base directory for experiments
+        @param experiment_name Optional custom experiment name prefix
+        @param save_frequency How often to save periodic checkpoints (epochs)
+        @param save_best Whether to save the best model
         """
-        self.config = config
-        self.enabled = enabled
-        self.save_frequency = save_frequency
-        self.save_best = save_best
+        self.config: Dict[str, Any] = config
+        self.enabled: bool = enabled
+        self.save_frequency: int = save_frequency
+        self.save_best: bool = save_best
         
         # Directories
         self.experiment_dir: Optional[Path] = None
@@ -58,10 +80,15 @@ class ExperimentManager:
             self._setup_experiment_dir(base_dir, experiment_name)
 
     def _generate_experiment_name(self, custom_name: Optional[str] = None) -> str:
-        """Generate a meaningful experiment name based on config."""
-        model_name = self.config["model"]["name"].lower()
-        dataset_name = self.config["dataset"]["name"].lower()
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        """!
+        @brief Generate a meaningful experiment name from config.
+        
+        @param custom_name Optional custom prefix
+        @return Experiment name string (format: [prefix_]model_dataset_timestamp)
+        """
+        model_name: str = self.config["model"]["name"].lower()
+        dataset_name: str = self.config["dataset"]["name"].lower()
+        timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
         
         if custom_name:
             return f"{custom_name}_{model_name}_{dataset_name}_{timestamp}"
@@ -73,9 +100,14 @@ class ExperimentManager:
         base_dir: str,
         custom_name: Optional[str] = None,
     ):
-        """Setup experiment directory structure."""
-        base_path = Path(base_dir)
-        experiment_name = self._generate_experiment_name(custom_name)
+        """!
+        @brief Setup experiment directory structure.
+        
+        @param base_dir Base directory for experiments
+        @param custom_name Optional custom experiment name prefix
+        """
+        base_path: Path = Path(base_dir)
+        experiment_name: str = self._generate_experiment_name(custom_name)
         
         self.experiment_dir = base_path / experiment_name
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
@@ -89,14 +121,18 @@ class ExperimentManager:
         # Save config
         self._save_config()
 
-    def _save_config(self):
-        """Save the configuration to the experiment directory."""
+    def _save_config(self) -> None:
+        """!
+        @brief Save configuration to the experiment directory.
+        
+        @details Saves as YAML if available, otherwise as text representation.
+        """
         if self.experiment_dir is None:
             return
         
         if YAML_AVAILABLE:
             import yaml as yaml_module
-            config_path = self.experiment_dir / "config.yaml"
+            config_path: Path = self.experiment_dir / "config.yaml"
             with open(config_path, "w") as f:
                 yaml_module.dump(self.config, f, default_flow_style=False, sort_keys=False)
         else:
@@ -119,24 +155,23 @@ class ExperimentManager:
         is_best: bool = False,
         test_acc: Optional[float] = None,
     ):
-        """
-        Save a model checkpoint.
+        """!
+        @brief Save a model checkpoint.
         
-        Args:
-            epoch: Current epoch number
-            model: The model to save
-            optimizer: The optimizer state
-            scheduler: The scheduler state (can be None)
-            best_acc: Best accuracy achieved so far (val or test depending on config)
-            current_acc: Current epoch's accuracy
-            scaler: GradScaler for AMP (optional)
-            is_best: Whether this is the best model so far
-            test_acc: Test set accuracy (only for best model when using validation)
+        @param epoch Current epoch number (0-indexed)
+        @param model The model to save
+        @param optimizer The optimizer state
+        @param scheduler The scheduler state (can be None)
+        @param best_acc Best accuracy achieved so far
+        @param current_acc Current epoch's accuracy
+        @param scaler GradScaler for AMP (optional)
+        @param is_best Whether this is the best model so far
+        @param test_acc Test accuracy (for best model with validation)
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
         
-        checkpoint = {
+        checkpoint: Dict[str, Any] = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
@@ -151,11 +186,11 @@ class ExperimentManager:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
         
         # Save periodic checkpoint
-        checkpoint_path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
+        checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
         
         # Save latest checkpoint (always overwritten)
-        latest_path = self.checkpoint_dir / "latest.pt"
+        latest_path: Path = self.checkpoint_dir / "latest.pt"
         torch.save(checkpoint, latest_path)
         
         # Save best checkpoint
@@ -163,7 +198,7 @@ class ExperimentManager:
             # Include test accuracy in best checkpoint
             if test_acc is not None:
                 checkpoint["test_acc"] = test_acc
-            best_path = self.checkpoint_dir / "best.pt"
+            best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
             if test_acc is not None:
                 print(f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)")
@@ -172,26 +207,23 @@ class ExperimentManager:
 
     def load_checkpoint(
         self,
-        checkpoint_path: str | Path,
+        checkpoint_path: Union[str, Path],
         model: torch.nn.Module,
         optimizer: torch.optim.Optimizer,
         scheduler: Any,
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
-    ) -> tuple[int, float]:
-        """
-        Load a model checkpoint.
+    ) -> Tuple[int, float]:
+        """!
+        @brief Load a model checkpoint.
         
-        Args:
-            checkpoint_path: Path to the checkpoint file
-            model: Model to load state into
-            optimizer: Optimizer to load state into
-            scheduler: Scheduler to load state into (can be None)
-            scaler: GradScaler for AMP (optional)
-            device: Device to load the checkpoint to
-            
-        Returns:
-            Tuple of (start_epoch, best_acc)
+        @param checkpoint_path Path to the checkpoint file
+        @param model Model to load state into
+        @param optimizer Optimizer to load state into
+        @param scheduler Scheduler to load state into (can be None)
+        @param scaler GradScaler for AMP (optional)
+        @param device Device to load the checkpoint to
+        @return Tuple of (start_epoch, best_acc)
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
@@ -199,7 +231,7 @@ class ExperimentManager:
             return 0, 0.0
         
         print(f"Loading checkpoint from {checkpoint_path}")
-        checkpoint = torch.load(checkpoint_path, map_location=device)
+        checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
         
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -211,38 +243,52 @@ class ExperimentManager:
         if scaler is not None and "scaler_state_dict" in checkpoint:
             scaler.load_state_dict(checkpoint["scaler_state_dict"])
         
-        start_epoch = checkpoint["epoch"] + 1
-        best_acc = checkpoint.get("best_acc", 0.0)
+        start_epoch: int = checkpoint["epoch"] + 1
+        best_acc: float = checkpoint.get("best_acc", 0.0)
         
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
         return start_epoch, best_acc
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
-        """Check if a checkpoint should be saved at this epoch."""
+        """!
+        @brief Check if a checkpoint should be saved at this epoch.
+        
+        @param epoch Current epoch number (0-indexed)
+        @param is_best Whether this is the best model
+        @return True if checkpoint should be saved
+        """
         if not self.enabled:
             return False
         return (epoch + 1) % self.save_frequency == 0 or is_best
 
     def get_tensorboard_dir(self) -> Optional[Path]:
-        """Get the TensorBoard log directory."""
+        """!
+        @brief Get the TensorBoard log directory.
+        
+        @return Path to TensorBoard directory, or None if disabled
+        """
         return self.tensorboard_dir
 
     def get_experiment_dir(self) -> Optional[Path]:
-        """Get the experiment directory."""
+        """!
+        @brief Get the experiment directory.
+        
+        @return Path to experiment directory, or None if disabled
+        """
         return self.experiment_dir
 
     def cleanup_old_checkpoints(self, keep_last_n: int = 5):
-        """
-        Remove old periodic checkpoints, keeping only the last N.
+        """!
+        @brief Remove old periodic checkpoints, keeping only the last N.
         
-        Args:
-            keep_last_n: Number of recent checkpoints to keep
+        @param keep_last_n Number of recent checkpoints to keep
+        @note Does not remove best.pt or latest.pt
         """
         if self.checkpoint_dir is None:
             return
         
         # Find all epoch checkpoints
-        checkpoints = sorted(self.checkpoint_dir.glob("epoch_*.pt"))
+        checkpoints: list[Path] = sorted(self.checkpoint_dir.glob("epoch_*.pt"))
         
         # Keep best.pt and latest.pt, remove old epoch checkpoints
         if len(checkpoints) > keep_last_n:
@@ -251,17 +297,14 @@ class ExperimentManager:
                 print(f"Removed old checkpoint: {ckpt.name}")
 
     @classmethod
-    def from_config(cls, config: dict) -> "ExperimentManager":
-        """
-        Create an ExperimentManager from a configuration dictionary.
+    def from_config(cls, config: Dict[str, Any]) -> ExperimentManager:
+        """!
+        @brief Create an ExperimentManager from configuration.
         
-        Args:
-            config: Full configuration dictionary
-            
-        Returns:
-            Configured ExperimentManager instance
+        @param config Full configuration dictionary
+        @return Configured ExperimentManager instance
         """
-        checkpoint_config = config.get("checkpoint", {})
+        checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         return cls(
             config=config,
             enabled=checkpoint_config.get("enabled", False),

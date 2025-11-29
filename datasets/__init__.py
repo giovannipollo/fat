@@ -1,4 +1,18 @@
-from typing import Dict, Type, Tuple
+"""!
+@file datasets/__init__.py
+@brief Dataset module initialization and registry.
+
+@details This module provides a unified interface for loading datasets
+through a registry pattern. Supported datasets include CIFAR-10, CIFAR-100,
+MNIST, and Fashion-MNIST.
+
+@see BaseDataset for the abstract base class interface
+@see get_dataset for the main factory function
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict, List, Type, Tuple, Optional
 from torch.utils.data import DataLoader
 
 from .base import BaseDataset
@@ -8,7 +22,8 @@ from .mnist import MNISTDataset
 from .fashion_mnist import FashionMNISTDataset
 
 
-# Registry of available datasets
+## @var DATASETS
+#  @brief Registry mapping dataset names to their implementation classes.
 DATASETS: Dict[str, Type[BaseDataset]] = {
     "cifar10": CIFAR10Dataset,
     "cifar100": CIFAR100Dataset,
@@ -18,23 +33,23 @@ DATASETS: Dict[str, Type[BaseDataset]] = {
 
 
 def register_dataset(dataset_class: Type[BaseDataset]) -> Type[BaseDataset]:
-    """
-    Register a custom dataset class.
+    """!
+    @brief Register a custom dataset class in the global registry.
     
-    Can be used as a decorator:
-        @register_dataset
-        class MyCustomDataset(BaseDataset):
-            name = "my_dataset"
-            ...
+    @details Can be used as a decorator or called directly to add
+    custom dataset implementations to the DATASETS registry.
     
-    Or called directly:
-        register_dataset(MyCustomDataset)
+    @code{.py}
+    @register_dataset
+    class MyCustomDataset(BaseDataset):
+        name = "my_dataset"
+        ...
+    @endcode
     
-    Args:
-        dataset_class: Dataset class extending BaseDataset
-        
-    Returns:
-        The registered dataset class (for decorator usage)
+    @param dataset_class Dataset class extending BaseDataset
+    @return The registered dataset class (for decorator usage)
+    @throws TypeError If dataset_class does not extend BaseDataset
+    @throws ValueError If dataset_class has no 'name' attribute
     """
     if not issubclass(dataset_class, BaseDataset):
         raise TypeError(f"{dataset_class.__name__} must extend BaseDataset")
@@ -46,24 +61,26 @@ def register_dataset(dataset_class: Type[BaseDataset]) -> Type[BaseDataset]:
     return dataset_class
 
 
-def get_dataset(config: dict) -> BaseDataset:
-    """
-    Get dataset instance based on configuration.
+def get_dataset(config: Dict[str, Any]) -> BaseDataset:
+    """!
+    @brief Factory function to create a dataset instance from configuration.
     
-    Args:
-        config: Configuration dictionary with dataset settings
-        
-    Returns:
-        BaseDataset: Initialized dataset instance
+    @details Looks up the dataset name in the registry and instantiates
+    it with parameters from the configuration dictionary.
+    
+    @param config Configuration dictionary containing dataset settings
+                  under config["dataset"]
+    @return Initialized dataset instance
+    @throws ValueError If the dataset name is not found in the registry
     """
-    dataset_name = config["dataset"]["name"].lower()
+    dataset_name: str = config["dataset"]["name"].lower()
     
     if dataset_name not in DATASETS:
-        available = list(DATASETS.keys())
+        available: List[str] = list(DATASETS.keys())
         raise ValueError(f"Unknown dataset: {dataset_name}. Available: {available}")
     
-    dataset_class = DATASETS[dataset_name]
-    dataset_config = config["dataset"]
+    dataset_class: Type[BaseDataset] = DATASETS[dataset_name]
+    dataset_config: Dict[str, Any] = config["dataset"]
     
     return dataset_class(
         root=dataset_config["root"],
@@ -75,17 +92,17 @@ def get_dataset(config: dict) -> BaseDataset:
     )
 
 
-def get_dataloaders(config: dict) -> Tuple[DataLoader, DataLoader]:
-    """
-    Get train and test dataloaders based on configuration.
+def get_dataloaders(config: Dict[str, Any]) -> Tuple[DataLoader, Optional[DataLoader], DataLoader]:
+    """!
+    @brief Convenience function to get data loaders directly from configuration.
     
-    Args:
-        config: Configuration dictionary with dataset settings
-        
-    Returns:
-        Tuple[DataLoader, DataLoader]: (train_loader, test_loader)
+    @details Creates a dataset instance and returns its data loaders.
+    
+    @param config Configuration dictionary with dataset settings
+    @return Tuple of (train_loader, val_loader, test_loader)
+    @note val_loader may be None if val_split is not specified
     """
-    dataset = get_dataset(config)
+    dataset: BaseDataset = get_dataset(config)
     return dataset.get_loaders()
 
 
