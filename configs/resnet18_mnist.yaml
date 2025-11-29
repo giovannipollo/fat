@@ -1,0 +1,45 @@
+# ResNet-18 on MNIST - Simple digit classification
+# Expected accuracy: ~99%+ after 50 epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "mnist"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "resnet18"
+
+training:
+  batch_size: 128
+  epochs: 50
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  weight_decay: 0
+
+scheduler:
+  name: "cosine"
+  T_max: 50
+  warmup_epochs: 0
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true

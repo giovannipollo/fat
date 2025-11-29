@@ -1,0 +1,47 @@
+# VGG-16 on CIFAR-10 - Classic architecture
+# Expected accuracy: ~92-94% after 200 epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 8
+  val_split: 0.1
+
+model:
+  name: "vgg16"
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.05  # Lower LR for VGG
+  momentum: 0.9
+  weight_decay: 0.0005
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 20
+  save_best: true

@@ -1,0 +1,46 @@
+# ResNet-18 on FashionMNIST - Clothing classification
+# Expected accuracy: ~93-94% after 100 epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "fashion_mnist"
+  root: "./data"
+  download: true
+  num_workers: 4
+  val_split: 0.1
+
+model:
+  name: "resnet18"
+
+training:
+  batch_size: 128
+  epochs: 100
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+scheduler:
+  name: "cosine"
+  T_max: 100
+  warmup_epochs: 5
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 20
+  save_best: true

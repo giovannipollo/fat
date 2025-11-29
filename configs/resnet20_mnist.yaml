@@ -1,0 +1,46 @@
+# ResNet-20 on MNIST
+# Overkill for MNIST but useful for testing
+# Expected accuracy: ~99%+ after just a few epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "mnist"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "resnet20"
+
+training:
+  batch_size: 128
+  epochs: 20
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  weight_decay: 0.0001
+
+scheduler:
+  name: "cosine"
+  T_max: 20
+  warmup_epochs: 1
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true

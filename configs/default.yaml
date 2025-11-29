@@ -1,0 +1,63 @@
+# Training Framework Configuration
+
+# Reproducibility
+seed:
+  enabled: true       # Enable for reproducible results
+  value: 42           # Random seed value
+  deterministic: false  # Use deterministic algorithms (slower but fully reproducible)
+
+# Dataset Configuration
+dataset:
+  name: "cifar10"  # Options: cifar10, cifar100, mnist, fashion_mnist
+  root: "./data"
+  download: true
+  num_workers: 16
+  # val_split: 0.1   # Optional: fraction of training data for validation (0.0-1.0)
+
+# Model Configuration
+model:
+  name: "resnet18"  # Options: mobilenetv1, resnet18, resnet34, resnet50, resnet101, resnet152, vgg11, vgg13, vgg16, vgg19
+  # num_classes: 10    # Optional: auto-detected from dataset
+  # in_channels: 3     # Optional: auto-detected from dataset
+
+# Training Hyperparameters
+training:
+  batch_size: 128
+  epochs: 200
+  # test_frequency: 10  # Evaluate on test set every N epochs (only when using val_split)
+
+# Optimizer Configuration
+optimizer:
+  name: "sgd"  # Options: sgd, adam, adamw
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+
+# Learning Rate Scheduler
+scheduler:
+  name: "cosine"  # Options: cosine, step, none
+  T_max: 200      # For cosine annealing (typically same as epochs)
+  warmup_epochs: 5  # Number of warmup epochs (0 to disable)
+  # step_size: 30  # For step scheduler
+  # gamma: 0.1     # For step scheduler
+
+# Mixed Precision Training (AMP)
+amp:
+  enabled: false  # Enable automatic mixed precision (CUDA only)
+
+# TensorBoard Logging
+tensorboard:
+  enabled: true  # Logs saved in experiment_dir/tensorboard/
+
+# Progress Bar Configuration
+progress:
+  enabled: true
+
+# Checkpoint Configuration
+checkpoint:
+  enabled: true
+  dir: "./experiments"  # Base directory for experiments
+  # experiment_name: "my_experiment"  # Optional: custom experiment name prefix
+  save_frequency: 10  # Save every N epochs
+  save_best: true     # Save best model based on validation/test accuracy
+  # resume: "./experiments/<experiment_dir>/checkpoints/latest.pt"  # Uncomment to resume

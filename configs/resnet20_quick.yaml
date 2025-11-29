@@ -1,0 +1,44 @@
+# Quick test config for ResNet-20 on CIFAR-10
+# Use this to verify everything works (5 epochs, ~1-2 minutes)
+# Run: python train.py --config configs/resnet20_quick.yaml
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "resnet20"
+
+training:
+  batch_size: 128
+  epochs: 5
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0001
+
+scheduler:
+  name: "cosine"
+  T_max: 5
+  warmup_epochs: 1
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: false
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: false

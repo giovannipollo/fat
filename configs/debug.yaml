@@ -1,0 +1,41 @@
+# Debug configuration - Minimal setup for debugging code changes
+# Single epoch, small batch, no checkpoints
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: true  # Fully reproducible for debugging
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 0  # No multiprocessing for easier debugging
+
+model:
+  name: "resnet18"
+
+training:
+  batch_size: 32
+  epochs: 1
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.01
+  momentum: 0.9
+  weight_decay: 0
+
+scheduler:
+  name: "none"
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: false
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: false
