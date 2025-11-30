@@ -1,0 +1,127 @@
+site_name: FAT - Training Framework
+site_description: A modular PyTorch training framework for image classification
+repo_url: https://github.com/giovannipollo/fat
+repo_name: giovannipollo/fat
+
+theme:
+  name: material
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            members_order: source
+            heading_level: 2
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.details
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+  - Models:
+    - Overview: models/index.md
+    - Standard Models: models/standard.md
+    - Quantized Models: models/quantized.md
+    - Adding a Model: models/adding-model.md
+  - Datasets:
+    - Overview: datasets/index.md
+    - Adding a Dataset: datasets/adding-dataset.md
+  - Configuration:
+    - Overview: configuration/index.md
+    - Dataset: configuration/dataset.md
+    - Model: configuration/model.md
+    - Loss: configuration/loss.md
+    - Optimizer: configuration/optimizer.md
+    - Scheduler: configuration/scheduler.md
+    - Training: configuration/training.md
+    - Checkpoints: configuration/checkpoints.md
+  - API Reference:
+    - Overview: api/index.md
+    - Datasets:
+      - Base: api/datasets/base.md
+      - CIFAR-10: api/datasets/cifar10.md
+      - CIFAR-100: api/datasets/cifar100.md
+      - MNIST: api/datasets/mnist.md
+      - FashionMNIST: api/datasets/fashion_mnist.md
+    - Models:
+      - Registry: api/models/index.md
+      - CNV: api/models/cnv.md
+      - MobileNet: api/models/mobilenet.md
+      - VGG: api/models/vgg.md
+      - ResNet CIFAR: api/models/resnet_cifar.md
+      - ResNet ImageNet: api/models/resnet_imagenet.md
+      - Quantized: api/models/quantized.md
+    - Utils:
+      - Trainer: api/utils/trainer.md
+      - Optimizer: api/utils/optimizer.md
+      - Scheduler: api/utils/scheduler.md
+      - Loss: api/utils/loss.md
+      - Experiment: api/utils/experiment.md
+      - Logging: api/utils/logging.md
+      - Config: api/utils/config.md
+      - Device: api/utils/device.md
+      - Seed: api/utils/seed.md

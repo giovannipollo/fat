@@ -1,0 +1,53 @@
+# Quantized ResNet-20 on CIFAR-10
+# 4-bit quantization-aware training (QAT) using Brevitas
+# Expected accuracy: ~88-90% after 200 epochs (slightly lower than FP32)
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+  val_split: 0.1
+
+model:
+  name: "quant_resnet20"  # Use quant_ prefix for quantized models
+
+# Quantization settings (Brevitas)
+quantization:
+  weight_bit_width: 4   # Bit width for weight quantization
+  act_bit_width: 4      # Bit width for activation quantization
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false  # Disable AMP for quantized training
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
