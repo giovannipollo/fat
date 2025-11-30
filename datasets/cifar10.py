@@ -1,11 +1,9 @@
-"""!
-@file datasets/cifar10.py
-@brief CIFAR-10 dataset implementation.
+"""CIFAR-10 dataset implementation.
 
-@details Provides the CIFAR-10 dataset with standard augmentations
+Provides the CIFAR-10 dataset with standard augmentations
 (random crop with padding, horizontal flip) for training.
 
-@see https://www.cs.toronto.edu/~kriz/cifar.html
+See: https://www.cs.toronto.edu/~kriz/cifar.html
 """
 
 from __future__ import annotations
@@ -20,51 +18,51 @@ from .base import BaseDataset
 
 
 class CIFAR10Dataset(BaseDataset):
-    """!
-    @brief CIFAR-10 dataset with standard augmentations.
+    """CIFAR-10 dataset with standard augmentations.
     
-    @details 60,000 32x32 color images in 10 classes, with 6,000 images per class.
+    60,000 32x32 color images in 10 classes, with 6,000 images per class.
     Training augmentations include random crop (32x32 with 4px padding) and
     horizontal flip.
     
-    @par Dataset Properties
-    - 10 classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck
-    - 50,000 training images, 10,000 test images
-    - Image size: 32x32 RGB
+    Attributes:
+        name: Dataset identifier ("cifar10").
+        num_classes: Number of classes (10).
+        in_channels: Number of input channels (3 for RGB).
+        image_size: Image dimensions (32, 32).
+        mean: Per-channel normalization means.
+        std: Per-channel normalization standard deviations.
+    
+    Note:
+        Classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, truck.
+        50,000 training images, 10,000 test images.
     """
 
-    ## @var name
-    #  @brief Dataset identifier
     name = "cifar10"
+    """Dataset identifier."""
     
-    ## @var num_classes
-    #  @brief Number of classification classes
     num_classes = 10
+    """Number of classification classes."""
     
-    ## @var in_channels
-    #  @brief Number of input channels (RGB)
     in_channels = 3
+    """Number of input channels (RGB)."""
     
-    ## @var image_size
-    #  @brief Image dimensions
     image_size = (32, 32)
+    """Image dimensions."""
     
-    ## @var mean
-    #  @brief Per-channel normalization means
     mean = (0.4914, 0.4822, 0.4465)
+    """Per-channel normalization means."""
     
-    ## @var std
-    #  @brief Per-channel normalization stds
     std = (0.2470, 0.2435, 0.2616)
+    """Per-channel normalization stds."""
 
     def _build_train_transform(self) -> transforms.Compose:
-        """!
-        @brief Build training transforms with augmentation.
+        """Build training transforms with augmentation.
         
-        @details Applies random crop with 4px padding and horizontal flip
+        Applies random crop with 4px padding and horizontal flip
         before normalization.
         
-        @return Composed training transforms
+        Returns:
+            Composed training transforms.
         """
         return transforms.Compose(
             [
@@ -82,14 +80,16 @@ class CIFAR10Dataset(BaseDataset):
         download: bool,
         transform: transforms.Compose,
     ) -> Dataset[Any]:
-        """!
-        @brief Load CIFAR-10 dataset from torchvision.
+        """Load CIFAR-10 dataset from torchvision.
         
-        @param root Root directory for dataset storage
-        @param train Whether to load training or test set
-        @param download Whether to download if not present
-        @param transform Transforms to apply
-        @return CIFAR-10 Dataset instance
+        Args:
+            root: Root directory for dataset storage.
+            train: Whether to load training or test set.
+            download: Whether to download if not present.
+            transform: Transforms to apply.
+            
+        Returns:
+            CIFAR-10 Dataset instance.
         """
         return torchvision.datasets.CIFAR10(
             root=root,

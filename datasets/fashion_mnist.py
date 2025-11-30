@@ -1,11 +1,9 @@
-"""!
-@file datasets/fashion_mnist.py
-@brief Fashion-MNIST dataset implementation.
+"""Fashion-MNIST dataset implementation.
 
-@details Provides the Fashion-MNIST dataset of clothing items
+Provides the Fashion-MNIST dataset of clothing items
 as a drop-in replacement for MNIST.
 
-@see https://github.com/zalandoresearch/fashion-mnist
+See: https://github.com/zalandoresearch/fashion-mnist
 """
 
 from __future__ import annotations
@@ -20,48 +18,48 @@ from .base import BaseDataset
 
 
 class FashionMNISTDataset(BaseDataset):
-    """!
-    @brief Fashion-MNIST clothing dataset.
+    """Fashion-MNIST clothing dataset.
     
-    @details 70,000 28x28 grayscale images of clothing items in 10 categories.
+    70,000 28x28 grayscale images of clothing items in 10 categories.
     Training augmentation includes horizontal flip.
     
-    @par Dataset Properties
-    - 10 classes: T-shirt/top, Trouser, Pullover, Dress, Coat, 
-      Sandal, Shirt, Sneaker, Bag, Ankle boot
-    - 60,000 training images, 10,000 test images
-    - Image size: 28x28 grayscale
+    Attributes:
+        name: Dataset identifier ("fashion_mnist").
+        num_classes: Number of clothing categories (10).
+        in_channels: Number of input channels (1 for grayscale).
+        image_size: Image dimensions (28, 28).
+        mean: Normalization mean.
+        std: Normalization standard deviation.
+    
+    Note:
+        Classes: T-shirt/top, Trouser, Pullover, Dress, Coat, 
+        Sandal, Shirt, Sneaker, Bag, Ankle boot.
+        60,000 training images, 10,000 test images.
     """
 
-    ## @var name
-    #  @brief Dataset identifier
     name = "fashion_mnist"
+    """Dataset identifier."""
     
-    ## @var num_classes
-    #  @brief Number of clothing categories
     num_classes = 10
+    """Number of clothing categories."""
     
-    ## @var in_channels
-    #  @brief Number of input channels (grayscale)
     in_channels = 1
+    """Number of input channels (grayscale)."""
     
-    ## @var image_size
-    #  @brief Image dimensions
     image_size = (28, 28)
+    """Image dimensions."""
     
-    ## @var mean
-    #  @brief Normalization mean
     mean = (0.2860,)
+    """Normalization mean."""
     
-    ## @var std
-    #  @brief Normalization std
     std = (0.3530,)
+    """Normalization std."""
 
     def _build_train_transform(self) -> transforms.Compose:
-        """!
-        @brief Build training transforms with horizontal flip.
+        """Build training transforms with horizontal flip.
         
-        @return Composed training transforms
+        Returns:
+            Composed training transforms.
         """
         return transforms.Compose(
             [
@@ -78,14 +76,16 @@ class FashionMNISTDataset(BaseDataset):
         download: bool,
         transform: transforms.Compose,
     ) -> Dataset[Any]:
-        """!
-        @brief Load Fashion-MNIST dataset from torchvision.
+        """Load Fashion-MNIST dataset from torchvision.
         
-        @param root Root directory for dataset storage
-        @param train Whether to load training or test set
-        @param download Whether to download if not present
-        @param transform Transforms to apply
-        @return Fashion-MNIST Dataset instance
+        Args:
+            root: Root directory for dataset storage.
+            train: Whether to load training or test set.
+            download: Whether to download if not present.
+            transform: Transforms to apply.
+            
+        Returns:
+            Fashion-MNIST Dataset instance.
         """
         return torchvision.datasets.FashionMNIST(
             root=root,

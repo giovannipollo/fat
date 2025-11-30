@@ -1,8 +1,6 @@
-"""!
-@file datasets/base.py
-@brief Abstract base class for all dataset implementations.
+"""Abstract base class for all dataset implementations.
 
-@details Provides a unified interface for dataset loading, transformation,
+Provides a unified interface for dataset loading, transformation,
 and data loader creation. Subclasses must implement dataset-specific
 metadata and the _load_dataset method.
 """
@@ -19,13 +17,13 @@ import random
 
 
 def _worker_init_fn(worker_id: int) -> None:
-    """!
-    @brief Initialize data loader worker with deterministic seed.
+    """Initialize data loader worker with deterministic seed.
     
-    @details Ensures reproducibility when using num_workers > 0 by
+    Ensures reproducibility when using num_workers > 0 by
     seeding each worker based on the main process's random state.
     
-    @param worker_id The ID of the worker process
+    Args:
+        worker_id: The ID of the worker process.
     """
     worker_seed = torch.initial_seed() % 2**32
     np.random.seed(worker_seed)
@@ -33,61 +31,55 @@ def _worker_init_fn(worker_id: int) -> None:
 
 
 class BaseDataset(ABC):
-    """!
-    @brief Abstract base class for all datasets.
+    """Abstract base class for all datasets.
 
-    @details Subclasses must implement dataset-specific metadata and the
+    Subclasses must implement dataset-specific metadata and the
     _load_dataset method. The class provides automatic handling of:
+    
     - Train/validation/test splits
     - Data transformations
     - DataLoader creation with reproducibility support
     
-    @par Required Class Attributes
-    - name: Dataset identifier string
-    - num_classes: Number of output classes
-    - in_channels: Number of input channels (1=grayscale, 3=RGB)
-    - image_size: Tuple of (height, width)
-    - mean: Tuple of channel means for normalization
-    - std: Tuple of channel stds for normalization
+    Attributes:
+        name: Dataset identifier string.
+        num_classes: Number of output classes.
+        in_channels: Number of input channels (1=grayscale, 3=RGB).
+        image_size: Tuple of (height, width).
+        mean: Tuple of channel means for normalization.
+        std: Tuple of channel stds for normalization.
     
-    @par Example
-    @code{.py}
-    class MyDataset(BaseDataset):
-        name = "my_dataset"
-        num_classes = 10
-        in_channels = 3
-        image_size = (32, 32)
-        mean = (0.5, 0.5, 0.5)
-        std = (0.5, 0.5, 0.5)
+    Example:
+        ```python
+        class MyDataset(BaseDataset):
+            name = "my_dataset"
+            num_classes = 10
+            in_channels = 3
+            image_size = (32, 32)
+            mean = (0.5, 0.5, 0.5)
+            std = (0.5, 0.5, 0.5)
 
-        def _load_dataset(self, root, train, download, transform):
-            return MyTorchDataset(root=root, train=train, transform=transform)
-    @endcode
+            def _load_dataset(self, root, train, download, transform):
+                return MyTorchDataset(root=root, train=train, transform=transform)
+        ```
     """
 
-    ## @var name
-    #  @brief Dataset identifier string (must be defined by subclasses)
     name: ClassVar[str]
+    """Dataset identifier string (must be defined by subclasses)."""
     
-    ## @var num_classes
-    #  @brief Number of classification classes
     num_classes: ClassVar[int]
+    """Number of classification classes."""
     
-    ## @var in_channels  
-    #  @brief Number of input image channels
     in_channels: ClassVar[int]
+    """Number of input image channels."""
     
-    ## @var image_size
-    #  @brief Input image dimensions as (height, width)
     image_size: ClassVar[Tuple[int, int]]
+    """Input image dimensions as (height, width)."""
     
-    ## @var mean
-    #  @brief Per-channel means for normalization
     mean: ClassVar[Tuple[float, ...]]
+    """Per-channel means for normalization."""
     
-    ## @var std
-    #  @brief Per-channel standard deviations for normalization
     std: ClassVar[Tuple[float, ...]]
+    """Per-channel standard deviations for normalization."""
 
     def __init__(
         self,
@@ -98,15 +90,16 @@ class BaseDataset(ABC):
         val_split: Optional[float] = None,
         seed: int = 42,
     ):
-        """!
-        @brief Initialize the dataset.
+        """Initialize the dataset.
         
-        @param root Root directory for dataset storage
-        @param batch_size Batch size for data loaders
-        @param num_workers Number of worker processes for data loading
-        @param download Whether to download dataset if not present
-        @param val_split Fraction of training data for validation (0.0-1.0), None to disable
-        @param seed Random seed for reproducible validation split
+        Args:
+            root: Root directory for dataset storage.
+            batch_size: Batch size for data loaders.
+            num_workers: Number of worker processes for data loading.
+            download: Whether to download dataset if not present.
+            val_split: Fraction of training data for validation (0.0-1.0), 
+                None to disable.
+            seed: Random seed for reproducible validation split.
         """
         self.root: str = root
         self.batch_size: int = batch_size
@@ -128,10 +121,9 @@ class BaseDataset(ABC):
         self._load_all_datasets()
 
     def _load_all_datasets(self) -> None:
-        """!
-        @brief Load train, validation, and test datasets.
+        """Load train, validation, and test datasets.
         
-        @details Handles validation split creation if val_split is specified.
+        Handles validation split creation if val_split is specified.
         """
         # Load full training dataset
         full_train_dataset: Dataset[Any] = self._load_dataset(
@@ -172,14 +164,16 @@ class BaseDataset(ABC):
         )
 
     def _create_val_dataset_with_transform(self, val_subset: Subset[Any]) -> Subset[Any]:
-        """!
-        @brief Create validation dataset with test transforms.
+        """Create validation dataset with test transforms.
         
-        @details Reloads training data with test transforms and selects
+        Reloads training data with test transforms and selects
         the same indices as the validation split.
         
-        @param val_subset The validation subset from random_split
-        @return Dataset with test transforms applied
+        Args:
+            val_subset: The validation subset from random_split.
+            
+        Returns:
+            Dataset with test transforms applied.
         """
         # Load training data again with test transforms
         train_with_test_transform: Dataset[Any] = self._load_dataset(
@@ -193,13 +187,13 @@ class BaseDataset(ABC):
         return Subset(train_with_test_transform, val_subset.indices)
 
     def _build_train_transform(self) -> transforms.Compose:
-        """!
-        @brief Build training data transforms.
+        """Build training data transforms.
         
-        @details Override this method to customize training augmentations.
+        Override this method to customize training augmentations.
         Default implementation applies ToTensor and normalization.
         
-        @return Composed transforms for training data
+        Returns:
+            Composed transforms for training data.
         """
         return transforms.Compose(
             [
@@ -209,13 +203,13 @@ class BaseDataset(ABC):
         )
 
     def _build_test_transform(self) -> transforms.Compose:
-        """!
-        @brief Build test/validation data transforms.
+        """Build test/validation data transforms.
         
-        @details Override this method to customize test transforms.
+        Override this method to customize test transforms.
         Default implementation applies ToTensor and normalization.
         
-        @return Composed transforms for test/validation data
+        Returns:
+            Composed transforms for test/validation data.
         """
         return transforms.Compose(
             [
@@ -232,28 +226,30 @@ class BaseDataset(ABC):
         download: bool,
         transform: transforms.Compose,
     ) -> Dataset[Any]:
-        """!
-        @brief Load the actual dataset (abstract method).
+        """Load the actual dataset (abstract method).
         
-        @details Must be implemented by subclasses to return a PyTorch Dataset.
+        Must be implemented by subclasses to return a PyTorch Dataset.
         
-        @param root Root directory for dataset storage
-        @param train Whether to load training or test set
-        @param download Whether to download the dataset if not present
-        @param transform Transforms to apply to the data
-        @return PyTorch Dataset instance
+        Args:
+            root: Root directory for dataset storage.
+            train: Whether to load training or test set.
+            download: Whether to download the dataset if not present.
+            transform: Transforms to apply to the data.
+            
+        Returns:
+            PyTorch Dataset instance.
         """
         pass
 
     def get_loaders(self) -> Tuple[DataLoader[Any], Optional[DataLoader[Any]], DataLoader[Any]]:
-        """!
-        @brief Get train, validation, and test data loaders.
+        """Get train, validation, and test data loaders.
         
-        @details Creates DataLoader instances with proper shuffling and
+        Creates DataLoader instances with proper shuffling and
         worker initialization for reproducibility.
         
-        @return Tuple of (train_loader, val_loader, test_loader)
-        @note val_loader is None if val_split was not specified
+        Returns:
+            Tuple of (train_loader, val_loader, test_loader).
+            val_loader is None if val_split was not specified.
         """
         # Create a seeded generator for reproducible shuffling
         # This ensures the same batch order across runs with num_workers > 0
@@ -290,9 +286,10 @@ class BaseDataset(ABC):
 
     @property
     def has_validation(self) -> bool:
-        """!
-        @brief Check if validation set is available.
-        @return True if validation dataset exists
+        """Check if validation set is available.
+        
+        Returns:
+            True if validation dataset exists.
         """
         return self.val_dataset is not None
 

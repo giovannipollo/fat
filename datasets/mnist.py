@@ -1,10 +1,8 @@
-"""!
-@file datasets/mnist.py
-@brief MNIST handwritten digits dataset implementation.
+"""MNIST handwritten digits dataset implementation.
 
-@details Provides the classic MNIST dataset of handwritten digits 0-9.
+Provides the classic MNIST dataset of handwritten digits 0-9.
 
-@see http://yann.lecun.com/exdb/mnist/
+See: http://yann.lecun.com/exdb/mnist/
 """
 
 from __future__ import annotations
@@ -19,41 +17,41 @@ from .base import BaseDataset
 
 
 class MNISTDataset(BaseDataset):
-    """!
-    @brief MNIST handwritten digits dataset.
+    """MNIST handwritten digits dataset.
     
-    @details 70,000 28x28 grayscale images of handwritten digits (0-9).
+    70,000 28x28 grayscale images of handwritten digits (0-9).
     No augmentation is applied by default.
     
-    @par Dataset Properties
-    - 10 classes: digits 0-9
-    - 60,000 training images, 10,000 test images
-    - Image size: 28x28 grayscale
+    Attributes:
+        name: Dataset identifier ("mnist").
+        num_classes: Number of digit classes (10).
+        in_channels: Number of input channels (1 for grayscale).
+        image_size: Image dimensions (28, 28).
+        mean: Normalization mean.
+        std: Normalization standard deviation.
+    
+    Note:
+        Classes: digits 0-9.
+        60,000 training images, 10,000 test images.
     """
 
-    ## @var name
-    #  @brief Dataset identifier
     name = "mnist"
+    """Dataset identifier."""
     
-    ## @var num_classes
-    #  @brief Number of digit classes
     num_classes = 10
+    """Number of digit classes."""
     
-    ## @var in_channels
-    #  @brief Number of input channels (grayscale)
     in_channels = 1
+    """Number of input channels (grayscale)."""
     
-    ## @var image_size
-    #  @brief Image dimensions
     image_size = (28, 28)
+    """Image dimensions."""
     
-    ## @var mean
-    #  @brief Normalization mean
     mean = (0.1307,)
+    """Normalization mean."""
     
-    ## @var std
-    #  @brief Normalization std
     std = (0.3081,)
+    """Normalization std."""
 
     def _load_dataset(
         self,
@@ -62,14 +60,16 @@ class MNISTDataset(BaseDataset):
         download: bool,
         transform: transforms.Compose,
     ) -> Dataset[Any]:
-        """!
-        @brief Load MNIST dataset from torchvision.
+        """Load MNIST dataset from torchvision.
         
-        @param root Root directory for dataset storage
-        @param train Whether to load training or test set
-        @param download Whether to download if not present
-        @param transform Transforms to apply
-        @return MNIST Dataset instance
+        Args:
+            root: Root directory for dataset storage.
+            train: Whether to load training or test set.
+            download: Whether to download if not present.
+            transform: Transforms to apply.
+            
+        Returns:
+            MNIST Dataset instance.
         """
         return torchvision.datasets.MNIST(
             root=root,
