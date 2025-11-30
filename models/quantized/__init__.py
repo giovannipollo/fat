@@ -1,12 +1,10 @@
-"""!
-@file models/quantized/__init__.py
-@brief Quantized model module initialization.
+"""Quantized model module initialization.
 
-@details Provides quantized versions of all models using Brevitas for
+Provides quantized versions of all models using Brevitas for
 quantization-aware training (QAT). Supports configurable bit widths
 for weights and activations.
 
-@see get_quantized_model for the main factory function
+See: get_quantized_model for the main factory function
 """
 
 from __future__ import annotations

@@ -1,8 +1,6 @@
-"""!
-@file models/quantized/vgg.py
-@brief Quantized VGG models using Brevitas.
+"""Quantized VGG models using Brevitas.
 
-@details Implements quantized versions of VGG-11, VGG-13, VGG-16, and VGG-19
+Implements quantized versions of VGG-11, VGG-13, VGG-16, and VGG-19
 with configurable bit widths for weights and activations.
 """
 
@@ -15,8 +13,7 @@ import torch.nn as nn
 import brevitas.nn as qnn
 
 
-## @var CFG
-#  @brief VGG layer configurations. Numbers denote output channels, 'M' denotes max pooling.
+#: VGG layer configurations. Numbers denote output channels, 'M' denotes max pooling.
 CFG: Dict[str, List[Union[int, str]]] = {
     "vgg11": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "vgg13": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
@@ -32,10 +29,9 @@ CFG: Dict[str, List[Union[int, str]]] = {
 
 
 class QuantVGG(nn.Module):
-    """!
-    @brief Quantized VGG model adapted for small images.
-    
-    @details Quantized version with configurable bit widths for
+    """Quantized VGG model adapted for small images.
+
+    Quantized version with configurable bit widths for
     weights and activations.
     """
 
@@ -48,15 +44,15 @@ class QuantVGG(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized VGG model.
-        
-        @param cfg Layer configuration list
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels
-        @param batch_norm Whether to use batch normalization
-        @param weight_bit_width Bit width for weights
-        @param act_bit_width Bit width for activations
+        """Initialize quantized VGG model.
+
+        Args:
+            cfg: Layer configuration list.
+            num_classes: Number of output classes.
+            in_channels: Number of input channels.
+            batch_norm: Whether to use batch normalization.
+            weight_bit_width: Bit width for weights.
+            act_bit_width: Bit width for activations.
         """
         super().__init__()
         self.in_channels = in_channels
@@ -91,13 +87,15 @@ class QuantVGG(nn.Module):
         in_channels: int,
         batch_norm: bool,
     ) -> nn.Sequential:
-        """!
-        @brief Build the quantized feature extraction layers.
-        
-        @param cfg Layer configuration list
-        @param in_channels Number of input channels
-        @param batch_norm Whether to include batch normalization
-        @return Sequential container of layers
+        """Build the quantized feature extraction layers.
+
+        Args:
+            cfg: Layer configuration list.
+            in_channels: Number of input channels.
+            batch_norm: Whether to include batch normalization.
+
+        Returns:
+            Sequential container of layers.
         """
         layers: List[nn.Module] = []
         current_channels: int = in_channels
@@ -126,9 +124,7 @@ class QuantVGG(nn.Module):
         return nn.Sequential(*layers)
 
     def _initialize_weights(self) -> None:
-        """!
-        @brief Initialize network weights using Kaiming initialization.
-        """
+        """Initialize network weights using Kaiming initialization."""
         for m in self.modules():
             if isinstance(m, qnn.QuantConv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -142,11 +138,13 @@ class QuantVGG(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through quantized VGG network.
-        
-        @param x Input tensor of shape (N, C, H, W)
-        @return Output logits of shape (N, num_classes)
+        """Forward pass through quantized VGG network.
+
+        Args:
+            x: Input tensor of shape (N, C, H, W).
+
+        Returns:
+            Output logits of shape (N, num_classes).
         """
         out = self.quant_inp(x)
         out = self.features(out)
@@ -162,9 +160,7 @@ def QuantVGG11(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantVGG:
-    """!
-    @brief Create quantized VGG-11 model with batch normalization.
-    """
+    """Create quantized VGG-11 model with batch normalization."""
     return QuantVGG(
         CFG["vgg11"], num_classes, in_channels, batch_norm=True,
         weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
@@ -177,9 +173,7 @@ def QuantVGG13(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantVGG:
-    """!
-    @brief Create quantized VGG-13 model with batch normalization.
-    """
+    """Create quantized VGG-13 model with batch normalization."""
     return QuantVGG(
         CFG["vgg13"], num_classes, in_channels, batch_norm=True,
         weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
@@ -192,9 +186,7 @@ def QuantVGG16(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantVGG:
-    """!
-    @brief Create quantized VGG-16 model with batch normalization.
-    """
+    """Create quantized VGG-16 model with batch normalization."""
     return QuantVGG(
         CFG["vgg16"], num_classes, in_channels, batch_norm=True,
         weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
@@ -207,9 +199,7 @@ def QuantVGG19(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantVGG:
-    """!
-    @brief Create quantized VGG-19 model with batch normalization.
-    """
+    """Create quantized VGG-19 model with batch normalization."""
     return QuantVGG(
         CFG["vgg19"], num_classes, in_channels, batch_norm=True,
         weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,

@@ -1,11 +1,9 @@
-"""!
-@file models/mobilenet.py
-@brief MobileNetV1 architecture adapted for small images.
+"""MobileNetV1 architecture adapted for small images.
 
-@details Implementation of MobileNetV1 with depthwise separable convolutions,
+Implementation of MobileNetV1 with depthwise separable convolutions,
 adapted for CIFAR-10/100 (32x32) and MNIST (28x28) inputs.
 
-@see https://arxiv.org/abs/1704.04861
+See: https://arxiv.org/abs/1704.04861
 """
 
 from __future__ import annotations
@@ -17,21 +15,20 @@ import torch.nn as nn
 
 
 class DepthwiseSeparableBlock(nn.Module):
-    """!
-    @brief Depthwise Separable Convolution Block.
-    
-    @details Consists of a depthwise convolution (per-channel spatial filtering)
+    """Depthwise Separable Convolution Block.
+
+    Consists of a depthwise convolution (per-channel spatial filtering)
     followed by a pointwise convolution (1x1 cross-channel mixing).
     This reduces computation compared to standard convolutions.
     """
 
     def __init__(self, in_planes: int, out_planes: int, stride: int = 1):
-        """!
-        @brief Initialize depthwise separable block.
-        
-        @param in_planes Number of input channels
-        @param out_planes Number of output channels
-        @param stride Stride for the depthwise convolution
+        """Initialize depthwise separable block.
+
+        Args:
+            in_planes: Number of input channels.
+            out_planes: Number of output channels.
+            stride: Stride for the depthwise convolution.
         """
         super().__init__()
         # Depthwise convolution
@@ -54,11 +51,13 @@ class DepthwiseSeparableBlock(nn.Module):
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through depthwise separable block.
-        
-        @param x Input tensor of shape (N, C_in, H, W)
-        @return Output tensor of shape (N, C_out, H', W')
+        """Forward pass through depthwise separable block.
+
+        Args:
+            x: Input tensor of shape (N, C_in, H, W).
+
+        Returns:
+            Output tensor of shape (N, C_out, H', W').
         """
         out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
         out = self.relu(self.bn2(self.conv2(out)))
@@ -66,23 +65,21 @@ class DepthwiseSeparableBlock(nn.Module):
 
 
 class MobileNetV1(nn.Module):
-    """!
-    @brief MobileNetV1 adapted for small images.
-    
-    @details Modified from the original ImageNet architecture:
+    """MobileNetV1 adapted for small images.
+
+    Modified from the original ImageNet architecture:
     - Initial stride is 1 (vs 2) to preserve resolution for 32x32 inputs
     - Fewer downsampling operations to prevent features from becoming too small
     - Supports both RGB (3-channel) and grayscale (1-channel) inputs
-    
-    @par Architecture
-    - Initial 3x3 conv -> 32 channels
-    - 13 depthwise separable blocks
-    - Global average pooling
-    - Fully connected classifier
+
+    Architecture:
+        - Initial 3x3 conv -> 32 channels
+        - 13 depthwise separable blocks
+        - Global average pooling
+        - Fully connected classifier
     """
 
-    ## @var CFG
-    #  @brief Architecture configuration: list of (out_channels, stride) tuples
+    #: Architecture configuration: list of (out_channels, stride) tuples
     CFG: ClassVar[List[Tuple[int, int]]] = [
         (64, 1),
         (128, 2),
@@ -100,11 +97,11 @@ class MobileNetV1(nn.Module):
     ]
 
     def __init__(self, num_classes: int = 10, in_channels: int = 3):
-        """!
-        @brief Initialize MobileNetV1.
-        
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels (3 for RGB, 1 for grayscale)
+        """Initialize MobileNetV1.
+
+        Args:
+            num_classes: Number of output classes.
+            in_channels: Number of input channels (3 for RGB, 1 for grayscale).
         """
         super().__init__()
 
@@ -125,11 +122,13 @@ class MobileNetV1(nn.Module):
         self.linear = nn.Linear(1024, num_classes)
 
     def _make_layers(self, in_planes: int) -> nn.Sequential:
-        """!
-        @brief Build the sequence of depthwise separable blocks.
-        
-        @param in_planes Number of input channels to the first block
-        @return Sequential container of depthwise separable blocks
+        """Build the sequence of depthwise separable blocks.
+
+        Args:
+            in_planes: Number of input channels to the first block.
+
+        Returns:
+            Sequential container of depthwise separable blocks.
         """
         layers: List[nn.Module] = []
         for out_planes, stride in self.CFG:
@@ -138,11 +137,13 @@ class MobileNetV1(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through MobileNetV1.
-        
-        @param x Input tensor of shape (N, C, H, W)
-        @return Output logits of shape (N, num_classes)
+        """Forward pass through MobileNetV1.
+
+        Args:
+            x: Input tensor of shape (N, C, H, W).
+
+        Returns:
+            Output logits of shape (N, num_classes).
         """
         out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
         out = self.layers(out)

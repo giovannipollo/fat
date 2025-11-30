@@ -1,8 +1,7 @@
-"""!
-@file utils/trainer.py
-@brief Trainer class for training and evaluating models.
+"""Trainer class for training and evaluating models.
 
-@details Provides a complete training loop with support for:
+Provides a complete training loop with support for:
+
 - Progress bars with tqdm
 - Checkpoint saving/loading
 - Learning rate warmup
@@ -28,28 +27,42 @@ from .loss import LossFactory
 
 
 class Trainer:
-    """!
-    @brief Trainer class for training and evaluating models.
+    """Trainer class for training and evaluating models.
     
-    @details Orchestrates the training process using modular components:
+    Orchestrates the training process using modular components:
+    
     - OptimizerFactory: Creates optimizers from config
     - SchedulerFactory: Creates schedulers with warmup support
     - ExperimentManager: Handles checkpoints and experiment organization
     - MetricsLogger: Handles TensorBoard and console logging
     
-    @par Features
-    - Progress bars with tqdm
-    - Checkpoint saving/loading with meaningful experiment names
-    - Learning rate warmup
-    - Mixed precision training (AMP)
-    - TensorBoard logging
-    - Config saving for experiment reproducibility
+    Features:
+        - Progress bars with tqdm
+        - Checkpoint saving/loading with meaningful experiment names
+        - Learning rate warmup
+        - Mixed precision training (AMP)
+        - TensorBoard logging
+        - Config saving for experiment reproducibility
     
-    @par Usage
-    @code{.py}
-    trainer = Trainer(model, train_loader, test_loader, config, device)
-    trainer.train()
-    @endcode
+    Example:
+        ```python
+        trainer = Trainer(model, train_loader, test_loader, config, device)
+        trainer.train()
+        ```
+    
+    Attributes:
+        model: The model being trained.
+        train_loader: DataLoader for training data.
+        val_loader: Optional DataLoader for validation data.
+        test_loader: DataLoader for test data.
+        config: Full configuration dictionary.
+        device: Compute device (cuda/mps/cpu).
+        criterion: Loss function.
+        optimizer: Optimizer instance.
+        scheduler: Learning rate scheduler.
+        use_amp: Whether AMP is enabled.
+        experiment: Experiment manager for checkpoints.
+        logger: Metrics logger for TensorBoard and console.
     """
 
     def __init__(
@@ -61,15 +74,15 @@ class Trainer:
         device: torch.device,
         val_loader: Optional[DataLoader[Any]] = None,
     ) -> None:
-        """!
-        @brief Initialize the trainer.
+        """Initialize the trainer.
         
-        @param model The model to train (will be moved to device)
-        @param train_loader DataLoader for training data
-        @param test_loader DataLoader for test data
-        @param config Full configuration dictionary
-        @param device Compute device (cuda/mps/cpu)
-        @param val_loader Optional DataLoader for validation data
+        Args:
+            model: The model to train (will be moved to device).
+            train_loader: DataLoader for training data.
+            test_loader: DataLoader for test data.
+            config: Full configuration dictionary.
+            device: Compute device (cuda/mps/cpu).
+            val_loader: Optional DataLoader for validation data.
         """
         self.model: nn.Module = model.to(device)
         self.train_loader: DataLoader[Any] = train_loader
@@ -123,18 +136,21 @@ class Trainer:
 
     @property
     def has_validation(self) -> bool:
-        """!
-        @brief Check if validation loader is available.
-        @return True if validation data is available
+        """Check if validation loader is available.
+        
+        Returns:
+            True if validation data is available.
         """
         return self.val_loader is not None
 
     def train_epoch(self, epoch: int) -> Tuple[float, float]:
-        """!
-        @brief Train for one epoch.
+        """Train for one epoch.
         
-        @param epoch Current epoch number (for progress bar display)
-        @return Tuple of (average_loss, accuracy)
+        Args:
+            epoch: Current epoch number (for progress bar display).
+            
+        Returns:
+            Tuple of (average_loss, accuracy).
         """
         self.model.train()
         running_loss = 0.0
@@ -194,12 +210,14 @@ class Trainer:
 
     @torch.no_grad()
     def evaluate(self, loader: DataLoader[Any], desc: str = "Evaluating") -> Tuple[float, float]:
-        """!
-        @brief Evaluate model on a given dataloader.
+        """Evaluate model on a given dataloader.
         
-        @param loader DataLoader to evaluate on
-        @param desc Description for progress bar
-        @return Tuple of (average_loss, accuracy)
+        Args:
+            loader: DataLoader to evaluate on.
+            desc: Description for progress bar.
+            
+        Returns:
+            Tuple of (average_loss, accuracy).
         """
         self.model.eval()
         running_loss = 0.0
@@ -239,29 +257,30 @@ class Trainer:
         return avg_loss, accuracy
 
     def validate(self) -> Tuple[float, float]:
-        """!
-        @brief Evaluate model on validation set.
+        """Evaluate model on validation set.
         
-        @return Tuple of (average_loss, accuracy)
-        @throws ValueError If no validation set is available
+        Returns:
+            Tuple of (average_loss, accuracy).
+            
+        Raises:
+            ValueError: If no validation set is available.
         """
         if self.val_loader is None:
             raise ValueError("No validation set available")
         return self.evaluate(self.val_loader, desc="Validating")
 
     def test(self) -> Tuple[float, float]:
-        """!
-        @brief Evaluate model on test set.
+        """Evaluate model on test set.
         
-        @return Tuple of (average_loss, accuracy)
+        Returns:
+            Tuple of (average_loss, accuracy).
         """
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
-        """!
-        @brief Run the full training loop.
+        """Run the full training loop.
         
-        @details Executes training for the configured number of epochs,
+        Executes training for the configured number of epochs,
         handling validation/test evaluation, checkpointing, and logging.
         """
         epochs: int = self.config["training"]["epochs"]

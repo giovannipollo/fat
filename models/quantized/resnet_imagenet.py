@@ -1,8 +1,6 @@
-"""!
-@file models/quantized/resnet_imagenet.py
-@brief Quantized ResNet models for ImageNet-style architectures using Brevitas.
+"""Quantized ResNet models for ImageNet-style architectures using Brevitas.
 
-@details Implements quantized versions of ResNet-18 through ResNet-152
+Implements quantized versions of ResNet-18 through ResNet-152
 with configurable bit widths for weights and activations.
 """
 
@@ -17,9 +15,7 @@ import brevitas.nn as qnn
 
 
 class QuantBasicBlock(nn.Module):
-    """!
-    @brief Quantized basic residual block for ResNet-18 and ResNet-34.
-    """
+    """Quantized basic residual block for ResNet-18 and ResNet-34."""
 
     expansion: ClassVar[int] = 1
 
@@ -32,15 +28,15 @@ class QuantBasicBlock(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized basic residual block.
-        
-        @param in_planes Number of input channels
-        @param planes Number of output channels
-        @param stride Stride for first convolution
-        @param downsample Optional downsampling layer
-        @param weight_bit_width Bit width for weights
-        @param act_bit_width Bit width for activations
+        """Initialize quantized basic residual block.
+
+        Args:
+            in_planes: Number of input channels.
+            planes: Number of output channels.
+            stride: Stride for first convolution.
+            downsample: Optional downsampling layer.
+            weight_bit_width: Bit width for weights.
+            act_bit_width: Bit width for activations.
         """
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
@@ -49,21 +45,19 @@ class QuantBasicBlock(nn.Module):
         )
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu1 = self._make_quant_relu(act_bit_width)
-        
+
         self.conv2 = self._make_quant_conv2d(
             planes, planes, kernel_size=3, stride=1, padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(planes)
         self.relu2 = self._make_quant_relu(act_bit_width)
-        
+
         self.downsample = downsample
         self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass with residual connection.
-        """
+        """Forward pass with residual connection."""
         identity = x
 
         out = self.conv1(x)
@@ -83,9 +77,7 @@ class QuantBasicBlock(nn.Module):
 
 
 class QuantBottleneck(nn.Module):
-    """!
-    @brief Quantized bottleneck residual block for ResNet-50, 101, 152.
-    """
+    """Quantized bottleneck residual block for ResNet-50, 101, 152."""
 
     expansion: ClassVar[int] = 4
 
@@ -98,9 +90,7 @@ class QuantBottleneck(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized bottleneck residual block.
-        """
+        """Initialize quantized bottleneck residual block."""
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
             in_planes, planes, kernel_size=1,
@@ -108,28 +98,26 @@ class QuantBottleneck(nn.Module):
         )
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu1 = self._make_quant_relu(act_bit_width)
-        
+
         self.conv2 = self._make_quant_conv2d(
             planes, planes, kernel_size=3, stride=stride, padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(planes)
         self.relu2 = self._make_quant_relu(act_bit_width)
-        
+
         self.conv3 = self._make_quant_conv2d(
             planes, planes * self.expansion, kernel_size=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
         self.relu3 = self._make_quant_relu(act_bit_width)
-        
+
         self.downsample = downsample
         self.stride = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass with residual connection.
-        """
+        """Forward pass with residual connection."""
         identity = x
 
         out = self.conv1(x)
@@ -156,9 +144,7 @@ BlockType = Union[Type[QuantBasicBlock], Type[QuantBottleneck]]
 
 
 class QuantResNetBase(nn.Module, ABC):
-    """!
-    @brief Quantized base ResNet model adapted for small images.
-    """
+    """Quantized base ResNet model adapted for small images."""
 
     block: ClassVar[BlockType]
     layers: ClassVar[List[int]]
@@ -170,13 +156,13 @@ class QuantResNetBase(nn.Module, ABC):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized ResNet base model.
-        
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels
-        @param weight_bit_width Bit width for weights
-        @param act_bit_width Bit width for activations
+        """Initialize quantized ResNet base model.
+
+        Args:
+            num_classes: Number of output classes.
+            in_channels: Number of input channels.
+            weight_bit_width: Bit width for weights.
+            act_bit_width: Bit width for activations.
         """
         super().__init__()
         self.in_planes: int = 64
@@ -217,9 +203,7 @@ class QuantResNetBase(nn.Module, ABC):
         num_blocks: int,
         stride: int = 1,
     ) -> nn.Sequential:
-        """!
-        @brief Build a stage of quantized residual blocks.
-        """
+        """Build a stage of quantized residual blocks."""
         downsample: Optional[nn.Module] = None
         if stride != 1 or self.in_planes != planes * self.block.expansion:
             downsample = nn.Sequential(
@@ -247,9 +231,7 @@ class QuantResNetBase(nn.Module, ABC):
         return nn.Sequential(*layers)
 
     def _initialize_weights(self) -> None:
-        """!
-        @brief Initialize weights using Kaiming initialization.
-        """
+        """Initialize weights using Kaiming initialization."""
         for m in self.modules():
             if isinstance(m, qnn.QuantConv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -258,9 +240,7 @@ class QuantResNetBase(nn.Module, ABC):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through quantized ResNet.
-        """
+        """Forward pass through quantized ResNet."""
         out = self.quant_inp(x)
         out = self.conv1(out)
         out = self.bn1(out)
@@ -279,40 +259,30 @@ class QuantResNetBase(nn.Module, ABC):
 
 
 class QuantResNet18(QuantResNetBase):
-    """!
-    @brief Quantized ResNet-18 model.
-    """
+    """Quantized ResNet-18 model."""
     block = QuantBasicBlock
     layers = [2, 2, 2, 2]
 
 
 class QuantResNet34(QuantResNetBase):
-    """!
-    @brief Quantized ResNet-34 model.
-    """
+    """Quantized ResNet-34 model."""
     block = QuantBasicBlock
     layers = [3, 4, 6, 3]
 
 
 class QuantResNet50(QuantResNetBase):
-    """!
-    @brief Quantized ResNet-50 model.
-    """
+    """Quantized ResNet-50 model."""
     block = QuantBottleneck
     layers = [3, 4, 6, 3]
 
 
 class QuantResNet101(QuantResNetBase):
-    """!
-    @brief Quantized ResNet-101 model.
-    """
+    """Quantized ResNet-101 model."""
     block = QuantBottleneck
     layers = [3, 4, 23, 3]
 
 
 class QuantResNet152(QuantResNetBase):
-    """!
-    @brief Quantized ResNet-152 model.
-    """
+    """Quantized ResNet-152 model."""
     block = QuantBottleneck
     layers = [3, 8, 36, 3]

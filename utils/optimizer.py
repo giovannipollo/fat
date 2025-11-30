@@ -1,8 +1,6 @@
-"""!
-@file utils/optimizer.py
-@brief Optimizer factory for creating optimizers from configuration.
+"""Optimizer factory for creating optimizers from configuration.
 
-@details Provides a factory pattern for instantiating PyTorch optimizers
+Provides a factory pattern for instantiating PyTorch optimizers
 (SGD, Adam, AdamW) based on YAML configuration dictionaries.
 """
 
@@ -15,36 +13,46 @@ from torch import nn
 
 
 class OptimizerFactory:
-    """!
-    @brief Factory class for creating optimizers from configuration.
+    """Factory class for creating optimizers from configuration.
     
-    @details Supports SGD, Adam, and AdamW optimizers with their
+    Supports SGD, Adam, and AdamW optimizers with their
     respective hyperparameters extracted from config dictionaries.
     
-    @par Supported Optimizers
-    - sgd: Stochastic Gradient Descent with momentum
-    - adam: Adam optimizer
-    - adamw: AdamW optimizer with decoupled weight decay
+    Supported Optimizers:
+        - sgd: Stochastic Gradient Descent with momentum
+        - adam: Adam optimizer
+        - adamw: AdamW optimizer with decoupled weight decay
+    
+    Attributes:
+        OPTIMIZERS: Registry of available optimizer classes.
+    
+    Example:
+        ```python
+        optimizer = OptimizerFactory.create(model, config)
+        ```
     """
     
-    ## @var OPTIMIZERS
-    #  @brief Registry of available optimizer classes
     OPTIMIZERS: Dict[str, Type[optim.Optimizer]] = {
         "sgd": optim.SGD,
         "adam": optim.Adam,
         "adamw": optim.AdamW,
     }
+    """Registry of available optimizer classes."""
     
     @classmethod
     def create(cls, model: nn.Module, config: Dict[str, Any]) -> optim.Optimizer:
-        """!
-        @brief Create an optimizer based on configuration.
+        """Create an optimizer based on configuration.
         
-        @param model The model whose parameters will be optimized
-        @param config Configuration dictionary with optimizer settings
-                      under config["optimizer"]
-        @return Configured optimizer instance
-        @throws ValueError If the optimizer name is unknown
+        Args:
+            model: The model whose parameters will be optimized.
+            config: Configuration dictionary with optimizer settings
+                under config["optimizer"].
+        
+        Returns:
+            Configured optimizer instance.
+            
+        Raises:
+            ValueError: If the optimizer name is unknown.
         """
         opt_config: Dict[str, Any] = config["optimizer"]
         opt_name: str = opt_config["name"].lower()
@@ -75,9 +83,9 @@ class OptimizerFactory:
     
     @classmethod
     def available_optimizers(cls) -> List[str]:
-        """!
-        @brief Get list of available optimizer names.
+        """Get list of available optimizer names.
         
-        @return List of supported optimizer name strings
+        Returns:
+            List of supported optimizer name strings.
         """
         return list(cls.OPTIMIZERS.keys())

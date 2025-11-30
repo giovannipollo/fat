@@ -1,11 +1,9 @@
-"""!
-@file models/cnv.py
-@brief CNV (Compact Neural Vision) model adapted for small images.
+"""CNV (Compact Neural Vision) model adapted for small images.
 
-@details Implementation of the CNV architecture, a compact convolutional network
+Implementation of the CNV architecture, a compact convolutional network
 designed for efficient inference. Originally from AMD/Xilinx Brevitas examples.
 
-@see https://github.com/Xilinx/brevitas
+See: https://github.com/Xilinx/brevitas
 """
 
 from __future__ import annotations
@@ -17,8 +15,7 @@ import torch.nn as nn
 from utils.tensor_norm import TensorNorm
 
 
-## @var CNV_OUT_CH_POOL
-#  @brief Configuration for conv layers: (output_channels, use_pooling)
+#: Configuration for conv layers: (output_channels, use_pooling)
 CNV_OUT_CH_POOL: List[Tuple[int, bool]] = [
     (64, True),
     (128, False),
@@ -27,39 +24,34 @@ CNV_OUT_CH_POOL: List[Tuple[int, bool]] = [
     (256, False),
 ]
 
-## @var INTERMEDIATE_FC_FEATURES
-#  @brief Configuration for intermediate FC layers: (in_features, out_features)
+#: Configuration for intermediate FC layers: (in_features, out_features)
 INTERMEDIATE_FC_FEATURES: List[Tuple[int, int]] = [
     (256, 512),
     (512, 512),
 ]
 
-## @var LAST_FC_IN_FEATURES
-#  @brief Input features for the final classification layer
+#: Input features for the final classification layer
 LAST_FC_IN_FEATURES: int = 512
 
-## @var POOL_SIZE
-#  @brief Max pooling kernel size
+#: Max pooling kernel size
 POOL_SIZE: int = 2
 
-## @var KERNEL_SIZE
-#  @brief Convolution kernel size
+#: Convolution kernel size
 KERNEL_SIZE: int = 3
 
 
 class CNV(nn.Module):
-    """!
-    @brief CNV (Compact Neural Vision) model.
+    """CNV (Compact Neural Vision) model.
 
-    @details A compact convolutional neural network with:
+    A compact convolutional neural network with:
     - 6 convolutional layers with batch normalization and ReLU
     - 2 max pooling layers
     - 2 intermediate fully connected layers
     - Final classification layer
 
-    @par Architecture
-    - Conv layers: 64 -> 64 -> 128 -> 128 -> 256 -> 256 channels
-    - FC layers: 256 -> 512 -> 512 -> num_classes
+    Architecture:
+        - Conv layers: 64 -> 64 -> 128 -> 128 -> 256 -> 256 channels
+        - FC layers: 256 -> 512 -> 512 -> num_classes
     """
 
     def __init__(
@@ -67,11 +59,11 @@ class CNV(nn.Module):
         num_classes: int = 10,
         in_channels: int = 3,
     ):
-        """!
-        @brief Initialize CNV model.
+        """Initialize CNV model.
 
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels (3=RGB, 1=grayscale)
+        Args:
+            num_classes: Number of output classes.
+            in_channels: Number of input channels (3=RGB, 1=grayscale).
         """
         super().__init__()
 
@@ -130,19 +122,19 @@ class CNV(nn.Module):
         self._initialize_weights()
 
     def _initialize_weights(self) -> None:
-        """!
-        @brief Initialize weights using uniform distribution.
-        """
+        """Initialize weights using uniform distribution."""
         for m in self.modules():
             if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
                 torch.nn.init.uniform_(m.weight.data, -1, 1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through CNV network.
+        """Forward pass through CNV network.
 
-        @param x Input tensor of shape (N, C, H, W)
-        @return Output logits of shape (N, num_classes)
+        Args:
+            x: Input tensor of shape (N, C, H, W).
+
+        Returns:
+            Output logits of shape (N, num_classes).
         """
         for mod in self.conv_features:
             x = mod(x)

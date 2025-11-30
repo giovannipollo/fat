@@ -1,8 +1,6 @@
-"""!
-@file utils/loss.py
-@brief Loss function factory for creating loss functions from configuration.
+"""Loss function factory for creating loss functions from configuration.
 
-@details Provides a factory pattern for instantiating PyTorch loss functions
+Provides a factory pattern for instantiating PyTorch loss functions
 based on YAML configuration dictionaries.
 """
 
@@ -16,26 +14,33 @@ from .losses import SqrHingeLoss
 
 
 class LossFactory:
-    """!
-    @brief Factory class for creating loss functions from configuration.
+    """Factory class for creating loss functions from configuration.
     
-    @details Supports common classification loss functions with their
+    Supports common classification loss functions with their
     respective hyperparameters extracted from config dictionaries.
     
-    @par Supported Loss Functions
-    - cross_entropy: CrossEntropyLoss (default)
-    - nll: Negative Log Likelihood Loss
-    - mse: Mean Squared Error Loss
-    - l1: L1 Loss (Mean Absolute Error)
-    - smooth_l1: Smooth L1 Loss (Huber Loss)
-    - bce: Binary Cross Entropy Loss
-    - bce_with_logits: Binary Cross Entropy with Logits Loss
-    - kl_div: Kullback-Leibler Divergence Loss
-    - sqr_hinge: Squared Hinge Loss (for SVM-style training)
+    Supported Loss Functions:
+        - cross_entropy: CrossEntropyLoss (default)
+        - nll: Negative Log Likelihood Loss
+        - mse: Mean Squared Error Loss
+        - l1: L1 Loss (Mean Absolute Error)
+        - smooth_l1: Smooth L1 Loss (Huber Loss)
+        - bce: Binary Cross Entropy Loss
+        - bce_with_logits: Binary Cross Entropy with Logits Loss
+        - kl_div: Kullback-Leibler Divergence Loss
+        - sqr_hinge: Squared Hinge Loss (for SVM-style training)
+    
+    Attributes:
+        LOSSES: Registry of available loss function classes.
+    
+    Example:
+        ```yaml
+        loss:
+          name: "cross_entropy"
+          label_smoothing: 0.1
+        ```
     """
     
-    ## @var LOSSES
-    #  @brief Registry of available loss function classes
     LOSSES: Dict[str, Type[nn.Module]] = {
         "cross_entropy": nn.CrossEntropyLoss,
         "nll": nn.NLLLoss,
@@ -47,23 +52,27 @@ class LossFactory:
         "kl_div": nn.KLDivLoss,
         "sqr_hinge": SqrHingeLoss,
     }
+    """Registry of available loss function classes."""
     
     @classmethod
     def create(cls, config: Dict[str, Any]) -> nn.Module:
-        """!
-        @brief Create a loss function based on configuration.
+        """Create a loss function based on configuration.
         
-        @param config Configuration dictionary with optional loss settings
-                      under config["loss"]
-        @return Configured loss function instance
-        @throws ValueError If the loss name is unknown
+        Args:
+            config: Configuration dictionary with optional loss settings
+                under config["loss"].
         
-        @par Example Config
-        @code{.yaml}
-        loss:
-          name: "cross_entropy"
-          label_smoothing: 0.1  # Optional, for cross_entropy
-        @endcode
+        Returns:
+            Configured loss function instance.
+            
+        Raises:
+            ValueError: If the loss name is unknown.
+        
+        Example:
+            ```python
+            config = {"loss": {"name": "cross_entropy", "label_smoothing": 0.1}}
+            criterion = LossFactory.create(config)
+            ```
         """
         loss_config: Dict[str, Any] = config.get("loss", {})
         loss_name: str = loss_config.get("name", "cross_entropy").lower()
@@ -114,9 +123,9 @@ class LossFactory:
     
     @classmethod
     def available_losses(cls) -> List[str]:
-        """!
-        @brief Get list of available loss function names.
+        """Get list of available loss function names.
         
-        @return List of supported loss function name strings
+        Returns:
+            List of supported loss function name strings.
         """
         return list(cls.LOSSES.keys())

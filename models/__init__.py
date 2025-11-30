@@ -1,12 +1,11 @@
-"""!
-@file models/__init__.py
-@brief Model module initialization and registry.
+"""Model module initialization and registry.
 
-@details Provides a unified interface for creating neural network models
+Provides a unified interface for creating neural network models
 through a registry pattern. Includes ResNet (CIFAR and ImageNet variants),
 VGG, MobileNet, CNV architectures, and their quantized versions using Brevitas.
 
-@see get_model for the main factory function
+See Also:
+    get_model: Main factory function.
 """
 
 from __future__ import annotations
@@ -39,12 +38,9 @@ from .quantized import (
     QuantMobileNetV1,
 )
 
-## @var ModelType
-#  @brief Type alias for model factories (class or callable returning nn.Module)
 ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
+"""Type alias for model factories (class or callable returning nn.Module)."""
 
-## @var MODELS
-#  @brief Registry mapping model names to their implementation classes/factories.
 MODELS: Dict[str, ModelType] = {
     # CNV
     "cnv": CNV,
@@ -68,9 +64,8 @@ MODELS: Dict[str, ModelType] = {
     "vgg16": VGG16,
     "vgg19": VGG19,
 }
+"""Registry mapping model names to their implementation classes/factories."""
 
-## @var QUANT_MODELS
-#  @brief Registry mapping quantized model names to their implementation classes.
 QUANT_MODELS: Dict[str, ModelType] = {
     # Quantized CNV
     "quant_cnv": QuantCNV,
@@ -94,35 +89,40 @@ QUANT_MODELS: Dict[str, ModelType] = {
     "quant_vgg16": QuantVGG16,
     "quant_vgg19": QuantVGG19,
 }
+"""Registry mapping quantized model names to their implementation classes."""
 
 # Merge both registries
 MODELS.update(QUANT_MODELS)
 
 
 def get_model(config: Dict[str, Any]) -> nn.Module:
-    """!
-    @brief Factory function to create a model from configuration.
+    """Factory function to create a model from configuration.
     
-    @details Looks up the model name in the MODELS registry and instantiates
+    Looks up the model name in the MODELS registry and instantiates
     it with the appropriate parameters. For quantized models (prefixed with
     'quant_'), also passes weight_bit_width and act_bit_width from the
     quantization config section.
     
-    @param config Configuration dictionary containing model settings
-                  under config["model"] and optionally config["quantization"]
-    @return Initialized nn.Module model
-    @throws ValueError If the model name is not found in the registry
+    Args:
+        config: Configuration dictionary containing model settings
+            under config["model"] and optionally config["quantization"].
     
-    @par Example Configuration (YAML)
-    @code{.yaml}
-    model:
-      name: "quant_resnet20"
-      num_classes: 10
+    Returns:
+        Initialized nn.Module model.
+        
+    Raises:
+        ValueError: If the model name is not found in the registry.
     
-    quantization:
-      weight_bit_width: 4
-      act_bit_width: 4
-    @endcode
+    Example:
+        ```yaml
+        model:
+          name: "quant_resnet20"
+          num_classes: 10
+        
+        quantization:
+          weight_bit_width: 4
+          act_bit_width: 4
+        ```
     """
     model_name: str = config["model"]["name"].lower()
     num_classes: int = config["model"].get("num_classes", 10)

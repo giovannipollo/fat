@@ -1,8 +1,6 @@
-"""!
-@file utils/__init__.py
-@brief Training utilities module for the PyTorch training framework.
+"""Training utilities module for the PyTorch training framework.
 
-@details Exports core utilities and modular components for training,
+Exports core utilities and modular components for training,
 including device management, configuration loading, reproducibility,
 and the main Trainer class.
 """

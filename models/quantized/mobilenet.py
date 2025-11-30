@@ -1,8 +1,6 @@
-"""!
-@file models/quantized/mobilenet.py
-@brief Quantized MobileNetV1 using Brevitas.
+"""Quantized MobileNetV1 using Brevitas.
 
-@details Implements quantized version of MobileNetV1 with depthwise
+Implements quantized version of MobileNetV1 with depthwise
 separable convolutions and configurable bit widths.
 """
 
@@ -16,10 +14,9 @@ import brevitas.nn as qnn
 
 
 class QuantDepthwiseSeparableBlock(nn.Module):
-    """!
-    @brief Quantized Depthwise Separable Convolution Block.
-    
-    @details Quantized version consisting of a depthwise convolution
+    """Quantized Depthwise Separable Convolution Block.
+
+    Quantized version consisting of a depthwise convolution
     followed by a pointwise convolution.
     """
 
@@ -31,14 +28,14 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized depthwise separable block.
-        
-        @param in_planes Number of input channels
-        @param out_planes Number of output channels
-        @param stride Stride for the depthwise convolution
-        @param weight_bit_width Bit width for weights
-        @param act_bit_width Bit width for activations
+        """Initialize quantized depthwise separable block.
+
+        Args:
+            in_planes: Number of input channels.
+            out_planes: Number of output channels.
+            stride: Stride for the depthwise convolution.
+            weight_bit_width: Bit width for weights.
+            act_bit_width: Bit width for activations.
         """
         super().__init__()
         # Quantized depthwise convolution
@@ -58,24 +55,20 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         self.relu2 = self._make_quant_relu(act_bit_width)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through quantized depthwise separable block.
-        """
+        """Forward pass through quantized depthwise separable block."""
         out = self.relu1(self.bn1(self.conv1(x)))
         out = self.relu2(self.bn2(self.conv2(out)))
         return out
 
 
 class QuantMobileNetV1(nn.Module):
-    """!
-    @brief Quantized MobileNetV1 adapted for small images.
-    
-    @details Quantized version with configurable bit widths for
+    """Quantized MobileNetV1 adapted for small images.
+
+    Quantized version with configurable bit widths for
     weights and activations.
     """
 
-    ## @var CFG
-    #  @brief Architecture configuration: list of (out_channels, stride) tuples
+    #: Architecture configuration: list of (out_channels, stride) tuples
     CFG: ClassVar[List[Tuple[int, int]]] = [
         (64, 1),
         (128, 2),
@@ -99,13 +92,13 @@ class QuantMobileNetV1(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized MobileNetV1.
-        
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels
-        @param weight_bit_width Bit width for weights
-        @param act_bit_width Bit width for activations
+        """Initialize quantized MobileNetV1.
+
+        Args:
+            num_classes: Number of output classes.
+            in_channels: Number of input channels.
+            weight_bit_width: Bit width for weights.
+            act_bit_width: Bit width for activations.
         """
         super().__init__()
         self.in_channels = in_channels
@@ -132,11 +125,13 @@ class QuantMobileNetV1(nn.Module):
         )
 
     def _make_layers(self, in_planes: int) -> nn.Sequential:
-        """!
-        @brief Build the sequence of quantized depthwise separable blocks.
-        
-        @param in_planes Number of input channels to the first block
-        @return Sequential container of blocks
+        """Build the sequence of quantized depthwise separable blocks.
+
+        Args:
+            in_planes: Number of input channels to the first block.
+
+        Returns:
+            Sequential container of blocks.
         """
         layers: List[nn.Module] = []
         for out_planes, stride in self.CFG:
@@ -148,11 +143,13 @@ class QuantMobileNetV1(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through quantized MobileNetV1.
-        
-        @param x Input tensor of shape (N, C, H, W)
-        @return Output logits of shape (N, num_classes)
+        """Forward pass through quantized MobileNetV1.
+
+        Args:
+            x: Input tensor of shape (N, C, H, W).
+
+        Returns:
+            Output logits of shape (N, num_classes).
         """
         out = self.quant_inp(x)
         out = self.relu(self.bn1(self.conv1(out)))

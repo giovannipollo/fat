@@ -1,8 +1,6 @@
-"""!
-@file utils/experiment.py
-@brief Experiment manager for checkpoints and experiment organization.
+"""Experiment manager for checkpoints and experiment organization.
 
-@details Handles experiment directory structure, checkpoint saving/loading,
+Handles experiment directory structure, checkpoint saving/loading,
 and configuration persistence for reproducibility.
 """
 
@@ -23,28 +21,27 @@ except ImportError:
 
 
 class ExperimentManager:
-    """!
-    @brief Manages experiment directories, checkpoints, and configuration saving.
-    
-    @details Provides organized experiment tracking with:
+    """Manages experiment directories, checkpoints, and configuration saving.
+
+    Provides organized experiment tracking with:
+
     - Auto-generated experiment names (model_dataset_timestamp)
     - Directory structure: experiments/<name>/checkpoints/, tensorboard/
     - Config saving for reproducibility
     - Checkpoint saving/loading with best model tracking
-    
-    @par Directory Structure
-    @code
-    experiments/
-      resnet18_cifar10_20240101_120000/
-        config.yaml
-        training_log.txt
-        checkpoints/
-          best.pt
-          latest.pt
-          epoch_0010.pt
-        tensorboard/
-          events.out.tfevents.*
-    @endcode
+
+    Directory Structure::
+
+        experiments/
+          resnet18_cifar10_20240101_120000/
+            config.yaml
+            training_log.txt
+            checkpoints/
+              best.pt
+              latest.pt
+              epoch_0010.pt
+            tensorboard/
+              events.out.tfevents.*
     """
 
     def __init__(
@@ -56,40 +53,42 @@ class ExperimentManager:
         save_frequency: int = 10,
         save_best: bool = True,
     ) -> None:
-        """!
-        @brief Initialize the experiment manager.
-        
-        @param config Full configuration dictionary
-        @param enabled Whether checkpointing is enabled
-        @param base_dir Base directory for experiments
-        @param experiment_name Optional custom experiment name prefix
-        @param save_frequency How often to save periodic checkpoints (epochs)
-        @param save_best Whether to save the best model
+        """Initialize the experiment manager.
+
+        Args:
+            config: Full configuration dictionary.
+            enabled: Whether checkpointing is enabled.
+            base_dir: Base directory for experiments.
+            experiment_name: Optional custom experiment name prefix.
+            save_frequency: How often to save periodic checkpoints (epochs).
+            save_best: Whether to save the best model.
         """
         self.config: Dict[str, Any] = config
         self.enabled: bool = enabled
         self.save_frequency: int = save_frequency
         self.save_best: bool = save_best
-        
+
         # Directories
         self.experiment_dir: Optional[Path] = None
         self.checkpoint_dir: Optional[Path] = None
         self.tensorboard_dir: Optional[Path] = None
-        
+
         if enabled:
             self._setup_experiment_dir(base_dir, experiment_name)
 
     def _generate_experiment_name(self, custom_name: Optional[str] = None) -> str:
-        """!
-        @brief Generate a meaningful experiment name from config.
-        
-        @param custom_name Optional custom prefix
-        @return Experiment name string (format: [prefix_]model_dataset_timestamp)
+        """Generate a meaningful experiment name from config.
+
+        Args:
+            custom_name: Optional custom prefix.
+
+        Returns:
+            Experiment name string (format: [prefix_]model_dataset_timestamp).
         """
         model_name: str = self.config["model"]["name"].lower()
         dataset_name: str = self.config["dataset"]["name"].lower()
         timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         if custom_name:
             return f"{custom_name}_{model_name}_{dataset_name}_{timestamp}"
         else:
@@ -100,36 +99,35 @@ class ExperimentManager:
         base_dir: str,
         custom_name: Optional[str] = None,
     ):
-        """!
-        @brief Setup experiment directory structure.
-        
-        @param base_dir Base directory for experiments
-        @param custom_name Optional custom experiment name prefix
+        """Setup experiment directory structure.
+
+        Args:
+            base_dir: Base directory for experiments.
+            custom_name: Optional custom experiment name prefix.
         """
         base_path: Path = Path(base_dir)
         experiment_name: str = self._generate_experiment_name(custom_name)
-        
+
         self.experiment_dir = base_path / experiment_name
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.tensorboard_dir = self.experiment_dir / "tensorboard"
-        
+
         # Create directories
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         self.tensorboard_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Save config
         self._save_config()
 
     def _save_config(self) -> None:
-        """!
-        @brief Save configuration to the experiment directory.
-        
-        @details Saves as YAML if available, otherwise as text representation.
+        """Save configuration to the experiment directory.
+
+        Saves as YAML if available, otherwise as text representation.
         """
         if self.experiment_dir is None:
             return
-        
+
         if YAML_AVAILABLE:
             import yaml as yaml_module
             config_path: Path = self.experiment_dir / "config.yaml"
@@ -140,7 +138,7 @@ class ExperimentManager:
             config_path = self.experiment_dir / "config.txt"
             with open(config_path, "w") as f:
                 f.write(str(self.config))
-        
+
         print(f"Config saved to: {config_path}")
 
     def save_checkpoint(
@@ -155,22 +153,22 @@ class ExperimentManager:
         is_best: bool = False,
         test_acc: Optional[float] = None,
     ):
-        """!
-        @brief Save a model checkpoint.
-        
-        @param epoch Current epoch number (0-indexed)
-        @param model The model to save
-        @param optimizer The optimizer state
-        @param scheduler The scheduler state (can be None)
-        @param best_acc Best accuracy achieved so far
-        @param current_acc Current epoch's accuracy
-        @param scaler GradScaler for AMP (optional)
-        @param is_best Whether this is the best model so far
-        @param test_acc Test accuracy (for best model with validation)
+        """Save a model checkpoint.
+
+        Args:
+            epoch: Current epoch number (0-indexed).
+            model: The model to save.
+            optimizer: The optimizer state.
+            scheduler: The scheduler state (can be None).
+            best_acc: Best accuracy achieved so far.
+            current_acc: Current epoch's accuracy.
+            scaler: GradScaler for AMP (optional).
+            is_best: Whether this is the best model so far.
+            test_acc: Test accuracy (for best model with validation).
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
-        
+
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
@@ -180,19 +178,19 @@ class ExperimentManager:
             "current_acc": current_acc,
             "config": self.config,
         }
-        
+
         # Save scaler state if using AMP
         if scaler is not None:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
-        
+
         # Save periodic checkpoint
         checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
-        
+
         # Save latest checkpoint (always overwritten)
         latest_path: Path = self.checkpoint_dir / "latest.pt"
         torch.save(checkpoint, latest_path)
-        
+
         # Save best checkpoint
         if is_best and self.save_best:
             # Include test accuracy in best checkpoint
@@ -214,82 +212,88 @@ class ExperimentManager:
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
     ) -> Tuple[int, float]:
-        """!
-        @brief Load a model checkpoint.
-        
-        @param checkpoint_path Path to the checkpoint file
-        @param model Model to load state into
-        @param optimizer Optimizer to load state into
-        @param scheduler Scheduler to load state into (can be None)
-        @param scaler GradScaler for AMP (optional)
-        @param device Device to load the checkpoint to
-        @return Tuple of (start_epoch, best_acc)
+        """Load a model checkpoint.
+
+        Args:
+            checkpoint_path: Path to the checkpoint file.
+            model: Model to load state into.
+            optimizer: Optimizer to load state into.
+            scheduler: Scheduler to load state into (can be None).
+            scaler: GradScaler for AMP (optional).
+            device: Device to load the checkpoint to.
+
+        Returns:
+            Tuple of (start_epoch, best_acc).
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             print(f"Warning: Checkpoint not found at {checkpoint_path}")
             return 0, 0.0
-        
+
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
-        
+
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        
+
         if scheduler and checkpoint.get("scheduler_state_dict"):
             scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-        
+
         # Load scaler state if using AMP
         if scaler is not None and "scaler_state_dict" in checkpoint:
             scaler.load_state_dict(checkpoint["scaler_state_dict"])
-        
+
         start_epoch: int = checkpoint["epoch"] + 1
         best_acc: float = checkpoint.get("best_acc", 0.0)
-        
+
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
         return start_epoch, best_acc
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
-        """!
-        @brief Check if a checkpoint should be saved at this epoch.
-        
-        @param epoch Current epoch number (0-indexed)
-        @param is_best Whether this is the best model
-        @return True if checkpoint should be saved
+        """Check if a checkpoint should be saved at this epoch.
+
+        Args:
+            epoch: Current epoch number (0-indexed).
+            is_best: Whether this is the best model.
+
+        Returns:
+            True if checkpoint should be saved.
         """
         if not self.enabled:
             return False
         return (epoch + 1) % self.save_frequency == 0 or is_best
 
     def get_tensorboard_dir(self) -> Optional[Path]:
-        """!
-        @brief Get the TensorBoard log directory.
-        
-        @return Path to TensorBoard directory, or None if disabled
+        """Get the TensorBoard log directory.
+
+        Returns:
+            Path to TensorBoard directory, or None if disabled.
         """
         return self.tensorboard_dir
 
     def get_experiment_dir(self) -> Optional[Path]:
-        """!
-        @brief Get the experiment directory.
-        
-        @return Path to experiment directory, or None if disabled
+        """Get the experiment directory.
+
+        Returns:
+            Path to experiment directory, or None if disabled.
         """
         return self.experiment_dir
 
     def cleanup_old_checkpoints(self, keep_last_n: int = 5):
-        """!
-        @brief Remove old periodic checkpoints, keeping only the last N.
-        
-        @param keep_last_n Number of recent checkpoints to keep
-        @note Does not remove best.pt or latest.pt
+        """Remove old periodic checkpoints, keeping only the last N.
+
+        Args:
+            keep_last_n: Number of recent checkpoints to keep.
+
+        Note:
+            Does not remove best.pt or latest.pt.
         """
         if self.checkpoint_dir is None:
             return
-        
+
         # Find all epoch checkpoints
         checkpoints: list[Path] = sorted(self.checkpoint_dir.glob("epoch_*.pt"))
-        
+
         # Keep best.pt and latest.pt, remove old epoch checkpoints
         if len(checkpoints) > keep_last_n:
             for ckpt in checkpoints[:-keep_last_n]:
@@ -298,11 +302,13 @@ class ExperimentManager:
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> ExperimentManager:
-        """!
-        @brief Create an ExperimentManager from configuration.
-        
-        @param config Full configuration dictionary
-        @return Configured ExperimentManager instance
+        """Create an ExperimentManager from configuration.
+
+        Args:
+            config: Full configuration dictionary.
+
+        Returns:
+            Configured ExperimentManager instance.
         """
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         return cls(

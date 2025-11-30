@@ -1,8 +1,6 @@
-"""!
-@file utils/config.py
-@brief Configuration loading utilities.
+"""Configuration loading utilities.
 
-@details Provides functions for loading YAML configuration files
+Provides functions for loading YAML configuration files
 used to specify training hyperparameters, model architecture, etc.
 """
 
@@ -15,12 +13,16 @@ import yaml
 
 
 def load_config(config_path: Union[str, Path]) -> Dict[str, Any]:
-    """!
-    @brief Load configuration from a YAML file.
-    
-    @param config_path Path to the YAML configuration file
-    @return Configuration dictionary
-    @throws FileNotFoundError If the configuration file doesn't exist
+    """Load configuration from a YAML file.
+
+    Args:
+        config_path: Path to the YAML configuration file.
+
+    Returns:
+        Configuration dictionary.
+
+    Raises:
+        FileNotFoundError: If the configuration file doesn't exist.
     """
     config_path = Path(config_path)
 

@@ -1,8 +1,6 @@
-"""!
-@file models/quantized/resnet_cifar.py
-@brief Quantized ResNet models for CIFAR using Brevitas.
+"""Quantized ResNet models for CIFAR using Brevitas.
 
-@details Implements quantized versions of CIFAR-specific ResNet architectures
+Implements quantized versions of CIFAR-specific ResNet architectures
 with configurable bit widths for weights and activations.
 """
 
@@ -16,10 +14,9 @@ import brevitas.nn as qnn
 
 
 class QuantBasicBlock(nn.Module):
-    """!
-    @brief Quantized basic residual block for CIFAR ResNets.
+    """Quantized basic residual block for CIFAR ResNets.
 
-    @details Two quantized 3x3 convolutions with batch normalization,
+    Two quantized 3x3 convolutions with batch normalization,
     quantized ReLU activations, and skip connection.
     """
 
@@ -34,15 +31,15 @@ class QuantBasicBlock(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized basic residual block.
+        """Initialize quantized basic residual block.
 
-        @param in_planes Number of input channels
-        @param planes Number of output channels
-        @param stride Stride for first convolution
-        @param downsample Optional downsampling layer for skip connection
-        @param weight_bit_width Bit width for weight quantization
-        @param act_bit_width Bit width for activation quantization
+        Args:
+            in_planes: Number of input channels.
+            planes: Number of output channels.
+            stride: Stride for first convolution.
+            downsample: Optional downsampling layer for skip connection.
+            weight_bit_width: Bit width for weight quantization.
+            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
@@ -70,11 +67,13 @@ class QuantBasicBlock(nn.Module):
         self.downsample = downsample
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass with residual connection.
+        """Forward pass with residual connection.
 
-        @param x Input tensor
-        @return Output tensor with skip connection added
+        Args:
+            x: Input tensor.
+
+        Returns:
+            Output tensor with skip connection added.
         """
         identity = x
 
@@ -95,10 +94,9 @@ class QuantBasicBlock(nn.Module):
 
 
 class QuantResNetCIFAR(nn.Module):
-    """!
-    @brief Quantized CIFAR-specific ResNet architecture.
+    """Quantized CIFAR-specific ResNet architecture.
 
-    @details Quantized version following the original paper's CIFAR-10 architecture
+    Quantized version following the original paper's CIFAR-10 architecture
     with configurable bit widths for weights and activations.
     """
 
@@ -110,14 +108,14 @@ class QuantResNetCIFAR(nn.Module):
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
     ):
-        """!
-        @brief Initialize quantized CIFAR ResNet.
+        """Initialize quantized CIFAR ResNet.
 
-        @param num_blocks Number of blocks per stage
-        @param num_classes Number of output classes
-        @param in_channels Number of input channels
-        @param weight_bit_width Bit width for weight quantization
-        @param act_bit_width Bit width for activation quantization
+        Args:
+            num_blocks: Number of blocks per stage.
+            num_classes: Number of output classes.
+            in_channels: Number of input channels.
+            weight_bit_width: Bit width for weight quantization.
+            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
         self.in_planes: int = 16
@@ -154,13 +152,15 @@ class QuantResNetCIFAR(nn.Module):
         self._initialize_weights()
 
     def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
-        """!
-        @brief Build a stage of quantized residual blocks.
+        """Build a stage of quantized residual blocks.
 
-        @param planes Number of output channels
-        @param num_blocks Number of blocks in the stage
-        @param stride Stride for the first block
-        @return Sequential container of residual blocks
+        Args:
+            planes: Number of output channels.
+            num_blocks: Number of blocks in the stage.
+            stride: Stride for the first block.
+
+        Returns:
+            Sequential container of residual blocks.
         """
         downsample: Optional[nn.Module] = None
         if stride != 1 or self.in_planes != planes:
@@ -200,9 +200,7 @@ class QuantResNetCIFAR(nn.Module):
         return nn.Sequential(*layers)
 
     def _initialize_weights(self) -> None:
-        """!
-        @brief Initialize weights using Kaiming initialization.
-        """
+        """Initialize weights using Kaiming initialization."""
         for m in self.modules():
             if isinstance(m, qnn.QuantConv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
@@ -211,11 +209,13 @@ class QuantResNetCIFAR(nn.Module):
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """!
-        @brief Forward pass through quantized ResNet.
+        """Forward pass through quantized ResNet.
 
-        @param x Input tensor of shape (N, C, H, W)
-        @return Output logits of shape (N, num_classes)
+        Args:
+            x: Input tensor of shape (N, C, H, W).
+
+        Returns:
+            Output logits of shape (N, num_classes).
         """
         out = self.quant_inp(x)
         out = self.conv1(out)
@@ -239,14 +239,16 @@ def QuantResNet20(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantResNetCIFAR:
-    """!
-    @brief Create quantized ResNet-20 for CIFAR.
+    """Create quantized ResNet-20 for CIFAR.
 
-    @param num_classes Number of output classes
-    @param in_channels Number of input channels
-    @param weight_bit_width Bit width for weights
-    @param act_bit_width Bit width for activations
-    @return Quantized ResNet-20 model
+    Args:
+        num_classes: Number of output classes.
+        in_channels: Number of input channels.
+        weight_bit_width: Bit width for weights.
+        act_bit_width: Bit width for activations.
+
+    Returns:
+        Quantized ResNet-20 model.
     """
     return QuantResNetCIFAR(
         3, num_classes, in_channels, weight_bit_width, act_bit_width
@@ -259,9 +261,7 @@ def QuantResNet32(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantResNetCIFAR:
-    """!
-    @brief Create quantized ResNet-32 for CIFAR.
-    """
+    """Create quantized ResNet-32 for CIFAR."""
     return QuantResNetCIFAR(
         5, num_classes, in_channels, weight_bit_width, act_bit_width
     )
@@ -273,9 +273,7 @@ def QuantResNet44(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantResNetCIFAR:
-    """!
-    @brief Create quantized ResNet-44 for CIFAR.
-    """
+    """Create quantized ResNet-44 for CIFAR."""
     return QuantResNetCIFAR(
         7, num_classes, in_channels, weight_bit_width, act_bit_width
     )
@@ -287,9 +285,7 @@ def QuantResNet56(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantResNetCIFAR:
-    """!
-    @brief Create quantized ResNet-56 for CIFAR.
-    """
+    """Create quantized ResNet-56 for CIFAR."""
     return QuantResNetCIFAR(
         9, num_classes, in_channels, weight_bit_width, act_bit_width
     )
@@ -301,9 +297,7 @@ def QuantResNet110(
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
 ) -> QuantResNetCIFAR:
-    """!
-    @brief Create quantized ResNet-110 for CIFAR.
-    """
+    """Create quantized ResNet-110 for CIFAR."""
     return QuantResNetCIFAR(
         18, num_classes, in_channels, weight_bit_width, act_bit_width
     )
