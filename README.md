@@ -7,8 +7,10 @@ A modular PyTorch training framework for image classification, with support for 
 
 ## Features
 
-- **Modular architecture** with pluggable components (optimizer, scheduler, logging, checkpoints)
-- Multiple model architectures (ResNet, VGG, MobileNet)
+- **Modular architecture** with pluggable components (optimizer, scheduler, loss, logging, checkpoints)
+- Multiple model architectures (ResNet, VGG, MobileNet, CNV)
+- **Quantization-aware training (QAT)** with Brevitas for all model architectures
+- **Configurable loss functions** including cross-entropy, squared hinge, and more
 - Multiple datasets with automatic configuration
 - Reproducible training with seed control
 - Learning rate warmup with multiple scheduler options
@@ -19,53 +21,64 @@ A modular PyTorch training framework for image classification, with support for 
 - Validation split support
 - Progress bars with tqdm
 
+> [!TIP]
+> See [CONFIG.md](CONFIG.md) for a complete reference of all configuration parameters.
+
 ## Project Structure
 
 ```
 training-framework/
 ├── configs/
-│   ├── default.yaml          # Default training configuration
-│   ├── quick_test.yaml       # Fast iteration testing
-│   ├── debug.yaml            # Debugging configuration
-│   ├── fast_amp_training.yaml # Mixed precision training
-│   ├── resnet18_cifar10.yaml # ResNet-18 on CIFAR-10
-│   ├── resnet50_cifar100.yaml # ResNet-50 on CIFAR-100
-│   ├── resnet152_cifar100.yaml # ResNet-152 on CIFAR-100
-│   ├── vgg16_cifar10.yaml    # VGG-16 on CIFAR-10
-│   ├── mobilenetv1_cifar10.yaml # MobileNetV1 on CIFAR-10
-│   ├── resnet18_mnist.yaml   # ResNet-18 on MNIST
-│   └── resnet18_fashion_mnist.yaml # ResNet-18 on FashionMNIST
+│   ├── default.yaml              # Default training configuration
+│   ├── quick_test.yaml           # Fast iteration testing
+│   ├── debug.yaml                # Debugging configuration
+│   ├── fast_amp_training.yaml    # Mixed precision training
+│   ├── cnv_cifar10.yaml          # CNV on CIFAR-10
+│   ├── quant_cnv_cifar10.yaml    # Quantized CNV on CIFAR-10
+│   ├── quant_resnet20_cifar10.yaml # Quantized ResNet-20 on CIFAR-10
+│   ├── resnet18_cifar10.yaml     # ResNet-18 on CIFAR-10
+│   ├── resnet20_cifar10.yaml     # ResNet-20 on CIFAR-10
+│   └── ...                       # More configuration examples
 ├── datasets/
-│   ├── __init__.py           # Dataset registry and utilities
-│   ├── base.py               # BaseDataset abstract class
-│   ├── cifar10.py            # CIFAR-10 dataset
-│   ├── cifar100.py           # CIFAR-100 dataset
-│   ├── mnist.py              # MNIST dataset
-│   └── fashion_mnist.py      # FashionMNIST dataset
+│   ├── __init__.py               # Dataset registry and utilities
+│   ├── base.py                   # BaseDataset abstract class
+│   ├── cifar10.py                # CIFAR-10 dataset
+│   ├── cifar100.py               # CIFAR-100 dataset
+│   ├── mnist.py                  # MNIST dataset
+│   └── fashion_mnist.py          # FashionMNIST dataset
 ├── models/
-│   ├── __init__.py           # Model registry
-│   ├── mobilenet.py          # MobileNetV1 architecture
-│   ├── resnet_base.py        # ResNet base class and blocks
-│   ├── resnet18.py           # ResNet-18
-│   ├── resnet34.py           # ResNet-34
-│   ├── resnet50.py           # ResNet-50
-│   ├── resnet101.py          # ResNet-101
-│   ├── resnet152.py          # ResNet-152
-│   └── vgg.py                # VGG architectures (11, 13, 16, 19)
+│   ├── __init__.py               # Model registry
+│   ├── cnv.py                    # CNV (Compact Neural Vision) architecture
+│   ├── mobilenet.py              # MobileNetV1 architecture
+│   ├── vgg.py                    # VGG architectures (11, 13, 16, 19)
+│   ├── resnet_cifar/             # ResNet variants for CIFAR (20, 32, 44, 56, 110)
+│   ├── resnet_imagenet/          # ResNet variants for ImageNet (18, 34, 50, 101, 152)
+│   └── quantized/                # Quantized models using Brevitas
+│       ├── __init__.py
+│       ├── cnv.py                # Quantized CNV
+│       ├── mobilenet.py          # Quantized MobileNetV1
+│       ├── resnet_cifar.py       # Quantized ResNet (CIFAR variants)
+│       ├── resnet_imagenet.py    # Quantized ResNet (ImageNet variants)
+│       └── vgg.py                # Quantized VGG
 ├── utils/
-│   ├── __init__.py           # Exports all utilities
-│   ├── config.py             # YAML config loader
-│   ├── device.py             # Device detection (CUDA/MPS/CPU)
-│   ├── experiment.py         # Experiment management & checkpoints
-│   ├── logging.py            # TensorBoard & console logging
-│   ├── optimizer.py          # Optimizer factory
-│   ├── scheduler.py          # Scheduler factory with warmup
-│   ├── seed.py               # Reproducibility utilities
-│   └── trainer.py            # Training loop orchestration
-├── experiments/              # Auto-generated experiment directories
-├── data/                     # Downloaded datasets
-├── runs/                     # TensorBoard logs (when not using experiments)
-└── train.py                  # Main entry point
+│   ├── __init__.py               # Exports all utilities
+│   ├── config.py                 # YAML config loader
+│   ├── device.py                 # Device detection (CUDA/MPS/CPU)
+│   ├── experiment.py             # Experiment management & checkpoints
+│   ├── logging.py                # TensorBoard & console logging
+│   ├── loss.py                   # Loss function factory
+│   ├── optimizer.py              # Optimizer factory
+│   ├── scheduler.py              # Scheduler factory with warmup
+│   ├── seed.py                   # Reproducibility utilities
+│   ├── trainer.py                # Training loop orchestration
+│   └── losses/                   # Custom loss functions
+│       ├── __init__.py
+│       └── sqr_hinge.py          # Squared hinge loss
+├── experiments/                  # Auto-generated experiment directories
+├── data/                         # Downloaded datasets
+├── runs/                         # TensorBoard logs (when not using experiments)
+├── CONFIG.md                     # Configuration reference
+└── train.py                      # Main entry point
 ```
 
 ## Installation
@@ -80,10 +93,16 @@ python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 
 # Install dependencies
+pip install -r requirements.txt
+
+# Or install manually
 pip install torch torchvision pyyaml tqdm
 
 # Optional: TensorBoard for logging
 pip install tensorboard
+
+# Optional: Brevitas for quantization-aware training
+pip install brevitas
 ```
 
 ## Quick Start
@@ -102,9 +121,17 @@ python train.py --config configs/my_experiment.yaml
 
 ## Supported Models
 
+### Standard Models
+
 | Model | Name | Parameters | Description |
 |-------|------|------------|-------------|
+| CNV | `cnv` | ~1.5M | Compact Neural Vision network |
 | MobileNetV1 | `mobilenetv1` | ~3.2M | Lightweight, efficient |
+| ResNet-20 | `resnet20` | ~0.27M | ResNet for CIFAR (shallow) |
+| ResNet-32 | `resnet32` | ~0.46M | ResNet for CIFAR |
+| ResNet-44 | `resnet44` | ~0.66M | ResNet for CIFAR |
+| ResNet-56 | `resnet56` | ~0.85M | ResNet for CIFAR |
+| ResNet-110 | `resnet110` | ~1.7M | ResNet for CIFAR (deep) |
 | ResNet-18 | `resnet18` | ~11.2M | Good balance of speed/accuracy |
 | ResNet-34 | `resnet34` | ~21.3M | Deeper ResNet |
 | ResNet-50 | `resnet50` | ~23.5M | Bottleneck architecture |
@@ -114,6 +141,31 @@ python train.py --config configs/my_experiment.yaml
 | VGG-13 | `vgg13` | ~9.4M | Deeper VGG |
 | VGG-16 | `vgg16` | ~14.7M | Popular VGG variant |
 | VGG-19 | `vgg19` | ~20.0M | Deepest VGG |
+
+### Quantized Models (Brevitas)
+
+All standard models have quantized versions with configurable bit-widths. Use the `quant_` prefix:
+
+| Model | Name | Description |
+|-------|------|-------------|
+| Quantized CNV | `quant_cnv` | Quantized CNV |
+| Quantized MobileNetV1 | `quant_mobilenetv1` | Quantized MobileNet |
+| Quantized ResNet-20 | `quant_resnet20` | Quantized ResNet-20 |
+| Quantized ResNet-56 | `quant_resnet56` | Quantized ResNet-56 |
+| Quantized ResNet-18 | `quant_resnet18` | Quantized ResNet-18 |
+| Quantized VGG-16 | `quant_vgg16` | Quantized VGG-16 |
+| ... | `quant_*` | All models support quantization |
+
+Example quantized model configuration:
+
+```yaml
+model:
+  name: "quant_resnet20"
+
+quantization:
+  weight_bit_width: 4   # 1-8 bits
+  act_bit_width: 4      # 1-8 bits
+```
 
 All models are adapted for CIFAR-sized images (32x32) and support both RGB and grayscale inputs.
 
@@ -128,7 +180,9 @@ All models are adapted for CIFAR-sized images (32x32) and support both RGB and g
 
 ## Configuration
 
-All training parameters are configured via YAML files. Here's the full configuration reference:
+All training parameters are configured via YAML files. See [CONFIG.md](CONFIG.md) for the complete reference.
+
+Here's a quick overview of the main configuration sections:
 
 ```yaml
 # Reproducibility
@@ -144,13 +198,20 @@ dataset:
   download: true        # Download if not present
   num_workers: 16       # DataLoader workers
   val_split: 0.1        # Optional: fraction of training data for validation (0.0-1.0)
-  seed: 42              # Optional: random seed for reproducible validation split
 
 # Model Configuration
 model:
-  name: "resnet18"      # See "Supported Models" table above
-  # num_classes: 10     # Optional: auto-detected from dataset
-  # in_channels: 3      # Optional: auto-detected from dataset
+  name: "resnet20"      # See "Supported Models" table above
+
+# Quantization (for quant_* models only)
+quantization:
+  weight_bit_width: 4   # Bit width for weights (1-8)
+  act_bit_width: 4      # Bit width for activations (1-8)
+
+# Loss Function
+loss:
+  name: "cross_entropy" # Options: cross_entropy, nll, mse, sqr_hinge, etc.
+  label_smoothing: 0.1  # Optional: label smoothing factor
 
 # Training Hyperparameters
 training:
@@ -169,11 +230,6 @@ scheduler:
   name: "cosine"        # Options: cosine, step, multistep, exponential, plateau, none
   T_max: 200            # For cosine (typically same as epochs)
   warmup_epochs: 5      # Linear warmup epochs (0 to disable)
-  # step_size: 30       # For step scheduler
-  # milestones: [30, 60, 90]  # For multistep scheduler
-  # gamma: 0.1          # For step/multistep/exponential scheduler
-  # factor: 0.1         # For plateau scheduler
-  # patience: 10        # For plateau scheduler
 
 # Mixed Precision Training (AMP)
 amp:
@@ -191,12 +247,22 @@ progress:
 # Checkpoints
 checkpoint:
   enabled: true
-  dir: "./experiments"    # Base directory for experiments
-  experiment_name: ""     # Optional custom experiment name
-  save_frequency: 10      # Save every N epochs
-  save_best: true         # Save best model by validation/test accuracy
-  # resume: "./experiments/resnet18_cifar10_20240101_120000/checkpoints/latest.pt"
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true
 ```
+
+### Supported Loss Functions
+
+| Loss | Name | Description |
+|------|------|-------------|
+| Cross-Entropy | `cross_entropy` | Standard classification loss (default) |
+| NLL | `nll` | Negative log likelihood |
+| MSE | `mse` | Mean squared error |
+| Squared Hinge | `sqr_hinge` | SVM-style loss (for quantized networks) |
+| Smooth L1 | `smooth_l1` | Huber loss |
+| BCE | `bce` | Binary cross-entropy |
+| KL Divergence | `kl_div` | KL divergence loss |
 
 ### Experiment Directory Structure
 
@@ -495,6 +561,49 @@ scheduler:
 
 checkpoint:
   enabled: false
+```
+
+### Train Quantized Model (4-bit)
+
+```yaml
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_cnv"
+
+quantization:
+  weight_bit_width: 4
+  act_bit_width: 4
+
+loss:
+  name: "sqr_hinge"   # Common for quantized networks
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0001
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false      # Disable AMP for quantized training
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_best: true
 ```
 
 ## Adding Custom Datasets

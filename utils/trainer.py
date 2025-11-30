@@ -24,6 +24,7 @@ from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, SchedulerType
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
+from .loss import LossFactory
 
 
 class Trainer:
@@ -82,7 +83,7 @@ class Trainer:
         self.best_acc: float = 0.0
 
         # Setup loss function
-        self.criterion: nn.CrossEntropyLoss = nn.CrossEntropyLoss()
+        self.criterion: nn.Module = LossFactory.create(config)
         
         # Setup optimizer and scheduler using factories
         self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(self.model, config)
@@ -171,6 +172,9 @@ class Trainer:
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
+            
+            if hasattr(self.model, 'clip_weights'):
+                self.model.clip_weights(-1, 1)
 
             running_loss += loss.item()
             _, predicted = outputs.max(1)

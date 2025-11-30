@@ -17,6 +17,7 @@ from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, WarmupScheduler
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
+from .loss import LossFactory
 
 __all__ = [
     # Core utilities
@@ -30,4 +31,5 @@ __all__ = [
     "WarmupScheduler",
     "ExperimentManager",
     "MetricsLogger",
+    "LossFactory",
 ]
