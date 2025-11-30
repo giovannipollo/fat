@@ -2,7 +2,8 @@
 
 A modular PyTorch training framework for image classification, with support for standard and quantized models.
 
-> **Warning**: Tested with Python 3.12.3
+> [!WARNING]  
+> Tested with Python 3.12.3
 
 ## Features
 
