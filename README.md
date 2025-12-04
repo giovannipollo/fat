@@ -95,8 +95,9 @@ fat/
 ├── configs/          # YAML configuration files
 ├── datasets/         # Dataset implementations
 ├── models/           # Model architectures
-│   ├── resnet_cifar/     # ResNet for CIFAR (20, 32, 44, 56, 110)
-│   ├── resnet_imagenet/  # ResNet for ImageNet (18, 34, 50, 101, 152)
+│   ├── standard/         # Full-precision models
+│   │   ├── resnet_cifar/     # ResNet for CIFAR (20, 32, 44, 56, 110)
+│   │   └── resnet_imagenet/  # ResNet for ImageNet (18, 34, 50, 101, 152)
 │   └── quantized/        # Quantized models (Brevitas)
 ├── utils/            # Training utilities
 ├── docs/             # MkDocs documentation

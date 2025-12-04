@@ -20,14 +20,21 @@ Dataset implementations for image classification tasks.
 
 Neural network architectures for image classification.
 
+#### Standard Models
+
 | Module | Description |
 |--------|-------------|
 | [`models`](models/index.md) | Model registry and factory functions |
-| [`models.cnv`](models/cnv.md) | CNV (Compact Neural Vision) architecture |
-| [`models.mobilenet`](models/mobilenet.md) | MobileNetV1 architecture |
-| [`models.vgg`](models/vgg.md) | VGG architectures |
-| [`models.resnet_cifar`](models/resnet_cifar.md) | ResNet for CIFAR (20, 32, 44, 56, 110) |
-| [`models.resnet_imagenet`](models/resnet_imagenet.md) | ResNet for ImageNet (18, 34, 50, 101, 152) |
+| [`models.standard.cnv`](models/cnv.md) | CNV (Compact Neural Vision) architecture |
+| [`models.standard.mobilenet`](models/mobilenet.md) | MobileNetV1 architecture |
+| [`models.standard.vgg`](models/vgg.md) | VGG architectures |
+| [`models.standard.resnet_cifar`](models/resnet_cifar.md) | ResNet for CIFAR (20, 32, 44, 56, 110) |
+| [`models.standard.resnet_imagenet`](models/resnet_imagenet.md) | ResNet for ImageNet (18, 34, 50, 101, 152) |
+
+#### Quantized Models
+
+| Module | Description |
+|--------|-------------|
 | [`models.quantized`](models/quantized.md) | Quantized models using Brevitas |
 
 ### Utilities

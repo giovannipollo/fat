@@ -14,11 +14,24 @@ from typing import Any, Callable, Dict, List, Type, Union
 
 import torch.nn as nn
 
-from .cnv import CNV
-from .mobilenet import MobileNetV1
-from .resnet_cifar import ResNet20, ResNet32, ResNet44, ResNet56, ResNet110
-from .resnet_imagenet import ResNet18, ResNet34, ResNet50, ResNet101, ResNet152
-from .vgg import VGG11, VGG13, VGG16, VGG19
+from .standard import (
+    CNV,
+    MobileNetV1,
+    VGG11,
+    VGG13,
+    VGG16,
+    VGG19,
+    ResNet20,
+    ResNet32,
+    ResNet44,
+    ResNet56,
+    ResNet110,
+    ResNet18,
+    ResNet34,
+    ResNet50,
+    ResNet101,
+    ResNet152,
+)
 from .quantized import (
     QuantCNV,
     QuantResNet20,

@@ -1,5 +1,5 @@
-# models.mobilenet
+# models.standard.mobilenet
 
 MobileNetV1 architecture.
 
-::: models.mobilenet
+::: models.standard.mobilenet

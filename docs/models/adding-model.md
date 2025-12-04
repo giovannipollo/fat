@@ -465,5 +465,5 @@ quantization:
 
 - **Start Simple**: Begin with a working model and iterate.
 - **Check Dimensions**: Print tensor shapes during development to catch size mismatches.
-- **Use Existing Models**: Look at `models/cnv.py` or `models/resnet_cifar/` for reference implementations.
+- **Use Existing Models**: Look at `models/standard/cnv.py` or `models/standard/resnet_cifar/` for reference implementations.
 - **Handle Different Image Sizes**: Use adaptive pooling to support various input resolutions.
