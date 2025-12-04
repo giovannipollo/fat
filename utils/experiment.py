@@ -25,23 +25,29 @@ class ExperimentManager:
 
     Provides organized experiment tracking with:
 
-    - Auto-generated experiment names (model_dataset_timestamp)
-    - Directory structure: experiments/<name>/checkpoints/, tensorboard/
+    - Hierarchical directory organization (dataset/model_timestamp)
+    - Directory structure: experiments/<dataset>/<model_timestamp>/checkpoints/, tensorboard/
     - Config saving for reproducibility
     - Checkpoint saving/loading with best model tracking
 
     Directory Structure::
 
         experiments/
-          resnet18_cifar10_20240101_120000/
-            config.yaml
-            training_log.txt
-            checkpoints/
-              best.pt
-              latest.pt
-              epoch_0010.pt
-            tensorboard/
-              events.out.tfevents.*
+          cifar10/
+            resnet18_20240101_120000/
+              config.yaml
+              training_log.txt
+              checkpoints/
+                best.pt
+                latest.pt
+                epoch_0010.pt
+              tensorboard/
+                events.out.tfevents.*
+            resnet20_20240101_130000/
+              ...
+          cifar100/
+            resnet50_20240101_140000/
+              ...
     """
 
     def __init__(
@@ -83,16 +89,23 @@ class ExperimentManager:
             custom_name: Optional custom prefix.
 
         Returns:
-            Experiment name string (format: [prefix_]model_dataset_timestamp).
+            Experiment name string (format: [prefix_]model_timestamp).
         """
         model_name: str = self.config["model"]["name"].lower()
-        dataset_name: str = self.config["dataset"]["name"].lower()
         timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if custom_name:
-            return f"{custom_name}_{model_name}_{dataset_name}_{timestamp}"
+            return f"{custom_name}_{model_name}_{timestamp}"
         else:
-            return f"{model_name}_{dataset_name}_{timestamp}"
+            return f"{model_name}_{timestamp}"
+
+    def _get_dataset_name(self) -> str:
+        """Get the dataset name from config.
+
+        Returns:
+            Dataset name string in lowercase.
+        """
+        return self.config["dataset"]["name"].lower()
 
     def _setup_experiment_dir(
         self,
@@ -101,14 +114,17 @@ class ExperimentManager:
     ):
         """Setup experiment directory structure.
 
+        Creates a hierarchical structure: base_dir/dataset/model_timestamp/
+
         Args:
             base_dir: Base directory for experiments.
             custom_name: Optional custom experiment name prefix.
         """
         base_path: Path = Path(base_dir)
+        dataset_name: str = self._get_dataset_name()
         experiment_name: str = self._generate_experiment_name(custom_name)
 
-        self.experiment_dir = base_path / experiment_name
+        self.experiment_dir = base_path / dataset_name / experiment_name
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.tensorboard_dir = self.experiment_dir / "tensorboard"
 

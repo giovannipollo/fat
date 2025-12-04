@@ -1,0 +1,45 @@
+# Benchmark config: Quantized ResNet-20 (W2A2) on CIFAR-100
+# Expected accuracy: ~55% (200 epochs)
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar100"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_resnet20"
+  num_classes: 100
+
+quantization:
+  weight_bit_width: 2
+  act_bit_width: 2
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 5e-4
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
+
+progress:
+  enabled: true

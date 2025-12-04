@@ -17,7 +17,7 @@ checkpoint:
 checkpoint:
   enabled: true              # Enable checkpointing
   dir: "./experiments"       # Base directory
-  experiment_name: ""        # Custom name (optional)
+  experiment_name: ""        # Custom name prefix (optional)
   save_frequency: 10         # Save every N epochs
   save_best: true            # Save best model
   resume: ""                 # Resume path (optional)
@@ -29,33 +29,48 @@ checkpoint:
 |-----------|------|---------|-------------|
 | `enabled` | bool | false | Enable checkpoint saving |
 | `dir` | string | "./experiments" | Base directory |
-| `experiment_name` | string | auto | Custom experiment name |
+| `experiment_name` | string | auto | Custom experiment name prefix |
 | `save_frequency` | int | 10 | Epochs between saves |
 | `save_best` | bool | true | Save best accuracy model |
 | `resume` | string | null | Path to resume from |
 
 ## Experiment Directory Structure
 
-When checkpoints are enabled:
+Experiments are organized hierarchically by dataset:
 
 ```
 experiments/
-└── resnet20_cifar10_20240115_143022/
-    ├── config.yaml           # Saved configuration
-    ├── checkpoints/
-    │   ├── epoch_0010.pt     # Periodic checkpoint
-    │   ├── epoch_0020.pt
-    │   ├── latest.pt         # Most recent
-    │   └── best.pt           # Best accuracy
-    └── tensorboard/          # TensorBoard logs
-        └── events.out.tfevents.*
+├── cifar10/
+│   ├── resnet20_20240115_143022/
+│   │   ├── config.yaml           # Saved configuration
+│   │   ├── checkpoints/
+│   │   │   ├── epoch_0010.pt     # Periodic checkpoint
+│   │   │   ├── epoch_0020.pt
+│   │   │   ├── latest.pt         # Most recent
+│   │   │   └── best.pt           # Best accuracy
+│   │   └── tensorboard/          # TensorBoard logs
+│   │       └── events.out.tfevents.*
+│   └── resnet56_20240116_091500/
+│       └── ...
+├── cifar100/
+│   └── resnet50_20240117_120000/
+│       └── ...
+└── mnist/
+    └── resnet18_20240118_150000/
+        └── ...
 ```
+
+This organization makes it easy to:
+
+- Compare different models trained on the same dataset
+- Find all experiments for a specific dataset
+- Keep experiments organized as the number grows
 
 ## Experiment Naming
 
 ### Automatic Naming
 
-Default: `{model}_{dataset}_{timestamp}`
+Default: `{dataset}/{model}_{timestamp}`
 
 ```yaml
 checkpoint:
@@ -66,11 +81,14 @@ checkpoint:
 
 ### Custom Naming
 
+Add a prefix to the experiment name:
+
 ```yaml
 checkpoint:
   enabled: true
   dir: "./experiments"
-  experiment_name: "my_experiment_v1"
+  experiment_name: "baseline"
+  # Results in: cifar10/baseline_resnet20_20240115_143022/
 ```
 
 ## Checkpoint Contents
@@ -95,7 +113,7 @@ Resume from a checkpoint:
 checkpoint:
   enabled: true
   dir: "./experiments"
-  resume: "./experiments/resnet20_cifar10_20240115_143022/checkpoints/latest.pt"
+  resume: "./experiments/cifar10/resnet20_20240115_143022/checkpoints/latest.pt"
 ```
 
 ### Resume Behavior
@@ -135,7 +153,7 @@ checkpoint:
   dir: "./experiments"
   save_frequency: 10
   save_best: true
-  resume: "./experiments/my_experiment/checkpoints/latest.pt"
+  resume: "./experiments/cifar10/resnet20_20240115/checkpoints/latest.pt"
 ```
 
 ### Disable Checkpointing
@@ -153,11 +171,11 @@ from models import get_model
 from utils import load_config
 
 # Load config and create model
-config = load_config("experiments/my_exp/config.yaml")
+config = load_config("experiments/cifar10/resnet20_20240115/config.yaml")
 model = get_model(config)
 
 # Load checkpoint
-checkpoint = torch.load("experiments/my_exp/checkpoints/best.pt")
+checkpoint = torch.load("experiments/cifar10/resnet20_20240115/checkpoints/best.pt")
 model.load_state_dict(checkpoint["model_state_dict"])
 
 # Use model for inference
