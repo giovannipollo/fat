@@ -49,6 +49,7 @@ from .quantized import (
     QuantVGG16,
     QuantVGG19,
     QuantMobileNetV1,
+    QuantMobileNetV1HW,
 )
 
 ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
@@ -84,6 +85,7 @@ QUANT_MODELS: Dict[str, ModelType] = {
     "quant_cnv": QuantCNV,
     # Quantized MobileNet
     "quant_mobilenetv1": QuantMobileNetV1,
+    "quant_mobilenetv1_hw": QuantMobileNetV1HW,
     # Quantized ResNet (CIFAR-specific)
     "quant_resnet20": QuantResNet20,
     "quant_resnet32": QuantResNet32,
@@ -140,6 +142,7 @@ def get_model(config: Dict[str, Any]) -> nn.Module:
     model_name: str = config["model"]["name"].lower()
     num_classes: int = config["model"].get("num_classes", 10)
     in_channels: int = config["model"].get("in_channels", 3)
+    dataset: str = config.get("dataset", {}).get("name", "cifar10")
     
     if model_name not in MODELS:
         available: List[str] = list(MODELS.keys())
@@ -156,6 +159,7 @@ def get_model(config: Dict[str, Any]) -> nn.Module:
             in_channels=in_channels,
             weight_bit_width=weight_bit_width,
             act_bit_width=act_bit_width,
+            dataset=dataset,
         )
     
     return MODELS[model_name](num_classes=num_classes, in_channels=in_channels)
