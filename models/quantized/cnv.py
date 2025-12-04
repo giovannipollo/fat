@@ -60,6 +60,7 @@ class QuantCNV(nn.Module):
         in_weight_bit_width: int = 8,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        **kwargs,
     ):
         """Initialize quantized CNV model.
 
@@ -69,6 +70,7 @@ class QuantCNV(nn.Module):
             in_weight_bit_width: Bit width for input quantization.
             weight_bit_width: Bit width for weight quantization.
             act_bit_width: Bit width for activation quantization.
+            **kwargs: Additional arguments (ignored).
         """
         super().__init__()
 

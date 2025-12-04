@@ -91,6 +91,7 @@ class QuantMobileNetV1(nn.Module):
         in_channels: int = 3,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        **kwargs,
     ):
         """Initialize quantized MobileNetV1.
 
@@ -99,6 +100,7 @@ class QuantMobileNetV1(nn.Module):
             in_channels: Number of input channels.
             weight_bit_width: Bit width for weights.
             act_bit_width: Bit width for activations.
+            **kwargs: Additional arguments (ignored).
         """
         super().__init__()
         self.in_channels = in_channels

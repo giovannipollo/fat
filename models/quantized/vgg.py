@@ -159,6 +159,7 @@ def QuantVGG11(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantVGG:
     """Create quantized VGG-11 model with batch normalization."""
     return QuantVGG(
@@ -172,6 +173,7 @@ def QuantVGG13(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantVGG:
     """Create quantized VGG-13 model with batch normalization."""
     return QuantVGG(
@@ -185,6 +187,7 @@ def QuantVGG16(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantVGG:
     """Create quantized VGG-16 model with batch normalization."""
     return QuantVGG(
@@ -198,6 +201,7 @@ def QuantVGG19(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantVGG:
     """Create quantized VGG-19 model with batch normalization."""
     return QuantVGG(

@@ -238,6 +238,7 @@ def QuantResNet20(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-20 for CIFAR.
 
@@ -246,6 +247,7 @@ def QuantResNet20(
         in_channels: Number of input channels.
         weight_bit_width: Bit width for weights.
         act_bit_width: Bit width for activations.
+        **kwargs: Additional arguments (ignored).
 
     Returns:
         Quantized ResNet-20 model.
@@ -260,6 +262,7 @@ def QuantResNet32(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-32 for CIFAR."""
     return QuantResNetCIFAR(
@@ -272,6 +275,7 @@ def QuantResNet44(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-44 for CIFAR."""
     return QuantResNetCIFAR(
@@ -284,6 +288,7 @@ def QuantResNet56(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-56 for CIFAR."""
     return QuantResNetCIFAR(
@@ -296,6 +301,7 @@ def QuantResNet110(
     in_channels: int = 3,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
+    **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-110 for CIFAR."""
     return QuantResNetCIFAR(

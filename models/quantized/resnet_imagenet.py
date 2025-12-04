@@ -155,6 +155,7 @@ class QuantResNetBase(nn.Module, ABC):
         in_channels: int = 3,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        **kwargs,
     ):
         """Initialize quantized ResNet base model.
 
@@ -163,6 +164,7 @@ class QuantResNetBase(nn.Module, ABC):
             in_channels: Number of input channels.
             weight_bit_width: Bit width for weights.
             act_bit_width: Bit width for activations.
+            **kwargs: Additional arguments (ignored).
         """
         super().__init__()
         self.in_planes: int = 64
