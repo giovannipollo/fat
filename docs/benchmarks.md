@@ -1,27 +1,18 @@
 # Benchmark Results
 
-Benchmark results for models trained on various datasets. Results show **mean accuracy ± standard deviation** across multiple runs.
+Benchmark results for models trained on various datasets. Results show **test_accuracies** across multiple runs. All models were trained with the `deterministic` setting enabled for reproducibility. The chosen seeds for each run are as follows:
+- Run 1: 0
+- Run 2: 1
+- Run 3: 2
 
 ## CIFAR-10
 
 ### Standard Models
 
-| Model | Accuracy (%) | Epochs | Notes |
-|-------|--------------|--------|-------|
-| ResNet-20 | - | 200 | |
-| ResNet-32 | - | 200 | |
-| ResNet-44 | - | 200 | |
-| ResNet-56 | - | 200 | |
-| ResNet-110 | - | 200 | |
-| ResNet-18 | - | 200 | |
-| ResNet-34 | - | 200 | |
-| ResNet-50 | - | 200 | |
-| VGG-11 | - | 200 | |
-| VGG-13 | - | 200 | |
-| VGG-16 | - | 200 | |
-| VGG-19 | - | 200 | |
-| MobileNetV1 | - | 200 | |
-| CNV | - | 200 | |
+| Model | Mean (%) | Std (%) | Run 1 (%) | Run 2 (%) | Run 3 (%) | Config File |
+|-------|----------:|----------:|----------:|---------:|--------:|-------------|
+| MobileNetV1 | 90.91 | 0.31 | 90.85 | 91.25 | 90.64 |  `configs/benchmark/cifar10_mobilenetv1` |
+| CNV | 91.09 | 0.15 | 91.19 | 91.16 | 90.91 |  `configs/benchmark/cifar10_cnv.yaml` |
 
 ### Quantized Models
 
@@ -90,37 +81,9 @@ Benchmark results for models trained on various datasets. Results show **mean ac
 
 ---
 
-## Training Configuration
-
-Default training configuration used for benchmarks:
-
-```yaml
-optimizer:
-  name: "sgd"
-  learning_rate: 0.1
-  momentum: 0.9
-  weight_decay: 5e-4
-
-scheduler:
-  name: "cosine"
-  warmup_epochs: 5
-
-training:
-  batch_size: 128
-
-seed:
-  enabled: true
-  value: 42
-```
-
 ## Hardware
 
-- **GPU**: 
-- **CUDA Version**: 
-- **PyTorch Version**: 
-
-## Notes
-
-- Results format: `mean ± std` (e.g., `93.45 ± 0.12`)
-- Number of runs per experiment: 
-- All models trained from scratch (no pre-training)
+- **GPU**: RTX 4060 Ti
+- **CUDA Version**: 12.8
+- **Driver Version**: 570.195.03
+- **PyTorch Version**: 2.9.1

@@ -1,8 +1,7 @@
-# CIFAR-10 CNV Benchmark
 seed:
   enabled: true
-  value: 42
-  deterministic: false
+  value: 2
+  deterministic: true
 
 dataset:
   name: "cifar10"
@@ -13,15 +12,18 @@ dataset:
 model:
   name: "cnv"
 
+loss:
+  name: "sqr_hinge"
+
 training:
-  batch_size: 128
+  batch_size: 64
   epochs: 200
 
 optimizer:
-  name: "sgd"
-  learning_rate: 0.1
+  name: "adam"
+  learning_rate: 0.01
   momentum: 0.9
-  weight_decay: 5e-4
+  weight_decay: 0.0
 
 scheduler:
   name: "cosine"
