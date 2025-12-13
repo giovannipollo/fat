@@ -102,6 +102,16 @@ fault_injection:
   
   # Verbose output for debugging
   verbose: false
+  
+  # Hardware-aware periodic fault pattern (simulates real FPGA/ASIC behavior)
+  # When enabled, uses a deterministic periodic pattern instead of random injection
+  # Set to true for hardware-in-the-loop validation or comparison with actual hardware
+  hw_mask: false
+  
+  # Hardware parallelism factor (number of parallel MAC units)
+  # Only used when hw_mask is true. With probability=5% and frequency_value=1024,
+  # 52 positions out of every 1024 will have faults
+  frequency_value: 1024
 
 tensorboard:
   enabled: true

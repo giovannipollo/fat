@@ -205,6 +205,9 @@ class FaultInjector:
                     epoch_interval=config.epoch_interval,
                     step_interval=config.step_interval,
                     verbose=config.verbose,
+                    hw_mask=config.hw_mask,
+                    frequency_value=config.frequency_value,
+                    seed=config.seed,
                 )
                 self._injection_layers.append(inj_layer)
 
@@ -269,6 +272,9 @@ class FaultInjector:
                     epoch_interval=config.epoch_interval,
                     step_interval=config.step_interval,
                     verbose=config.verbose,
+                    hw_mask=config.hw_mask,
+                    frequency_value=config.frequency_value,
+                    seed=config.seed,
                 )
                 self._injection_layers.append(inj_layer)
                 new_modules.append((f"fault_inj_{self._layer_count}", inj_layer))

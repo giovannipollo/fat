@@ -6,8 +6,11 @@ faults into activations. Supports both training (FAT) and evaluation modes.
 
 from __future__ import annotations
 
+import math
+import random
 from typing import TYPE_CHECKING, Optional
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch import Tensor
@@ -18,6 +21,204 @@ from .strategies import InjectionStrategy, get_strategy
 
 if TYPE_CHECKING:
     from .statistics import FaultStatistics
+
+
+class HardwareMaskGenerator:
+    """Generates hardware-aware periodic fault masks.
+
+    This class creates deterministic, periodic fault patterns that simulate
+    how faults occur in real hardware accelerators (FPGAs/ASICs) with fixed
+    parallelism.
+
+    Instead of randomly selecting which activations to inject faults into,
+    it creates a periodic pattern based on the hardware's parallelism factor
+    (frequency_value). This is more realistic for hardware-in-the-loop
+    validation and fault characterization.
+
+    Attributes:
+        frequency_value: Number of parallel processing units (e.g., MAC units).
+        probability: Fault probability as percentage (0-100).
+        seed: Random seed for reproducible mask patterns.
+
+    Example:
+        ```python
+        generator = HardwareMaskGenerator(
+            frequency_value=1024,
+            probability=5.0,
+            seed=42,
+        )
+        mask = generator.generate(shape=(32, 64, 8, 8), device=torch.device("cuda"))
+        ```
+    """
+
+    def __init__(
+        self,
+        frequency_value: int = 1024,
+        probability: float = 0.0,
+        seed: Optional[int] = None,
+    ) -> None:
+        """Initialize the hardware mask generator.
+
+        Args:
+            frequency_value: Hardware parallelism factor (number of parallel units).
+            probability: Fault probability as percentage (0-100).
+            seed: Random seed for reproducible patterns.
+        """
+        self.frequency_value = frequency_value
+        self.probability = probability
+        self.seed = seed
+
+    def generate(
+        self,
+        shape: torch.Size,
+        device: torch.device,
+    ) -> Tensor:
+        """Generate a hardware-aware periodic fault mask.
+
+        Creates a boolean tensor where True indicates positions to inject faults.
+        The pattern is periodic based on frequency_value and probability.
+
+        Args:
+            shape: Shape of the activation tensor (batch, channels, [height, width]).
+            device: Device to create the mask on.
+
+        Returns:
+            Boolean tensor with shape matching input, indicating fault positions.
+        """
+        # Calculate number of fault positions in one period
+        ones = math.ceil(self.frequency_value * self.probability / 100.0)
+        zeros = self.frequency_value - ones
+
+        # Create and shuffle the base pattern
+        if self.seed is not None:
+            random.seed(self.seed)
+
+        frequency_mask_list = ([1] * ones) + ([0] * zeros)
+        random.shuffle(frequency_mask_list)
+        frequency_mask_np = np.array(frequency_mask_list, dtype=np.float32)
+
+        # Create output mask
+        mask_np = np.zeros(shape, dtype=np.float32)
+
+        if len(shape) == 4:
+            # 4D tensor: (batch, channels, height, width)
+            mask_np = self._generate_4d_mask(shape, frequency_mask_np)
+        elif len(shape) == 2:
+            # 2D tensor: (batch, features)
+            mask_np = self._generate_2d_mask(shape, frequency_mask_np)
+        else:
+            # Fallback: tile the pattern across all dimensions
+            mask_np = self._generate_nd_mask(shape, frequency_mask_np)
+
+        # Convert to tensor
+        mask_tensor = torch.tensor(mask_np, device=device, dtype=torch.bool)
+        return mask_tensor
+
+    def _generate_4d_mask(
+        self,
+        shape: torch.Size,
+        frequency_mask: np.ndarray,
+    ) -> np.ndarray:
+        """Generate mask for 4D tensors (conv layers).
+
+        Args:
+            shape: (batch, channels, height, width).
+            frequency_mask: Base periodic pattern.
+
+        Returns:
+            4D numpy mask array.
+        """
+        batch_size, channels, height, width = shape
+        mask_np = np.zeros(shape, dtype=np.float32)
+
+        if channels <= self.frequency_value:
+            # Fewer channels than frequency: distribute pattern across spatial dims
+            positions_needed = self.frequency_value // channels
+            positions_filled = 0
+
+            for b in range(batch_size):
+                for h in range(height):
+                    for w in range(width):
+                        if positions_filled < positions_needed:
+                            start_idx = positions_filled * channels
+                            end_idx = start_idx + channels
+                            if end_idx <= self.frequency_value:
+                                if width == 1 and height == 1:
+                                    # Special case: 1x1 spatial
+                                    mask_np[b, :, h, w] = frequency_mask[:channels]
+                                else:
+                                    mask_np[b, :, h, w] = frequency_mask[start_idx:end_idx]
+
+                                positions_filled += 1
+                                if positions_filled == positions_needed:
+                                    positions_filled = 0
+        else:
+            # More channels than frequency: tile pattern across channels
+            repeats_needed = (channels + self.frequency_value) // self.frequency_value
+            repeated_mask = np.tile(frequency_mask, repeats_needed)[:channels]
+            for b in range(batch_size):
+                for h in range(height):
+                    for w in range(width):
+                        mask_np[b, :, h, w] = repeated_mask
+
+        return mask_np
+
+    def _generate_2d_mask(
+        self,
+        shape: torch.Size,
+        frequency_mask: np.ndarray,
+    ) -> np.ndarray:
+        """Generate mask for 2D tensors (linear layers).
+
+        Args:
+            shape: (batch, features).
+            frequency_mask: Base periodic pattern.
+
+        Returns:
+            2D numpy mask array.
+        """
+        batch_size, features = shape
+        mask_np = np.zeros(shape, dtype=np.float32)
+
+        if features <= self.frequency_value:
+            # Fewer features than frequency: use first portion of pattern
+            for b in range(batch_size):
+                mask_np[b, :] = frequency_mask[:features]
+        else:
+            # More features than frequency: tile pattern
+            repeats_needed = (features + self.frequency_value) // self.frequency_value
+            repeated_mask = np.tile(frequency_mask, repeats_needed)[:features]
+            for b in range(batch_size):
+                mask_np[b, :] = repeated_mask
+
+        return mask_np
+
+    def _generate_nd_mask(
+        self,
+        shape: torch.Size,
+        frequency_mask: np.ndarray,
+    ) -> np.ndarray:
+        """Generate mask for arbitrary N-dimensional tensors.
+
+        Args:
+            shape: Tensor shape.
+            frequency_mask: Base periodic pattern.
+
+        Returns:
+            N-dimensional numpy mask array.
+        """
+        total_elements = int(np.prod(shape))
+        repeats_needed = (total_elements + self.frequency_value) // self.frequency_value
+        repeated_mask = np.tile(frequency_mask, repeats_needed)[:total_elements]
+        return repeated_mask.reshape(shape)
+
+    def set_probability(self, probability: float) -> None:
+        """Update the fault probability.
+
+        Args:
+            probability: New probability (0-100).
+        """
+        self.probability = probability
 
 
 class QuantFaultInjectionLayer(nn.Module):
@@ -70,6 +271,9 @@ class QuantFaultInjectionLayer(nn.Module):
         epoch_interval: int = 1,
         step_interval: float = 0.5,
         verbose: bool = False,
+        hw_mask: bool = False,
+        frequency_value: int = 1024,
+        seed: Optional[int] = None,
     ) -> None:
         """Initialize the fault injection layer.
 
@@ -83,6 +287,9 @@ class QuantFaultInjectionLayer(nn.Module):
             epoch_interval: Re-generate fault mask every N epochs.
             step_interval: Probability of injection per batch step.
             verbose: Print injection details.
+            hw_mask: Use hardware-aware periodic fault pattern.
+            frequency_value: Hardware parallelism factor for hw_mask.
+            seed: Random seed for reproducible fault patterns.
         """
         super().__init__()
 
@@ -94,11 +301,23 @@ class QuantFaultInjectionLayer(nn.Module):
         self.epoch_interval = epoch_interval
         self.step_interval = step_interval
         self.verbose = verbose
+        self.hw_mask = hw_mask
+        self.frequency_value = frequency_value
+        self.seed = seed
 
         # Strategy for fault injection
         if strategy is None:
             strategy = get_strategy("random")
         self.strategy = strategy
+
+        # Hardware mask generator (created lazily)
+        self._hw_mask_generator: Optional[HardwareMaskGenerator] = None
+        if hw_mask:
+            self._hw_mask_generator = HardwareMaskGenerator(
+                frequency_value=frequency_value,
+                probability=probability,
+                seed=seed,
+            )
 
         # Runtime state
         self.use_mode: str = "eval"
@@ -238,10 +457,76 @@ class QuantFaultInjectionLayer(nn.Module):
         Returns:
             Boolean tensor indicating which values to inject, or None.
         """
+        # Use hardware mask if enabled
+        if self.hw_mask and self._hw_mask_generator is not None:
+            return self._get_hw_mask_condition_tensor(shape, device)
+
         if self.use_mode == "train":
             return self._get_train_condition_tensor(shape, device)
         else:
             return self._get_eval_condition_tensor(shape, device)
+
+    def _get_hw_mask_condition_tensor(
+        self, shape: torch.Size, device: torch.device
+    ) -> Optional[Tensor]:
+        """Generate condition tensor using hardware-aware periodic pattern.
+
+        This method uses the HardwareMaskGenerator to create a deterministic,
+        periodic fault pattern that simulates real hardware behavior.
+
+        Args:
+            shape: Shape of the activation tensor.
+            device: Device to create tensor on.
+
+        Returns:
+            Boolean tensor for fault injection with periodic pattern.
+        """
+        # Only generate mask when needed (same logic as random mask)
+        if self.use_mode == "train":
+            # Training: check injection layer and counter
+            if self.injection_layer == self.num_layers:
+                if self.epoch % self.epoch_interval == 0:
+                    if self.counter == 0:
+                        self._condition_tensor = self._hw_mask_generator.generate(
+                            shape, device
+                        )
+                        self._condition_tensor_true = self._condition_tensor.clone()
+                        self._condition_tensor_false = torch.zeros(
+                            shape, dtype=torch.bool, device=device
+                        )
+                    else:
+                        # Use pre-computed schedule
+                        if (
+                            self.condition_injector is not None
+                            and self.counter < len(self.condition_injector)
+                        ):
+                            if self.condition_injector[self.counter]:
+                                self._condition_tensor = self._condition_tensor_true
+                            else:
+                                self._condition_tensor = self._condition_tensor_false
+                else:
+                    # Non-interval epoch
+                    if self.counter == 0:
+                        self._condition_tensor = self._hw_mask_generator.generate(
+                            shape, device
+                        )
+            elif self.injection_layer == self.layer_id:
+                self._condition_tensor = self._hw_mask_generator.generate(
+                    shape, device
+                )
+        else:
+            # Evaluation: generate once per evaluation run
+            if self.counter == 0:
+                if self.injection_layer == self.num_layers:
+                    self._condition_tensor = self._hw_mask_generator.generate(
+                        shape, device
+                    )
+                elif self.layer_id == self.injection_layer:
+                    self._condition_tensor = self._hw_mask_generator.generate(
+                        shape, device
+                    )
+
+        return self._condition_tensor
 
     def _get_train_condition_tensor(
         self, shape: torch.Size, device: torch.device
@@ -351,6 +636,9 @@ class QuantFaultInjectionLayer(nn.Module):
             probability: New probability (0-100).
         """
         self.probability = probability
+        # Also update hardware mask generator if present
+        if self._hw_mask_generator is not None:
+            self._hw_mask_generator.set_probability(probability)
 
     def set_epoch(self, epoch: int) -> None:
         """Set the current epoch.

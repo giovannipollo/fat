@@ -55,7 +55,7 @@ from __future__ import annotations
 
 from .config import FaultInjectionConfig
 from .injector import FaultInjector
-from .layers import QuantFaultInjectionLayer, ErrInjLayer
+from .layers import QuantFaultInjectionLayer, ErrInjLayer, HardwareMaskGenerator
 from .statistics import FaultStatistics, LayerStatistics
 from .strategies import (
     InjectionStrategy,
@@ -74,6 +74,7 @@ __all__ = [
     # Layers
     "QuantFaultInjectionLayer",
     "ErrInjLayer",  # Alias for compatibility
+    "HardwareMaskGenerator",
     # Statistics
     "FaultStatistics",
     "LayerStatistics",

@@ -106,6 +106,12 @@ fault_injection:
   
   # Verbose output for debugging
   verbose: false
+  
+  # Hardware-aware periodic fault pattern (simulates real FPGA/ASIC behavior)
+  hw_mask: false
+  
+  # Hardware parallelism factor for hw_mask (number of parallel MAC units)
+  frequency_value: 1024
 ```
 
 ### Configuration Parameters
@@ -485,6 +491,89 @@ Fault injection enabled: 12 injection layers added
   Apply during: train
 Randomly selected layer 7 for injection
 ```
+
+---
+
+#### hw_mask
+
+| Property | Value |
+|----------|-------|
+| Type | `boolean` |
+| Default | `false` |
+| Required | No |
+
+Enable hardware-aware periodic fault pattern instead of random fault selection. When enabled, faults are injected using a deterministic, periodic pattern that simulates how faults occur in real hardware accelerators (FPGAs/ASICs) with fixed parallelism.
+
+**Why use hw_mask?**
+
+Real hardware accelerators process data in parallel (e.g., 1024 MAC units operating simultaneously). Faults in hardware affect specific parallel lanes consistently, not randomly per activation. The `hw_mask` feature creates fault patterns that match this behavior.
+
+```yaml
+fault_injection:
+  hw_mask: true
+  frequency_value: 1024
+  probability: 5.0
+```
+
+**How it works:**
+
+1. Given `frequency_value=1024` and `probability=5%`:
+   - `ceil(1024 * 5 / 100) = 52` fault positions per period
+   - `1024 - 52 = 972` clean positions per period
+2. A shuffled pattern of 52 ones and 972 zeros is created
+3. This pattern is tiled/repeated across the activation tensor
+4. Faults occur at the same relative positions in each period
+
+**Use cases:**
+
+| Scenario | hw_mask Setting |
+|----------|----------------|
+| General FAT training | `false` (random injection) |
+| Hardware-in-the-loop validation | `true` |
+| Comparing with actual faulty hardware | `true` |
+| FPGA/ASIC fault characterization | `true` |
+
+!!! tip "Combining with seed"
+    Use `seed` with `hw_mask: true` for fully reproducible hardware fault patterns across runs.
+
+---
+
+#### frequency_value
+
+| Property | Value |
+|----------|-------|
+| Type | `integer` |
+| Range | `1` to `∞` |
+| Default | `1024` |
+| Required | No (only used when `hw_mask: true`) |
+
+The hardware parallelism factor that determines the period of the fault pattern. This should match your target hardware's parallel processing capability.
+
+**Common values:**
+
+| Hardware Type | Typical frequency_value |
+|---------------|------------------------|
+| Small FPGA | 64-256 |
+| Medium FPGA | 256-1024 |
+| Large FPGA/ASIC | 1024-4096 |
+| Custom accelerator | Match actual parallelism |
+
+```yaml
+fault_injection:
+  hw_mask: true
+  frequency_value: 1024  # 1024 parallel MAC units
+  probability: 5.0       # 52 out of 1024 positions faulty
+```
+
+**Pattern distribution:**
+
+The periodic pattern is distributed across tensor dimensions as follows:
+
+- **4D tensors (conv layers)**: Pattern distributed across channels, then tiled across spatial dimensions
+- **2D tensors (linear layers)**: Pattern distributed across features
+
+!!! note "Pattern generation"
+    The pattern is generated once and reused, making `hw_mask` deterministic (given the same `seed`). This is different from random injection where each activation independently has the specified probability.
 
 ---
 

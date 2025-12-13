@@ -26,6 +26,9 @@ class FaultInjectionConfig:
         seed: Random seed for reproducible fault patterns.
         track_statistics: Enable statistics tracking (RMSE, cosine similarity).
         verbose: Print injection details.
+        hw_mask: Use hardware-aware periodic fault pattern instead of random.
+        frequency_value: Hardware parallelism factor for hw_mask (e.g., 1024 for
+            1024 parallel MAC units). Determines the period of the fault pattern.
 
     Example:
         ```python
@@ -34,6 +37,14 @@ class FaultInjectionConfig:
             probability=5.0,
             mode="full_model",
             injection_type="random",
+        )
+
+        # Hardware-aware mask for realistic FPGA/ASIC simulation
+        config = FaultInjectionConfig(
+            enabled=True,
+            probability=5.0,
+            hw_mask=True,
+            frequency_value=1024,
         )
 
         # Or from YAML dict
@@ -52,6 +63,8 @@ class FaultInjectionConfig:
     seed: Optional[int] = None
     track_statistics: bool = False
     verbose: bool = False
+    hw_mask: bool = False
+    frequency_value: int = 1024
 
     # Valid values for validation
     _VALID_MODES: List[str] = field(
@@ -104,6 +117,8 @@ class FaultInjectionConfig:
             seed=config.get("seed", None),
             track_statistics=config.get("track_statistics", False),
             verbose=config.get("verbose", False),
+            hw_mask=config.get("hw_mask", False),
+            frequency_value=config.get("frequency_value", 1024),
         )
 
     def validate(self) -> None:
@@ -144,6 +159,11 @@ class FaultInjectionConfig:
                 f"step_interval must be between 0 and 1, got {self.step_interval}"
             )
 
+        if self.frequency_value < 1:
+            raise ValueError(
+                f"frequency_value must be >= 1, got {self.frequency_value}"
+            )
+
     def should_inject_during_training(self) -> bool:
         """Check if injection should occur during training.
 
@@ -178,4 +198,6 @@ class FaultInjectionConfig:
             "seed": self.seed,
             "track_statistics": self.track_statistics,
             "verbose": self.verbose,
+            "hw_mask": self.hw_mask,
+            "frequency_value": self.frequency_value,
         }
