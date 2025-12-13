@@ -8,6 +8,7 @@ Provides a complete training loop with support for:
 - Mixed precision training (AMP)
 - TensorBoard logging
 - Validation and test evaluation
+- Fault injection for fault-aware training (FAT)
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ from .scheduler import SchedulerFactory, SchedulerType
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
 from .loss import LossFactory
+from .fault_injection import FaultInjectionConfig, FaultInjector, FaultStatistics
 
 
 class Trainer:
@@ -35,6 +37,7 @@ class Trainer:
     - SchedulerFactory: Creates schedulers with warmup support
     - ExperimentManager: Handles checkpoints and experiment organization
     - MetricsLogger: Handles TensorBoard and console logging
+    - FaultInjector: Optional fault injection for fault-aware training
     
     Features:
         - Progress bars with tqdm
@@ -43,6 +46,7 @@ class Trainer:
         - Mixed precision training (AMP)
         - TensorBoard logging
         - Config saving for experiment reproducibility
+        - Fault injection for fault-aware training (FAT)
     
     Example:
         ```python
@@ -63,6 +67,9 @@ class Trainer:
         use_amp: Whether AMP is enabled.
         experiment: Experiment manager for checkpoints.
         logger: Metrics logger for TensorBoard and console.
+        fault_injector: Optional fault injector for FAT.
+        fault_config: Fault injection configuration.
+        fault_statistics: Fault injection statistics tracker.
     """
 
     def __init__(
@@ -121,6 +128,12 @@ class Trainer:
         progress_config: Dict[str, Any] = config.get("progress", {})
         self.show_progress: bool = progress_config.get("enabled", True)
 
+        # Setup fault injection (if configured)
+        self.fault_injector: Optional[FaultInjector] = None
+        self.fault_config: Optional[FaultInjectionConfig] = None
+        self.fault_statistics: Optional[FaultStatistics] = None
+        self._setup_fault_injection(config)
+
         # Resume from checkpoint if specified
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         resume_path: Optional[str] = checkpoint_config.get("resume")
@@ -133,6 +146,38 @@ class Trainer:
                 self.scaler,
                 self.device,
             )
+
+    def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
+        """Setup fault injection if configured.
+        
+        Args:
+            config: Full configuration dictionary.
+        """
+        fi_config = config.get("fault_injection", {})
+        if not fi_config.get("enabled", False):
+            return
+        
+        # Create configuration from YAML
+        self.fault_config = FaultInjectionConfig.from_dict(fi_config)
+        
+        # Create injector and inject layers
+        self.fault_injector = FaultInjector()
+        self.model = self.fault_injector.inject(self.model, self.fault_config)
+        
+        # Setup statistics tracking if enabled
+        if self.fault_config.track_statistics:
+            num_layers = self.fault_injector.get_num_layers(self.model)
+            self.fault_statistics = FaultStatistics(num_layers=num_layers)
+            self.fault_injector.set_statistics(self.model, self.fault_statistics)
+        
+        # Log setup
+        if self.fault_config.verbose:
+            num_layers = self.fault_injector.get_num_layers(self.model)
+            print(f"Fault injection enabled: {num_layers} injection layers added")
+            print(f"  Mode: {self.fault_config.mode}")
+            print(f"  Probability: {self.fault_config.probability}%")
+            print(f"  Injection type: {self.fault_config.injection_type}")
+            print(f"  Apply during: {self.fault_config.apply_during}")
 
     @property
     def has_validation(self) -> bool:
@@ -156,6 +201,25 @@ class Trainer:
         running_loss = 0.0
         correct = 0
         total = 0
+
+        # Setup fault injection for this epoch
+        if self.fault_injector is not None and self.fault_config is not None:
+            self.fault_injector.update_epoch(self.model, epoch)
+            self.fault_injector.reset_counters(self.model)
+            
+            # Set up condition injector for step_interval-based injection
+            if self.fault_config.step_interval > 0:
+                num_iterations = len(self.train_loader)
+                self.fault_injector.set_condition_injector(
+                    self.model, num_iterations, self.fault_config.step_interval
+                )
+            
+            # Set mode based on apply_during config
+            apply_during = self.fault_config.apply_during
+            if apply_during in ("train", "both"):
+                self.fault_injector.set_enabled(self.model, True)
+            else:
+                self.fault_injector.set_enabled(self.model, False)
 
         # Create progress bar
         if self.show_progress:
@@ -223,6 +287,15 @@ class Trainer:
         running_loss = 0.0
         correct = 0
         total = 0
+
+        # Setup fault injection for evaluation
+        if self.fault_injector is not None and self.fault_config is not None:
+            apply_during = self.fault_config.apply_during
+            if apply_during in ("eval", "both"):
+                self.fault_injector.set_enabled(self.model, True)
+                self.fault_injector.reset_counters(self.model)
+            else:
+                self.fault_injector.set_enabled(self.model, False)
 
         # Create progress bar for evaluation
         if self.show_progress:
@@ -301,6 +374,14 @@ class Trainer:
             experiment_dir=self.experiment.get_experiment_dir(),
         )
 
+        # Log fault injection info
+        if self.fault_injector is not None and self.fault_config is not None:
+            num_layers = self.fault_injector.get_num_layers(self.model)
+            print(f"Fault injection: {num_layers} layers, "
+                  f"prob={self.fault_config.probability}%, "
+                  f"mode={self.fault_config.mode}, "
+                  f"type={self.fault_config.injection_type}")
+
         for epoch in range(self.start_epoch, epochs):
             train_loss, train_acc = self.train_epoch(epoch)
 
@@ -373,6 +454,19 @@ class Trainer:
             print("\nRunning final evaluation on test set...")
             final_test_loss, final_test_acc = self.test()
             self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
+
+        # Print fault injection statistics
+        if self.fault_statistics is not None:
+            print("\n" + "=" * 60)
+            self.fault_statistics.print_report()
+            
+            # Save statistics to experiment directory
+            experiment_dir = self.experiment.get_experiment_dir()
+            if experiment_dir is not None:
+                import os
+                stats_path = os.path.join(experiment_dir, "fault_injection_stats.json")
+                self.fault_statistics.save_to_file(stats_path)
+                print(f"Fault injection statistics saved to: {stats_path}")
 
         # Log completion
         self.logger.log_training_complete(self.best_acc, eval_name)

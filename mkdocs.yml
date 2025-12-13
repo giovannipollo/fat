@@ -99,6 +99,7 @@ nav:
     - Scheduler: configuration/scheduler.md
     - Training: configuration/training.md
     - Checkpoints: configuration/checkpoints.md
+    - Fault Injection: configuration/fault_injection.md
   - Benchmarks: benchmarks.md
   - API Reference:
     - Overview: api/index.md

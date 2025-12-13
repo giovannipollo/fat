@@ -10,6 +10,8 @@ A modular PyTorch training framework for image classification, with support for 
 - **Modular architecture** with pluggable components (optimizer, scheduler, loss, logging, checkpoints)
 - Multiple model architectures (ResNet, VGG, MobileNet, CNV)
 - **Quantization-aware training (QAT)** with Brevitas for all model architectures
+- **Fault-aware training (FAT)** for training models robust to hardware faults
+- **Fault injection framework** for evaluating model resilience to activation errors
 - **Configurable loss functions** including cross-entropy, squared hinge, and more
 - Multiple datasets with automatic configuration
 - Reproducible training with seed control

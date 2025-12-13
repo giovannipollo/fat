@@ -17,6 +17,14 @@ from .experiment import ExperimentManager
 from .logging import MetricsLogger
 from .loss import LossFactory
 
+# Fault injection framework
+from .fault_injection import (
+    FaultInjectionConfig,
+    FaultInjector,
+    FaultStatistics,
+    QuantFaultInjectionLayer,
+)
+
 __all__ = [
     # Core utilities
     "get_device",
@@ -30,4 +38,9 @@ __all__ = [
     "ExperimentManager",
     "MetricsLogger",
     "LossFactory",
+    # Fault injection
+    "FaultInjectionConfig",
+    "FaultInjector",
+    "FaultStatistics",
+    "QuantFaultInjectionLayer",
 ]

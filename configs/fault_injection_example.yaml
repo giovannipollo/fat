@@ -1,0 +1,116 @@
+# Fault-Aware Training (FAT) Example Configuration
+# Quantized CNV on CIFAR-10 with fault injection enabled
+#
+# This configuration demonstrates training with fault injection
+# to improve model resilience against hardware faults.
+#
+# Usage:
+#   python train.py --config configs/fault_injection_example.yaml
+#
+# For evaluation only:
+#   python evaluate.py --config configs/fault_injection_example.yaml --checkpoint path/to/checkpoint.pth
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_cnv"
+
+# Quantization settings (Brevitas)
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 2
+  act_bit_width: 2
+
+loss:
+  name: "sqr_hinge"
+
+training:
+  batch_size: 64
+  epochs: 300
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.01
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 300
+  warmup_epochs: 0
+
+amp:
+  enabled: false
+
+# =============================================================================
+# Fault Injection Configuration
+# =============================================================================
+# This section configures fault injection for fault-aware training (FAT).
+# Faults are injected into quantized activations to train the model
+# to be robust against hardware errors.
+
+fault_injection:
+  # Enable/disable fault injection
+  enabled: true
+  
+  # Fault probability (0-100%)
+  # Percentage of activations that will be modified when injection is active
+  probability: 5.0
+  
+  # Injection mode:
+  # - "full_model": Inject faults in all quantized layers
+  # - "layer": Inject faults only in a specific layer (use injection_layer)
+  mode: "full_model"
+  
+  # Layer index for "layer" mode (-1 for random selection each epoch)
+  injection_layer: -1
+  
+  # Injection type (fault model):
+  # - "random": Add random values within quantization range
+  # - "lsb_flip": Flip least significant bit
+  # - "msb_flip": Flip most significant bit
+  # - "full_flip": Flip all bits
+  injection_type: "random"
+  
+  # When to apply fault injection:
+  # - "train": Only during training forward pass
+  # - "eval": Only during evaluation
+  # - "both": During both training and evaluation
+  apply_during: "train"
+  
+  # Epoch interval for injection (1 = every epoch, 2 = every other epoch, etc.)
+  epoch_interval: 1
+  
+  # Step interval (0-1): Probability of injection per training step
+  # 0.5 means 50% of training steps will have fault injection
+  # 1.0 means all steps have injection (within epoch_interval)
+  step_interval: 0.5
+  
+  # Random seed for reproducible fault patterns (null for random)
+  seed: null
+  
+  # Track injection statistics (RMSE, cosine similarity, etc.)
+  track_statistics: true
+  
+  # Verbose output for debugging
+  verbose: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true

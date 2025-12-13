@@ -13,6 +13,7 @@ All training parameters are configured via YAML files. This section provides a c
 | [Scheduler](scheduler.md) | Learning rate scheduling |
 | [Training](training.md) | Training hyperparameters |
 | [Checkpoints](checkpoints.md) | Saving and resuming |
+| [Fault Injection](fault_injection.md) | Fault-aware training and evaluation |
 
 ## Quick Reference
 
@@ -66,6 +67,14 @@ scheduler:
 # Mixed precision
 amp:
   enabled: true
+
+# Fault Injection (for quantized models)
+fault_injection:
+  enabled: false
+  probability: 5.0
+  mode: "full_model"
+  injection_type: "random"
+  apply_during: "train"
 
 # Logging
 tensorboard:
@@ -176,3 +185,4 @@ Explore each configuration section in detail:
 - [Scheduler Configuration](scheduler.md)
 - [Training Configuration](training.md)
 - [Checkpoint Configuration](checkpoints.md)
+- [Fault Injection Configuration](fault_injection.md)
