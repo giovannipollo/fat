@@ -1,8 +1,8 @@
 # CIFAR-10 ResNet-56 Benchmark
 seed:
   enabled: true
-  value: 42
-  deterministic: false
+  value: 2
+  deterministic: true
 
 dataset:
   name: "cifar10"

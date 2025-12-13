@@ -1,10 +1,10 @@
 seed:
   enabled: true
-  value: 0
+  value: 2
   deterministic: true
 
 dataset:
-  name: "cifar10"
+  name: "cifar100"
   root: "./data"
   download: true
   num_workers: 4
