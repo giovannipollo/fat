@@ -2,7 +2,7 @@
 
 This module provides a unified interface for loading datasets
 through a registry pattern. Supported datasets include CIFAR-10, CIFAR-100,
-MNIST, and Fashion-MNIST.
+MNIST, Fashion-MNIST, and ImageNet.
 
 See Also:
     BaseDataset: Abstract base class interface.
@@ -19,6 +19,7 @@ from .cifar10 import CIFAR10Dataset
 from .cifar100 import CIFAR100Dataset
 from .mnist import MNISTDataset
 from .fashion_mnist import FashionMNISTDataset
+from .imagenet import ImageNetDataset
 
 
 DATASETS: Dict[str, Type[BaseDataset]] = {
@@ -26,6 +27,7 @@ DATASETS: Dict[str, Type[BaseDataset]] = {
     "cifar100": CIFAR100Dataset,
     "mnist": MNISTDataset,
     "fashion_mnist": FashionMNISTDataset,
+    "imagenet": ImageNetDataset,
 }
 """Registry mapping dataset names to their implementation classes."""
 
@@ -128,4 +130,5 @@ __all__ = [
     "CIFAR100Dataset", 
     "MNISTDataset",
     "FashionMNISTDataset",
+    "ImageNetDataset",
 ]

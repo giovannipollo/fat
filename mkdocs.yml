@@ -106,6 +106,7 @@ nav:
       - Base: api/datasets/base.md
       - CIFAR-10: api/datasets/cifar10.md
       - CIFAR-100: api/datasets/cifar100.md
+      - ImageNet: api/datasets/imagenet.md
       - MNIST: api/datasets/mnist.md
       - FashionMNIST: api/datasets/fashion_mnist.md
     - Models:
