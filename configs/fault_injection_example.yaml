@@ -112,6 +112,13 @@ fault_injection:
   # Only used when hw_mask is true. With probability=5% and frequency_value=1024,
   # 52 positions out of every 1024 will have faults
   frequency_value: 1024
+  
+  # Gradient mode for backpropagation through faulty positions:
+  # - "ste": Straight-Through Estimator - gradients flow through all positions
+  #          (standard approach, all positions get gradient = 1)
+  # - "zero_faulty": Zero gradients at faulty positions - only clean positions
+  #                  receive gradients (faulty positions get gradient = 0)
+  gradient_mode: "ste"
 
 tensorboard:
   enabled: true

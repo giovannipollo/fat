@@ -112,6 +112,9 @@ fault_injection:
   
   # Hardware parallelism factor for hw_mask (number of parallel MAC units)
   frequency_value: 1024
+  
+  # Gradient mode for backpropagation: "ste" or "zero_faulty"
+  gradient_mode: "ste"
 ```
 
 ### Configuration Parameters
@@ -577,6 +580,73 @@ The periodic pattern is distributed across tensor dimensions as follows:
 
 ---
 
+#### gradient_mode
+
+| Property | Value |
+|----------|-------|
+| Type | `string` |
+| Options | `"ste"`, `"zero_faulty"` |
+| Default | `"ste"` |
+| Required | No |
+
+Controls how gradients flow through faulty positions during backpropagation. This is critical for Fault-Aware Training (FAT) as it determines what the model learns from faulty activations.
+
+##### `"ste"` - Straight-Through Estimator (Default)
+
+Gradients flow through all positions unchanged, including faulty positions. This is the standard approach used in quantization-aware training.
+
+**Gradient behavior:**
+```
+Forward:  x = [1, 2, 3, 4]  →  faulty = [1, 99, 3, 4]  (position 1 corrupted)
+Backward: grad_output = [1, 1, 1, 1]  →  grad_x = [1, 1, 1, 1]  (all gradients pass)
+```
+
+**Characteristics:**
+
+- All positions contribute to parameter updates
+- Model learns to compensate for faults through all parameters
+- Standard approach in quantization-aware training (QAT)
+- May cause the model to try to "predict" faulty values
+
+```yaml
+fault_injection:
+  gradient_mode: "ste"
+```
+
+##### `"zero_faulty"` - Zero Faulty Gradients
+
+Gradients are zeroed at faulty positions. Only clean positions contribute to parameter updates.
+
+**Gradient behavior:**
+```
+Forward:  x = [1, 2, 3, 4]  →  faulty = [1, 99, 3, 4]  (position 1 corrupted)
+Backward: grad_output = [1, 1, 1, 1]  →  grad_x = [1, 0, 1, 1]  (faulty position blocked)
+```
+
+**Characteristics:**
+
+- Faulty positions don't contribute to parameter updates
+- Model only learns from reliable (clean) gradients
+- May improve robustness by preventing learning from corrupted signals
+- Matches the behavior of the original FAT implementation's `zero_gradients_hook`
+
+```yaml
+fault_injection:
+  gradient_mode: "zero_faulty"
+```
+
+##### Comparison of Gradient Modes
+
+| Mode | Gradient at Faulty Position | Use Case |
+|------|----------------------------|----------|
+| `ste` | Passes through (1) | Standard FAT, QAT-style training |
+| `zero_faulty` | Blocked (0) | Conservative FAT, avoiding corrupt gradients |
+
+!!! tip "Which mode to choose?"
+    Start with `"ste"` (default) as it's the standard approach. Try `"zero_faulty"` if you observe training instability or want to prevent the model from learning to predict faulty values. Research suggests both approaches can be effective depending on the fault model and network architecture.
+
+---
+
 ## Target Layers
 
 Fault injection is applied after these Brevitas quantized activation layers:
@@ -601,17 +671,27 @@ The `FaultInjector` automatically traverses the model graph and identifies these
 
 ### Backpropagation Support
 
-The fault injection layer uses the **Straight-Through Estimator (STE)** for backpropagation, ensuring gradients flow correctly during training:
+The fault injection layer supports configurable gradient modes for backpropagation, controlled by the `gradient_mode` parameter:
 
+**STE Mode (default):**
 ```python
 # Forward: Apply injection
-output_value = x.value + injection_delta
+output_value = torch.where(mask, faulty_values, x)
 
-# Backward: Straight-through (gradient passes unchanged)
-# The injection_delta is computed with torch.no_grad()
+# Backward: Straight-through (all gradients pass unchanged)
+grad_x = grad_output  # [1, 1, 1, 1]
 ```
 
-This allows Fault-Aware Training to work correctly with standard optimizers.
+**Zero-Faulty Mode:**
+```python
+# Forward: Apply injection  
+output_value = torch.where(mask, faulty_values, x)
+
+# Backward: Zero gradients at faulty positions
+grad_x = torch.where(mask, zeros, grad_output)  # [1, 0, 1, 1]
+```
+
+Both modes allow Fault-Aware Training to work correctly with standard optimizers. See the [`gradient_mode`](#gradient_mode) parameter for details.
 
 ---
 
@@ -1368,6 +1448,9 @@ class FaultInjectionConfig:
     seed: Optional[int] = None
     track_statistics: bool = True
     verbose: bool = False
+    hw_mask: bool = False
+    frequency_value: int = 1024
+    gradient_mode: str = "ste"
     
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> "FaultInjectionConfig": ...

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import numpy as np
 import torch
@@ -21,6 +21,85 @@ from .strategies import InjectionStrategy, get_strategy
 
 if TYPE_CHECKING:
     from .statistics import FaultStatistics
+
+
+class FaultInjectionFunction(torch.autograd.Function):
+    """Custom autograd function for fault injection with configurable gradient behavior.
+
+    This function applies fault injection during the forward pass and provides
+    two modes for backward pass gradient computation:
+
+    1. **STE mode**: Gradients flow through all positions as if no fault occurred
+    2. **Zero-faulty mode**: Gradients are zeroed at faulty positions
+
+    Example:
+        ```python
+        # STE mode - all gradients flow
+        output = FaultInjectionFunction.apply(x, faulty_values, mask, "ste")
+
+        # Zero-faulty mode - gradients zeroed at faulty positions
+        output = FaultInjectionFunction.apply(x, faulty_values, mask, "zero_faulty")
+        ```
+    """
+
+    @staticmethod
+    def forward(
+        ctx,
+        x: Tensor,
+        faulty_values: Tensor,
+        mask: Tensor,
+        gradient_mode: str,
+    ) -> Tensor:
+        """Forward pass: apply fault injection.
+
+        Args:
+            ctx: Autograd context for saving tensors.
+            x: Original activation tensor.
+            faulty_values: Tensor of faulty values to inject.
+            mask: Boolean mask indicating positions to inject (True = inject).
+            gradient_mode: Either "ste" or "zero_faulty".
+
+        Returns:
+            Tensor with faults injected at masked positions.
+        """
+        # Save mask and mode for backward pass
+        ctx.save_for_backward(mask)
+        ctx.gradient_mode = gradient_mode
+
+        # Apply fault injection: where mask is True, use faulty_values
+        output = torch.where(mask, faulty_values, x)
+        return output
+
+    @staticmethod
+    def backward(ctx, grad_output: Tensor) -> Tuple[Optional[Tensor], None, None, None]:
+        """Backward pass: compute gradients based on gradient_mode.
+
+        Args:
+            ctx: Autograd context with saved tensors.
+            grad_output: Gradient from upstream layers.
+
+        Returns:
+            Tuple of gradients for each forward input:
+            - grad_x: Gradient for original tensor x
+            - None: No gradient for faulty_values (not needed)
+            - None: No gradient for mask (not differentiable)
+            - None: No gradient for gradient_mode (string)
+        """
+        mask, = ctx.saved_tensors
+        gradient_mode = ctx.gradient_mode
+
+        if gradient_mode == "ste":
+            # STE: Pass all gradients through as if no injection happened
+            grad_x = grad_output
+        elif gradient_mode == "zero_faulty":
+            # Zero-faulty: Zero gradients at faulty positions
+            grad_x = torch.where(mask, torch.zeros_like(grad_output), grad_output)
+        else:
+            # Fallback to STE
+            grad_x = grad_output
+
+        # Return gradients: only x needs gradient, others are None
+        return grad_x, None, None, None
 
 
 class HardwareMaskGenerator:
@@ -274,6 +353,7 @@ class QuantFaultInjectionLayer(nn.Module):
         hw_mask: bool = False,
         frequency_value: int = 1024,
         seed: Optional[int] = None,
+        gradient_mode: str = "ste",
     ) -> None:
         """Initialize the fault injection layer.
 
@@ -290,6 +370,7 @@ class QuantFaultInjectionLayer(nn.Module):
             hw_mask: Use hardware-aware periodic fault pattern.
             frequency_value: Hardware parallelism factor for hw_mask.
             seed: Random seed for reproducible fault patterns.
+            gradient_mode: How gradients flow through faults ("ste" or "zero_faulty").
         """
         super().__init__()
 
@@ -304,6 +385,7 @@ class QuantFaultInjectionLayer(nn.Module):
         self.hw_mask = hw_mask
         self.frequency_value = frequency_value
         self.seed = seed
+        self.gradient_mode = gradient_mode
 
         # Strategy for fault injection
         if strategy is None:
@@ -390,17 +472,15 @@ class QuantFaultInjectionLayer(nn.Module):
         # Convert back to float with scale
         injected_float = injected_int.float() * scale
 
-        # Apply straight-through estimator for backpropagation:
-        # Forward: use injected values
-        # Backward: pass gradients through as if no injection happened
-        # This is done by detaching the injected values and adding back the gradient path
-        with torch.no_grad():
-            # Compute the difference caused by injection
-            injection_delta = injected_float - x.value
-
-        # Apply injection while preserving gradient flow for non-injected values
-        # For injected values, gradients are zeroed (fault is not differentiable)
-        output_value = x.value + injection_delta
+        # Apply fault injection with configurable gradient behavior
+        # - "ste": Straight-Through Estimator - all gradients flow through
+        # - "zero_faulty": Zero gradients at faulty positions
+        output_value = FaultInjectionFunction.apply(
+            x.value,
+            injected_float,
+            condition_tensor,
+            self.gradient_mode,
+        )
 
         # Track statistics if enabled
         if self.statistics is not None:

@@ -208,6 +208,7 @@ class FaultInjector:
                     hw_mask=config.hw_mask,
                     frequency_value=config.frequency_value,
                     seed=config.seed,
+                    gradient_mode=config.gradient_mode,
                 )
                 self._injection_layers.append(inj_layer)
 
@@ -275,6 +276,7 @@ class FaultInjector:
                     hw_mask=config.hw_mask,
                     frequency_value=config.frequency_value,
                     seed=config.seed,
+                    gradient_mode=config.gradient_mode,
                 )
                 self._injection_layers.append(inj_layer)
                 new_modules.append((f"fault_inj_{self._layer_count}", inj_layer))

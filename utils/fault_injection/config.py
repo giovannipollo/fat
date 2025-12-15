@@ -29,6 +29,9 @@ class FaultInjectionConfig:
         hw_mask: Use hardware-aware periodic fault pattern instead of random.
         frequency_value: Hardware parallelism factor for hw_mask (e.g., 1024 for
             1024 parallel MAC units). Determines the period of the fault pattern.
+        gradient_mode: How gradients flow through faulty positions during backprop.
+            - "ste": Straight-Through Estimator - gradients flow through all positions
+            - "zero_faulty": Zero gradients at faulty positions, flow through clean
 
     Example:
         ```python
@@ -45,6 +48,13 @@ class FaultInjectionConfig:
             probability=5.0,
             hw_mask=True,
             frequency_value=1024,
+        )
+
+        # Zero gradients at faulty positions (original fat/ behavior)
+        config = FaultInjectionConfig(
+            enabled=True,
+            probability=5.0,
+            gradient_mode="zero_faulty",
         )
 
         # Or from YAML dict
@@ -65,6 +75,7 @@ class FaultInjectionConfig:
     verbose: bool = False
     hw_mask: bool = False
     frequency_value: int = 1024
+    gradient_mode: str = "ste"
 
     # Valid values for validation
     _VALID_MODES: List[str] = field(
@@ -77,6 +88,10 @@ class FaultInjectionConfig:
     )
     _VALID_APPLY_DURING: List[str] = field(
         default_factory=lambda: ["train", "eval", "both"],
+        repr=False,
+    )
+    _VALID_GRADIENT_MODES: List[str] = field(
+        default_factory=lambda: ["ste", "zero_faulty"],
         repr=False,
     )
 
@@ -119,6 +134,7 @@ class FaultInjectionConfig:
             verbose=config.get("verbose", False),
             hw_mask=config.get("hw_mask", False),
             frequency_value=config.get("frequency_value", 1024),
+            gradient_mode=config.get("gradient_mode", "ste"),
         )
 
     def validate(self) -> None:
@@ -164,6 +180,12 @@ class FaultInjectionConfig:
                 f"frequency_value must be >= 1, got {self.frequency_value}"
             )
 
+        if self.gradient_mode not in self._VALID_GRADIENT_MODES:
+            raise ValueError(
+                f"gradient_mode must be one of {self._VALID_GRADIENT_MODES}, "
+                f"got '{self.gradient_mode}'"
+            )
+
     def should_inject_during_training(self) -> bool:
         """Check if injection should occur during training.
 
@@ -200,4 +222,5 @@ class FaultInjectionConfig:
             "verbose": self.verbose,
             "hw_mask": self.hw_mask,
             "frequency_value": self.frequency_value,
+            "gradient_mode": self.gradient_mode,
         }
