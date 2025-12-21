@@ -85,7 +85,7 @@ class FaultInjectionFunction(torch.autograd.Function):
             - None: No gradient for mask (not differentiable)
             - None: No gradient for gradient_mode (string)
         """
-        mask, = ctx.saved_tensors
+        (mask,) = ctx.saved_tensors
         gradient_mode = ctx.gradient_mode
 
         if gradient_mode == "ste":
@@ -226,7 +226,9 @@ class HardwareMaskGenerator:
                                     # Special case: 1x1 spatial
                                     mask_np[b, :, h, w] = frequency_mask[:channels]
                                 else:
-                                    mask_np[b, :, h, w] = frequency_mask[start_idx:end_idx]
+                                    mask_np[b, :, h, w] = frequency_mask[
+                                        start_idx:end_idx
+                                    ]
 
                                 positions_filled += 1
                                 if positions_filled == positions_needed:
@@ -392,7 +394,7 @@ class QuantFaultInjectionLayer(nn.Module):
             strategy = get_strategy("random")
         self.strategy = strategy
 
-        # Hardware mask generator (created lazily)
+        # Hardware mask generator
         self._hw_mask_generator: Optional[HardwareMaskGenerator] = None
         if hw_mask:
             self._hw_mask_generator = HardwareMaskGenerator(
@@ -576,9 +578,8 @@ class QuantFaultInjectionLayer(nn.Module):
                         )
                     else:
                         # Use pre-computed schedule
-                        if (
-                            self.condition_injector is not None
-                            and self.counter < len(self.condition_injector)
+                        if self.condition_injector is not None and self.counter < len(
+                            self.condition_injector
                         ):
                             if self.condition_injector[self.counter]:
                                 self._condition_tensor = self._condition_tensor_true
@@ -591,9 +592,7 @@ class QuantFaultInjectionLayer(nn.Module):
                             shape, device
                         )
             elif self.injection_layer == self.layer_id:
-                self._condition_tensor = self._hw_mask_generator.generate(
-                    shape, device
-                )
+                self._condition_tensor = self._hw_mask_generator.generate(shape, device)
         else:
             # Evaluation: generate once per evaluation run
             if self.counter == 0:
@@ -630,18 +629,15 @@ class QuantFaultInjectionLayer(nn.Module):
                 if self.counter == 0:
                     # Generate new fault mask
                     self._p_tensor = torch.rand(shape, device=device)
-                    self._condition_tensor = (
-                        self._p_tensor < self.probability / 100.0
-                    )
+                    self._condition_tensor = self._p_tensor < self.probability / 100.0
                     self._condition_tensor_true = self._condition_tensor.clone()
                     self._condition_tensor_false = torch.zeros(
                         shape, dtype=torch.bool, device=device
                     )
                 else:
                     # Use pre-computed schedule
-                    if (
-                        self.condition_injector is not None
-                        and self.counter < len(self.condition_injector)
+                    if self.condition_injector is not None and self.counter < len(
+                        self.condition_injector
                     ):
                         if self.condition_injector[self.counter]:
                             self._condition_tensor = self._condition_tensor_true
@@ -651,9 +647,7 @@ class QuantFaultInjectionLayer(nn.Module):
                 # Non-interval epoch: generate fresh mask each iteration
                 if self.counter == 0:
                     self._p_tensor = torch.rand(shape, device=device)
-                    self._condition_tensor = (
-                        self._p_tensor < self.probability / 100.0
-                    )
+                    self._condition_tensor = self._p_tensor < self.probability / 100.0
 
         # Single layer injection
         elif self.injection_layer == self.layer_id:
@@ -682,16 +676,12 @@ class QuantFaultInjectionLayer(nn.Module):
             # Full model injection
             if self.injection_layer == self.num_layers:
                 self._p_tensor = torch.rand(shape, device=device)
-                self._condition_tensor = (
-                    self._p_tensor < self.probability / 100.0
-                )
+                self._condition_tensor = self._p_tensor < self.probability / 100.0
 
             # Single layer injection
             elif self.layer_id == self.injection_layer:
                 self._p_tensor = torch.rand(shape, device=device)
-                self._condition_tensor = (
-                    self._p_tensor < self.probability / 100.0
-                )
+                self._condition_tensor = self._p_tensor < self.probability / 100.0
 
         return self._condition_tensor
 
@@ -767,7 +757,3 @@ class QuantFaultInjectionLayer(nn.Module):
             num_iterations: Number of iterations.
         """
         self.num_iterations = num_iterations
-
-
-# Compatibility alias for existing fat/src code
-ErrInjLayer = QuantFaultInjectionLayer

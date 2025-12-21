@@ -80,6 +80,10 @@ def main() -> None:
     model = get_model(config)
     print(f"Model: {config['model']['name']}")
 
+    # Save the model architecture to a file
+    with open("model_architecture.txt", "w") as f:
+        f.write(str(model))
+    print("Model architecture saved to model_architecture.txt")
     # Create trainer and start training
     trainer = Trainer(
         model=model,

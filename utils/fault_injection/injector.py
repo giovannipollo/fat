@@ -94,10 +94,11 @@ class FaultInjector:
         # Reset state
         self._layer_count = 0
         self._injection_layers = []
+        self.config = config
 
         # First pass: count target layers
         total_layers = self._count_target_layers(model)
-
+    
         # Determine injection layer for "layer" mode
         if config.mode == "layer":
             if config.injection_layer == -1:
@@ -110,6 +111,8 @@ class FaultInjector:
         else:
             # Full model: use total_layers as marker
             injection_layer = total_layers
+            if config.verbose:
+                print("Injecting faults into all target layers in the model")
 
         # Get injection strategy
         strategy = get_strategy(config.injection_type)
@@ -141,6 +144,8 @@ class FaultInjector:
         for child in module.modules():
             if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
                 count += 1
+                if self.config.verbose:
+                    print(f"Found target layer: {child.__class__.__name__}")
         return count
 
     def _inject_recursive(
@@ -164,6 +169,12 @@ class FaultInjector:
             parent: Parent module (for attribute replacement).
             name: Name of this module in parent.
         """
+        if config.verbose:
+            if name is not None and name != "":
+                print(f"Processing module: {module.__class__.__name__}, name: {name}")
+            else:
+                print(f"Processing module: {module.__class__.__name__}")
+
         # Handle Sequential modules specially
         if isinstance(module, nn.Sequential):
             self._inject_sequential(
@@ -177,16 +188,51 @@ class FaultInjector:
 
         # Handle ModuleList
         if isinstance(module, nn.ModuleList):
+            if config.verbose:
+                print(f"Injecting into ModuleList with {len(module)} layers")
             for i, child in enumerate(module):
-                self._inject_recursive(
-                    child,
-                    config=config,
-                    injection_layer=injection_layer,
-                    total_layers=total_layers,
-                    strategy=strategy,
-                    parent=module,
-                    name=str(i),
-                )
+                if config.verbose:
+                    print(f"Processing ModuleList child {i}: {child.__class__.__name__}")
+                # Check if this child is a target layer
+                if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
+                    if config.verbose:
+                        print(f"Found target layer in ModuleList: {child.__class__.__name__}")
+                    # Create injection layer
+                    inj_layer = QuantFaultInjectionLayer(
+                        layer_id=self._layer_count,
+                        probability=config.probability,
+                        injection_layer=injection_layer,
+                        num_layers=total_layers,
+                        strategy=strategy,
+                        mode=config.mode,
+                        epoch_interval=config.epoch_interval,
+                        step_interval=config.step_interval,
+                        verbose=config.verbose,
+                        hw_mask=config.hw_mask,
+                        frequency_value=config.frequency_value,
+                        seed=config.seed,
+                        gradient_mode=config.gradient_mode,
+                    )
+                    self._injection_layers.append(inj_layer)
+                    if config.verbose:
+                        print(f"Created injection layer {self._layer_count} for ModuleList")
+                    # Wrap the target layer with injection
+                    wrapper = _InjectionWrapper(child, inj_layer)
+                    module[i] = wrapper
+                    self._layer_count += 1
+                else:
+                    if config.verbose:
+                        print(f"Recurse into ModuleList child {i}: {child.__class__.__name__}")
+                    # Recurse into non-target children
+                    self._inject_recursive(
+                        child,
+                        config=config,
+                        injection_layer=injection_layer,
+                        total_layers=total_layers,
+                        strategy=strategy,
+                        parent=module,
+                        name=str(i),
+                    )
             return
 
         # Process named children
@@ -246,6 +292,9 @@ class FaultInjector:
             total_layers: Total number of injection layers.
             strategy: Injection strategy instance.
         """
+        if config.verbose:
+            print(f"Injecting into Sequential module with {len(module)} layers")
+
         new_modules: List[Tuple[str, nn.Module]] = []
 
         for name, child in module.named_children():
@@ -438,11 +487,16 @@ class FaultInjector:
             List of injection layer instances.
         """
         layers = []
+        seen_ids = set()
         for module in model.modules():
             if isinstance(module, QuantFaultInjectionLayer):
-                layers.append(module)
+                if id(module) not in seen_ids:
+                    layers.append(module)
+                    seen_ids.add(id(module))
             elif isinstance(module, _InjectionWrapper):
-                layers.append(module.injection_layer)
+                if id(module.injection_layer) not in seen_ids:
+                    layers.append(module.injection_layer)
+                    seen_ids.add(id(module.injection_layer))
         return layers
 
 

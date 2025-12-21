@@ -163,6 +163,11 @@ class Trainer:
         # Create injector and inject layers
         self.fault_injector = FaultInjector()
         self.model = self.fault_injector.inject(self.model, self.fault_config)
+
+        if self.fault_config.verbose:
+            # Print the model architecture with injection layers
+            for name, module in self.model.named_modules():
+                print(f"{name}: {module}")
         
         # Setup statistics tracking if enabled
         if self.fault_config.track_statistics:
