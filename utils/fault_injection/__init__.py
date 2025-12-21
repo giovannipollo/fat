@@ -54,8 +54,9 @@ Example:
 from __future__ import annotations
 
 from .config import FaultInjectionConfig
+from .functions import FaultInjectionFunction
 from .injector import FaultInjector
-from .layers import QuantFaultInjectionLayer, HardwareMaskGenerator
+from .layers import QuantFaultInjectionLayer
 from .statistics import FaultStatistics, LayerStatistics
 from .strategies import (
     InjectionStrategy,
@@ -69,12 +70,13 @@ from .strategies import (
 __all__ = [
     # Configuration
     "FaultInjectionConfig",
+    # Functions
+    "FaultInjectionFunction",
     # Injector
     "FaultInjector",
     # Layers
     "QuantFaultInjectionLayer",
     "ErrInjLayer",  # Alias for compatibility
-    "HardwareMaskGenerator",
     # Statistics
     "FaultStatistics",
     "LayerStatistics",

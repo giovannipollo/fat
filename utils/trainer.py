@@ -179,7 +179,7 @@ class Trainer:
         if self.fault_config.verbose:
             num_layers = self.fault_injector.get_num_layers(self.model)
             print(f"Fault injection enabled: {num_layers} injection layers added")
-            print(f"  Mode: {self.fault_config.mode}")
+            print("  Mode: full_model")
             print(f"  Probability: {self.fault_config.probability}%")
             print(f"  Injection type: {self.fault_config.injection_type}")
             print(f"  Apply during: {self.fault_config.apply_during}")
@@ -213,11 +213,7 @@ class Trainer:
             self.fault_injector.reset_counters(self.model)
             
             # Set up condition injector for step_interval-based injection
-            if self.fault_config.step_interval > 0:
-                num_iterations = len(self.train_loader)
-                self.fault_injector.set_condition_injector(
-                    self.model, num_iterations, self.fault_config.step_interval
-                )
+            # No step interval setup needed for simplified injection
             
             # Set mode based on apply_during config
             apply_during = self.fault_config.apply_during
@@ -384,7 +380,7 @@ class Trainer:
             num_layers = self.fault_injector.get_num_layers(self.model)
             print(f"Fault injection: {num_layers} layers, "
                   f"prob={self.fault_config.probability}%, "
-                  f"mode={self.fault_config.mode}, "
+                  f"mode=full_model, "
                   f"type={self.fault_config.injection_type}")
 
         for epoch in range(self.start_epoch, epochs):

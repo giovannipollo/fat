@@ -247,9 +247,7 @@ class FaultStatistics:
             Dictionary with total counts and rates.
         """
         total_injected = sum(s.injected_count for s in self.layer_stats.values())
-        total_activations = sum(
-            s.total_activations for s in self.layer_stats.values()
-        )
+        total_activations = sum(s.total_activations for s in self.layer_stats.values())
 
         if total_activations > 0:
             overall_rate = 100.0 * total_injected / total_activations

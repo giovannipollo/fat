@@ -47,9 +47,10 @@ Add the `fault_injection` section to your YAML configuration:
 fault_injection:
   enabled: true
   probability: 5.0
-  mode: "full_model"
   injection_type: "random"
   apply_during: "train"
+  track_statistics: true
+  verbose: true
 ```
 
 ### Training with Fault Injection
@@ -163,66 +164,6 @@ fault_injection:
 
 !!! tip "Starting Point"
     Start with low probabilities (1-5%) and increase gradually. High probabilities (>20%) can prevent model convergence during training.
-
----
-
-#### mode
-
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Options | `"full_model"`, `"layer"` |
-| Default | `"full_model"` |
-| Required | No |
-
-Determines the scope of fault injection:
-
-**`"full_model"`** (Recommended for FAT)
-
-Injects faults in **all** quantized activation layers. This provides comprehensive fault coverage and trains the model to be robust across all layers.
-
-```yaml
-fault_injection:
-  mode: "full_model"
-```
-
-**`"layer"`**
-
-Injects faults in only **one** specific layer, identified by `injection_layer`. This is useful for:
-
-- Identifying which layers are most vulnerable
-- Targeted hardening of specific layers
-- Research experiments comparing layer sensitivity
-
-```yaml
-fault_injection:
-  mode: "layer"
-  injection_layer: 3  # Inject only in layer 3
-```
-
----
-
-#### injection_layer
-
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Default | `-1` |
-| Required | No (only used when `mode: "layer"`) |
-
-Specifies which layer receives fault injection when `mode: "layer"`:
-
-- **Positive values (0, 1, 2, ...)**: Inject in the layer with that index
-- **`-1`**: Randomly select a different layer each epoch
-
-```yaml
-fault_injection:
-  mode: "layer"
-  injection_layer: -1  # Random layer each epoch
-```
-
-!!! note "Layer Indexing"
-    Layers are indexed in the order they appear during model traversal. Use `verbose: true` to see which layers are assigned which indices.
 
 ---
 
@@ -374,102 +315,6 @@ fault_injection:
 
 ---
 
-#### epoch_interval
-
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Range | `1` to `∞` |
-| Default | `1` |
-| Required | No |
-
-Controls how often fault injection is active across epochs:
-
-- `1`: Fault injection every epoch
-- `2`: Fault injection every other epoch
-- `N`: Fault injection every N epochs
-
-```yaml
-fault_injection:
-  epoch_interval: 2  # Inject faults in epochs 0, 2, 4, 6, ...
-```
-
-!!! tip "Curriculum Training"
-    Use `epoch_interval > 1` to implement curriculum learning where the model first learns on clean data, then progressively sees more faults.
-
----
-
-#### step_interval
-
-| Property | Value |
-|----------|-------|
-| Type | `float` |
-| Range | `0.0` to `1.0` |
-| Default | `0.5` |
-| Required | No |
-
-Probability of fault injection per training step (batch). This provides fine-grained control within each epoch:
-
-- `1.0`: Every training step has fault injection
-- `0.5`: 50% of training steps have fault injection
-- `0.0`: No fault injection (equivalent to `enabled: false`)
-
-```yaml
-fault_injection:
-  step_interval: 0.5  # 50% of batches will have faults
-```
-
-!!! note "Random Schedule"
-    The specific steps with faults are randomly selected at the start of each epoch based on this probability.
-
----
-
-#### seed
-
-| Property | Value |
-|----------|-------|
-| Type | `integer` or `null` |
-| Default | `null` |
-| Required | No |
-
-Random seed for reproducible fault patterns:
-
-- `null`: Non-deterministic fault injection (different each run)
-- Integer value: Reproducible fault patterns
-
-```yaml
-fault_injection:
-  seed: 42  # Reproducible fault patterns
-```
-
-!!! warning "Research vs. Production"
-    For research comparisons, use a fixed seed. For production FAT training, use `null` to expose the model to varied fault patterns.
-
----
-
-#### track_statistics
-
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `true` |
-| Required | No |
-
-Enable collection of fault injection statistics:
-
-- Per-layer injection counts
-- RMSE between original and corrupted values
-- Cosine similarity before/after injection
-
-Statistics are printed at the end of training and saved to `fault_injection_stats.json` in the experiment directory.
-
-```yaml
-fault_injection:
-  track_statistics: true
-```
-
----
-
 #### verbose
 
 | Property | Value |
@@ -497,155 +342,6 @@ Randomly selected layer 7 for injection
 
 ---
 
-#### hw_mask
-
-| Property | Value |
-|----------|-------|
-| Type | `boolean` |
-| Default | `false` |
-| Required | No |
-
-Enable hardware-aware periodic fault pattern instead of random fault selection. When enabled, faults are injected using a deterministic, periodic pattern that simulates how faults occur in real hardware accelerators (FPGAs/ASICs) with fixed parallelism.
-
-**Why use hw_mask?**
-
-Real hardware accelerators process data in parallel (e.g., 1024 MAC units operating simultaneously). Faults in hardware affect specific parallel lanes consistently, not randomly per activation. The `hw_mask` feature creates fault patterns that match this behavior.
-
-```yaml
-fault_injection:
-  hw_mask: true
-  frequency_value: 1024
-  probability: 5.0
-```
-
-**How it works:**
-
-1. Given `frequency_value=1024` and `probability=5%`:
-   - `ceil(1024 * 5 / 100) = 52` fault positions per period
-   - `1024 - 52 = 972` clean positions per period
-2. A shuffled pattern of 52 ones and 972 zeros is created
-3. This pattern is tiled/repeated across the activation tensor
-4. Faults occur at the same relative positions in each period
-
-**Use cases:**
-
-| Scenario | hw_mask Setting |
-|----------|----------------|
-| General FAT training | `false` (random injection) |
-| Hardware-in-the-loop validation | `true` |
-| Comparing with actual faulty hardware | `true` |
-| FPGA/ASIC fault characterization | `true` |
-
-!!! tip "Combining with seed"
-    Use `seed` with `hw_mask: true` for fully reproducible hardware fault patterns across runs.
-
----
-
-#### frequency_value
-
-| Property | Value |
-|----------|-------|
-| Type | `integer` |
-| Range | `1` to `∞` |
-| Default | `1024` |
-| Required | No (only used when `hw_mask: true`) |
-
-The hardware parallelism factor that determines the period of the fault pattern. This should match your target hardware's parallel processing capability.
-
-**Common values:**
-
-| Hardware Type | Typical frequency_value |
-|---------------|------------------------|
-| Small FPGA | 64-256 |
-| Medium FPGA | 256-1024 |
-| Large FPGA/ASIC | 1024-4096 |
-| Custom accelerator | Match actual parallelism |
-
-```yaml
-fault_injection:
-  hw_mask: true
-  frequency_value: 1024  # 1024 parallel MAC units
-  probability: 5.0       # 52 out of 1024 positions faulty
-```
-
-**Pattern distribution:**
-
-The periodic pattern is distributed across tensor dimensions as follows:
-
-- **4D tensors (conv layers)**: Pattern distributed across channels, then tiled across spatial dimensions
-- **2D tensors (linear layers)**: Pattern distributed across features
-
-!!! note "Pattern generation"
-    The pattern is generated once and reused, making `hw_mask` deterministic (given the same `seed`). This is different from random injection where each activation independently has the specified probability.
-
----
-
-#### gradient_mode
-
-| Property | Value |
-|----------|-------|
-| Type | `string` |
-| Options | `"ste"`, `"zero_faulty"` |
-| Default | `"ste"` |
-| Required | No |
-
-Controls how gradients flow through faulty positions during backpropagation. This is critical for Fault-Aware Training (FAT) as it determines what the model learns from faulty activations.
-
-##### `"ste"` - Straight-Through Estimator (Default)
-
-Gradients flow through all positions unchanged, including faulty positions. This is the standard approach used in quantization-aware training.
-
-**Gradient behavior:**
-```
-Forward:  x = [1, 2, 3, 4]  →  faulty = [1, 99, 3, 4]  (position 1 corrupted)
-Backward: grad_output = [1, 1, 1, 1]  →  grad_x = [1, 1, 1, 1]  (all gradients pass)
-```
-
-**Characteristics:**
-
-- All positions contribute to parameter updates
-- Model learns to compensate for faults through all parameters
-- Standard approach in quantization-aware training (QAT)
-- May cause the model to try to "predict" faulty values
-
-```yaml
-fault_injection:
-  gradient_mode: "ste"
-```
-
-##### `"zero_faulty"` - Zero Faulty Gradients
-
-Gradients are zeroed at faulty positions. Only clean positions contribute to parameter updates.
-
-**Gradient behavior:**
-```
-Forward:  x = [1, 2, 3, 4]  →  faulty = [1, 99, 3, 4]  (position 1 corrupted)
-Backward: grad_output = [1, 1, 1, 1]  →  grad_x = [1, 0, 1, 1]  (faulty position blocked)
-```
-
-**Characteristics:**
-
-- Faulty positions don't contribute to parameter updates
-- Model only learns from reliable (clean) gradients
-- May improve robustness by preventing learning from corrupted signals
-- Matches the behavior of the original FAT implementation's `zero_gradients_hook`
-
-```yaml
-fault_injection:
-  gradient_mode: "zero_faulty"
-```
-
-##### Comparison of Gradient Modes
-
-| Mode | Gradient at Faulty Position | Use Case |
-|------|----------------------------|----------|
-| `ste` | Passes through (1) | Standard FAT, QAT-style training |
-| `zero_faulty` | Blocked (0) | Conservative FAT, avoiding corrupt gradients |
-
-!!! tip "Which mode to choose?"
-    Start with `"ste"` (default) as it's the standard approach. Try `"zero_faulty"` if you observe training instability or want to prevent the model from learning to predict faulty values. Research suggests both approaches can be effective depending on the fault model and network architecture.
-
----
 
 ## Target Layers
 
@@ -1439,18 +1135,10 @@ utils/fault_injection/
 class FaultInjectionConfig:
     enabled: bool = False
     probability: float = 5.0
-    mode: str = "full_model"
-    injection_layer: int = -1
     injection_type: str = "random"
     apply_during: str = "eval"
-    epoch_interval: int = 1
-    step_interval: float = 0.5
-    seed: Optional[int] = None
-    track_statistics: bool = True
+    track_statistics: bool = False
     verbose: bool = False
-    hw_mask: bool = False
-    frequency_value: int = 1024
-    gradient_mode: str = "ste"
     
     @classmethod
     def from_dict(cls, config: Dict[str, Any]) -> "FaultInjectionConfig": ...
@@ -1466,13 +1154,9 @@ class FaultInjector:
     
     def inject(self, model: nn.Module, config: FaultInjectionConfig) -> nn.Module: ...
     def remove(self, model: nn.Module) -> nn.Module: ...
-    def update_epoch(self, model: nn.Module, epoch: int) -> None: ...
     def update_probability(self, model: nn.Module, probability: float, layer_id: Optional[int] = None) -> None: ...
-    def reset_counters(self, model: nn.Module) -> None: ...
-    def set_mode(self, model: nn.Module, mode: str) -> None: ...
     def set_enabled(self, model: nn.Module, enabled: bool) -> None: ...
     def set_statistics(self, model: nn.Module, statistics: FaultStatistics) -> None: ...
-    def set_condition_injector(self, model: nn.Module, num_iterations: int, step_interval: float) -> None: ...
     def get_num_layers(self, model: nn.Module) -> int: ...
 ```
 

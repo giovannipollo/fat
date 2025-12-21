@@ -64,49 +64,26 @@ checkpoint:
 fault_injection:
   # Enable/disable fault injection
   enabled: true
-  
+
   # Fault probability (0-100%)
   # Percentage of activations that will be modified when injection is active
   probability: 3.0
-  
-  # Injection mode:
-  # - "full_model": Inject faults in all quantized layers
-  # - "layer": Inject faults only in a specific layer (use injection_layer)
-  mode: "full_model"
-  
+
   # Injection type (fault model):
   # - "random": Add random values within quantization range
   # - "lsb_flip": Flip least significant bit
   # - "msb_flip": Flip most significant bit
   # - "full_flip": Flip all bits
   injection_type: "random"
-  
+
   # When to apply fault injection:
   # - "train": Only during training forward pass
   # - "eval": Only during evaluation
   # - "both": During both training and evaluation
   apply_during: "train"
-  
-  # Epoch interval for injection (1 = every epoch, 2 = every other epoch, etc.)
-  epoch_interval: 1
-  
-  # Step interval (0-1): Probability of injection per training step
-  # 0.5 means 50% of training steps will have fault injection
-  # 1.0 means all steps have injection (within epoch_interval)
-  step_interval: 1
-  
-  # Random seed for reproducible fault patterns (null for random)
-  seed: null
-  
+
   # Track injection statistics (RMSE, cosine similarity, etc.)
   track_statistics: true
-  
+
   # Verbose output for debugging
   verbose: true
-
-  # Gradient mode for backpropagation through faulty positions:
-  # - "ste": Straight-Through Estimator - gradients flow through all positions
-  #          (standard approach, all positions get gradient = 1)
-  # - "zero_faulty": Zero gradients at faulty positions - only clean positions
-  #                  receive gradients (faulty positions get gradient = 0)
-  gradient_mode: "zero_faulty"
