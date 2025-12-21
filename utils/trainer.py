@@ -209,7 +209,6 @@ class Trainer:
 
         # Setup fault injection for this epoch
         if self.fault_injector is not None and self.fault_config is not None:
-            self.fault_injector.reset_counters(self.model)
             
             # Set up condition injector for step_interval-based injection
             # No step interval setup needed for simplified injection
@@ -293,7 +292,6 @@ class Trainer:
             apply_during = self.fault_config.apply_during
             if apply_during in ("eval", "both"):
                 self.fault_injector.set_enabled(self.model, True)
-                self.fault_injector.reset_counters(self.model)
             else:
                 self.fault_injector.set_enabled(self.model, False)
 

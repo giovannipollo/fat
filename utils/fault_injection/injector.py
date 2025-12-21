@@ -38,9 +38,6 @@ class FaultInjector:
         # Inject layers
         model = injector.inject(model, config)
 
-        # Reset counters for new epoch
-        injector.reset_counters(model)
-
         # Remove injection layers
         model = injector.remove(model)
         ```
@@ -245,15 +242,6 @@ class FaultInjector:
         for layer in self._get_injection_layers(model):
             if layer_id is None or layer.layer_id == layer_id:
                 layer.set_probability(probability)
-
-    def reset_counters(self, model: nn.Module) -> None:
-        """Reset iteration counters for all injection layers.
-
-        Args:
-            model: Model with injection layers.
-        """
-        # No-op: counter handling removed for simplicity
-        pass
 
     def set_enabled(self, model: nn.Module, enabled: bool) -> None:
         """Enable or disable injection for all layers.
