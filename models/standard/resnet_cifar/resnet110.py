@@ -17,4 +17,6 @@ class ResNet110(ResNetCIFAR):
             num_classes: Number of output classes.
             in_channels: Number of input channels.
         """
-        super().__init__(num_blocks=18, num_classes=num_classes, in_channels=in_channels)
+        super().__init__(
+            num_blocks=18, num_classes=num_classes, in_channels=in_channels
+        )

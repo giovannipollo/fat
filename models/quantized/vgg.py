@@ -18,12 +18,47 @@ CFG: Dict[str, List[Union[int, str]]] = {
     "vgg11": [64, "M", 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "vgg13": [64, 64, "M", 128, 128, "M", 256, 256, "M", 512, 512, "M", 512, 512, "M"],
     "vgg16": [
-        64, 64, "M", 128, 128, "M", 256, 256, 256, "M",
-        512, 512, 512, "M", 512, 512, 512, "M",
+        64,
+        64,
+        "M",
+        128,
+        128,
+        "M",
+        256,
+        256,
+        256,
+        "M",
+        512,
+        512,
+        512,
+        "M",
+        512,
+        512,
+        512,
+        "M",
     ],
     "vgg19": [
-        64, 64, "M", 128, 128, "M", 256, 256, 256, 256, "M",
-        512, 512, 512, 512, "M", 512, 512, 512, 512, "M",
+        64,
+        64,
+        "M",
+        128,
+        128,
+        "M",
+        256,
+        256,
+        256,
+        256,
+        "M",
+        512,
+        512,
+        512,
+        512,
+        "M",
+        512,
+        512,
+        512,
+        512,
+        "M",
     ],
 }
 
@@ -75,7 +110,9 @@ class QuantVGG(nn.Module):
             self._make_quant_linear(512, 512, weight_bit_width=weight_bit_width),
             self._make_quant_relu(act_bit_width, return_quant_tensor=False),
             nn.Dropout(0.5),
-            self._make_quant_linear(512, num_classes, weight_bit_width=weight_bit_width),
+            self._make_quant_linear(
+                512, num_classes, weight_bit_width=weight_bit_width
+            ),
         )
 
         # Weight initialization
@@ -105,20 +142,27 @@ class QuantVGG(nn.Module):
                 layers.append(nn.MaxPool2d(kernel_size=2, stride=2))
             elif isinstance(v, int):
                 conv = self._make_quant_conv2d(
-                    current_channels, v, kernel_size=3, padding=1,
+                    current_channels,
+                    v,
+                    kernel_size=3,
+                    padding=1,
                     weight_bit_width=self.weight_bit_width,
                 )
                 if batch_norm:
-                    layers.extend([
-                        conv,
-                        nn.BatchNorm2d(v),
-                        self._make_quant_relu(self.act_bit_width),
-                    ])
+                    layers.extend(
+                        [
+                            conv,
+                            nn.BatchNorm2d(v),
+                            self._make_quant_relu(self.act_bit_width),
+                        ]
+                    )
                 else:
-                    layers.extend([
-                        conv,
-                        self._make_quant_relu(self.act_bit_width),
-                    ])
+                    layers.extend(
+                        [
+                            conv,
+                            self._make_quant_relu(self.act_bit_width),
+                        ]
+                    )
                 current_channels = v
 
         return nn.Sequential(*layers)
@@ -163,8 +207,12 @@ def QuantVGG11(
 ) -> QuantVGG:
     """Create quantized VGG-11 model with batch normalization."""
     return QuantVGG(
-        CFG["vgg11"], num_classes, in_channels, batch_norm=True,
-        weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
+        CFG["vgg11"],
+        num_classes,
+        in_channels,
+        batch_norm=True,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -177,8 +225,12 @@ def QuantVGG13(
 ) -> QuantVGG:
     """Create quantized VGG-13 model with batch normalization."""
     return QuantVGG(
-        CFG["vgg13"], num_classes, in_channels, batch_norm=True,
-        weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
+        CFG["vgg13"],
+        num_classes,
+        in_channels,
+        batch_norm=True,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -191,8 +243,12 @@ def QuantVGG16(
 ) -> QuantVGG:
     """Create quantized VGG-16 model with batch normalization."""
     return QuantVGG(
-        CFG["vgg16"], num_classes, in_channels, batch_norm=True,
-        weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
+        CFG["vgg16"],
+        num_classes,
+        in_channels,
+        batch_norm=True,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -205,6 +261,10 @@ def QuantVGG19(
 ) -> QuantVGG:
     """Create quantized VGG-19 model with batch normalization."""
     return QuantVGG(
-        CFG["vgg19"], num_classes, in_channels, batch_norm=True,
-        weight_bit_width=weight_bit_width, act_bit_width=act_bit_width,
+        CFG["vgg19"],
+        num_classes,
+        in_channels,
+        batch_norm=True,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )

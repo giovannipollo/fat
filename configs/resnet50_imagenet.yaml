@@ -1,0 +1,47 @@
+# ResNet-50 on ImageNet-1K
+# Standard ImageNet training configuration
+# Expected accuracy: ~76-77% top-1 after 90 epochs
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "imagenet"
+  root: "./data/imagenet"  # Must contain train/ and val/ subdirectories
+  download: false  # ImageNet must be manually downloaded
+  num_workers: 8
+
+model:
+  name: "resnet50"
+
+training:
+  batch_size: 256
+  epochs: 90
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0001
+
+scheduler:
+  name: "step"
+  step_size: 30
+  gamma: 0.1
+
+amp:
+  enabled: true  # Recommended for ImageNet training
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true

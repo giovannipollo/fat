@@ -40,15 +40,24 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         super().__init__()
         # Quantized depthwise convolution
         self.conv1 = self._make_quant_conv2d(
-            in_planes, in_planes, kernel_size=3, stride=stride, padding=1,
-            groups=in_planes, weight_bit_width=weight_bit_width,
+            in_planes,
+            in_planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            groups=in_planes,
+            weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.relu1 = self._make_quant_relu(act_bit_width)
 
         # Quantized pointwise convolution
         self.conv2 = self._make_quant_conv2d(
-            in_planes, out_planes, kernel_size=1, stride=1, padding=0,
+            in_planes,
+            out_planes,
+            kernel_size=1,
+            stride=1,
+            padding=0,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(out_planes)
@@ -112,7 +121,11 @@ class QuantMobileNetV1(nn.Module):
 
         # Initial Conv Layer
         self.conv1 = self._make_quant_conv2d(
-            in_channels, 32, kernel_size=3, stride=1, padding=1,
+            in_channels,
+            32,
+            kernel_size=3,
+            stride=1,
+            padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(32)
@@ -123,7 +136,9 @@ class QuantMobileNetV1(nn.Module):
 
         # Classifier
         self.linear = self._make_quant_linear(
-            1024, num_classes, weight_bit_width=weight_bit_width,
+            1024,
+            num_classes,
+            weight_bit_width=weight_bit_width,
         )
 
     def _make_layers(self, in_planes: int) -> nn.Sequential:
@@ -137,10 +152,15 @@ class QuantMobileNetV1(nn.Module):
         """
         layers: List[nn.Module] = []
         for out_planes, stride in self.CFG:
-            layers.append(QuantDepthwiseSeparableBlock(
-                in_planes, out_planes, stride,
-                self.weight_bit_width, self.act_bit_width,
-            ))
+            layers.append(
+                QuantDepthwiseSeparableBlock(
+                    in_planes,
+                    out_planes,
+                    stride,
+                    self.weight_bit_width,
+                    self.act_bit_width,
+                )
+            )
             in_planes = out_planes
         return nn.Sequential(*layers)
 

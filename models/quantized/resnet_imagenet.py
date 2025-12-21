@@ -40,14 +40,22 @@ class QuantBasicBlock(nn.Module):
         """
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
-            in_planes, planes, kernel_size=3, stride=stride, padding=1,
+            in_planes,
+            planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu1 = self._make_quant_relu(act_bit_width)
 
         self.conv2 = self._make_quant_conv2d(
-            planes, planes, kernel_size=3, stride=1, padding=1,
+            planes,
+            planes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(planes)
@@ -93,21 +101,29 @@ class QuantBottleneck(nn.Module):
         """Initialize quantized bottleneck residual block."""
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
-            in_planes, planes, kernel_size=1,
+            in_planes,
+            planes,
+            kernel_size=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(planes)
         self.relu1 = self._make_quant_relu(act_bit_width)
 
         self.conv2 = self._make_quant_conv2d(
-            planes, planes, kernel_size=3, stride=stride, padding=1,
+            planes,
+            planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(planes)
         self.relu2 = self._make_quant_relu(act_bit_width)
 
         self.conv3 = self._make_quant_conv2d(
-            planes, planes * self.expansion, kernel_size=1,
+            planes,
+            planes * self.expansion,
+            kernel_size=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
@@ -177,7 +193,11 @@ class QuantResNetBase(nn.Module, ABC):
 
         # Initial convolution layer
         self.conv1 = self._make_quant_conv2d(
-            in_channels, 64, kernel_size=3, stride=1, padding=1,
+            in_channels,
+            64,
+            kernel_size=3,
+            stride=1,
+            padding=1,
             weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(64)
@@ -192,7 +212,8 @@ class QuantResNetBase(nn.Module, ABC):
         # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = self._make_quant_linear(
-            512 * self.block.expansion, num_classes,
+            512 * self.block.expansion,
+            num_classes,
             weight_bit_width=weight_bit_width,
         )
 
@@ -210,25 +231,36 @@ class QuantResNetBase(nn.Module, ABC):
         if stride != 1 or self.in_planes != planes * self.block.expansion:
             downsample = nn.Sequential(
                 self._make_quant_conv2d(
-                    self.in_planes, planes * self.block.expansion,
-                    kernel_size=1, stride=stride,
+                    self.in_planes,
+                    planes * self.block.expansion,
+                    kernel_size=1,
+                    stride=stride,
                     weight_bit_width=self.weight_bit_width,
                 ),
                 nn.BatchNorm2d(planes * self.block.expansion),
             )
 
         layers: List[nn.Module] = []
-        layers.append(self.block(
-            self.in_planes, planes, stride, downsample,
-            self.weight_bit_width, self.act_bit_width,
-        ))
+        layers.append(
+            self.block(
+                self.in_planes,
+                planes,
+                stride,
+                downsample,
+                self.weight_bit_width,
+                self.act_bit_width,
+            )
+        )
         self.in_planes = planes * self.block.expansion
         for _ in range(1, num_blocks):
-            layers.append(self.block(
-                self.in_planes, planes,
-                weight_bit_width=self.weight_bit_width,
-                act_bit_width=self.act_bit_width,
-            ))
+            layers.append(
+                self.block(
+                    self.in_planes,
+                    planes,
+                    weight_bit_width=self.weight_bit_width,
+                    act_bit_width=self.act_bit_width,
+                )
+            )
 
         return nn.Sequential(*layers)
 
@@ -262,29 +294,34 @@ class QuantResNetBase(nn.Module, ABC):
 
 class QuantResNet18(QuantResNetBase):
     """Quantized ResNet-18 model."""
+
     block = QuantBasicBlock
     layers = [2, 2, 2, 2]
 
 
 class QuantResNet34(QuantResNetBase):
     """Quantized ResNet-34 model."""
+
     block = QuantBasicBlock
     layers = [3, 4, 6, 3]
 
 
 class QuantResNet50(QuantResNetBase):
     """Quantized ResNet-50 model."""
+
     block = QuantBottleneck
     layers = [3, 4, 6, 3]
 
 
 class QuantResNet101(QuantResNetBase):
     """Quantized ResNet-101 model."""
+
     block = QuantBottleneck
     layers = [3, 4, 23, 3]
 
 
 class QuantResNet152(QuantResNetBase):
     """Quantized ResNet-152 model."""
+
     block = QuantBottleneck
     layers = [3, 8, 36, 3]
