@@ -6,18 +6,15 @@ to add fault injection layers after target quantized layers.
 
 from __future__ import annotations
 
-import random
-from collections import OrderedDict
-from typing import Any, Dict, List, Optional, Set, Tuple, Type
+from typing import Any, List, Optional, Set
 
-import torch
 import torch.nn as nn
-from torch import Tensor
 
 from .config import FaultInjectionConfig
 from .layers import QuantFaultInjectionLayer
 from .statistics import FaultStatistics
 from .strategies import get_strategy
+from .wrapper import _InjectionWrapper
 
 
 class FaultInjector:
@@ -40,9 +37,6 @@ class FaultInjector:
 
         # Inject layers
         model = injector.inject(model, config)
-
-        # Update parameters per epoch
-        injector.update_epoch(model, epoch=10)
 
         # Reset counters for new epoch
         injector.reset_counters(model)
@@ -115,175 +109,98 @@ class FaultInjector:
 
         return model
 
-    def _count_target_layers(self, module: nn.Module) -> int:
-        """Count the number of target layers in the model.
+    def _is_target_layer(self, module: nn.Module) -> bool:
+        """Check if a module is a target for injection.
 
         Args:
-            module: Module to search.
+            module: Module to check.
 
         Returns:
-            Number of target layers found.
+            True if module is a target layer type.
         """
-        count = 0
-        for child in module.modules():
-            if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
-                count += 1
-                if self.config.verbose:
-                    print(f"Found target layer: {child.__class__.__name__}")
-        return count
+        return module.__class__.__name__ in self.QUANT_TARGET_LAYERS
+
+    def _create_injection_layer(
+        self,
+        config: FaultInjectionConfig,
+        strategy: Any,
+    ) -> QuantFaultInjectionLayer:
+        """Create a new injection layer and track it.
+
+        Args:
+            config: Fault injection configuration.
+            strategy: Injection strategy instance.
+
+        Returns:
+            New QuantFaultInjectionLayer instance.
+        """
+        layer = QuantFaultInjectionLayer(
+            layer_id=self._layer_count,
+            probability=config.probability,
+            strategy=strategy,
+            verbose=config.verbose,
+        )
+        self._injection_layers.append(layer)
+        self._layer_count += 1
+        return layer
+
+    def _set_child(
+        self,
+        module: nn.Module,
+        name: str,
+        child: nn.Module,
+    ) -> None:
+        """Set a child module, handling different container types.
+
+        Args:
+            module: Parent module.
+            name: Name of the child (or index string for ModuleList).
+            child: New child module to set.
+        """
+        if isinstance(module, nn.ModuleList):
+            module[int(name)] = child
+        else:
+            setattr(module, name, child)
 
     def _inject_recursive(
         self,
         module: nn.Module,
         config: FaultInjectionConfig,
         strategy: Any,
-        parent: Optional[nn.Module] = None,
         name: str = "",
     ) -> None:
-        """Recursively inject fault layers into a module.
+        """Recursively inject fault layers by wrapping target children.
+
+        Uses a unified approach for all module types (Sequential, ModuleList,
+        and regular modules) by wrapping target layers with _InjectionWrapper.
 
         Args:
             module: Current module to process.
             config: Fault injection configuration.
-            injection_layer: Target layer index or total_layers for full model.
-            total_layers: Total number of injection layers.
             strategy: Injection strategy instance.
-            parent: Parent module (for attribute replacement).
-            name: Name of this module in parent.
+            name: Name of this module in parent (for verbose logging).
         """
         if config.verbose:
-            if name is not None and name != "":
-                print(f"Processing module: {module.__class__.__name__}, name: {name}")
-            else:
-                print(f"Processing module: {module.__class__.__name__}")
+            name_str = f", name: {name}" if name else ""
+            print(f"Processing module: {module.__class__.__name__}{name_str}")
 
-        # Handle Sequential modules specially
-        if isinstance(module, nn.Sequential):
-            self._inject_sequential(
-                module,
-                config=config,
-                strategy=strategy,
-            )
-            return
-
-        # Handle ModuleList
-        if isinstance(module, nn.ModuleList):
+        for child_name, child in list(module.named_children()):
             if config.verbose:
-                print(f"Injecting into ModuleList with {len(module)} layers")
-            for i, child in enumerate(module):
+                print(f"  Child: {child_name} ({child.__class__.__name__})")
+
+            if self._is_target_layer(child):
                 if config.verbose:
-                    print(
-                        f"Processing ModuleList child {i}: {child.__class__.__name__}"
-                    )
-                # Check if this child is a target layer
-                if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
-                    if config.verbose:
-                        print(
-                            f"Found target layer in ModuleList: {child.__class__.__name__}"
-                        )
-                    # Create injection layer
-                    inj_layer = QuantFaultInjectionLayer(
-                        layer_id=self._layer_count,
-                        probability=config.probability,
-                        strategy=strategy,
-                        verbose=config.verbose,
-                    )
-                    self._injection_layers.append(inj_layer)
-                    if config.verbose:
-                        print(
-                            f"Created injection layer {self._layer_count} for ModuleList"
-                        )
-                    # Wrap the target layer with injection
-                    wrapper = _InjectionWrapper(child, inj_layer)
-                    module[i] = wrapper
-                    self._layer_count += 1
-                else:
-                    if config.verbose:
-                        print(
-                            f"Recurse into ModuleList child {i}: {child.__class__.__name__}"
-                        )
-                    # Recurse into non-target children
-            self._inject_recursive(
-                module,
-                config=config,
-                strategy=strategy,
-            )
-            return
+                    print(f"    Found target layer, wrapping with injection")
 
-        # Process named children
-        children_to_process = list(module.named_children())
-        for child_name, child in children_to_process:
-            # Check if this child is a target layer
-            if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
-                # Create injection layer
-                inj_layer = QuantFaultInjectionLayer(
-                    layer_id=self._layer_count,
-                    probability=config.probability,
-                    strategy=strategy,
-                    verbose=config.verbose,
-                )
-                self._injection_layers.append(inj_layer)
-
-                # Wrap the target layer with injection
+                inj_layer = self._create_injection_layer(config, strategy)
                 wrapper = _InjectionWrapper(child, inj_layer)
-                setattr(module, child_name, wrapper)
+                self._set_child(module, child_name, wrapper)
 
-                self._layer_count += 1
+                if config.verbose:
+                    print(f"    Created injection layer {inj_layer.layer_id}")
             else:
-                # Recurse into child
-                self._inject_recursive(
-                    child,
-                    config=config,
-                    strategy=strategy,
-                    parent=module,
-                    name=child_name,
-                )
-
-    def _inject_sequential(
-        self,
-        module: nn.Sequential,
-        config: FaultInjectionConfig,
-        strategy: Any,
-    ) -> None:
-        """Inject into a Sequential module.
-
-        Args:
-            module: Sequential module to transform.
-            config: Fault injection configuration.
-            injection_layer: Target layer index or total_layers for full model.
-            total_layers: Total number of injection layers.
-            strategy: Injection strategy instance.
-        """
-        if config.verbose:
-            print(f"Injecting into Sequential module with {len(module)} layers")
-
-        new_modules: List[Tuple[str, nn.Module]] = []
-
-        for name, child in module.named_children():
-            # First, recurse into the child if it has children
-            if len(list(child.children())) > 0:
-                self._inject_recursive(
-                    child,
-                    config=config,
-                    strategy=strategy,
-                )
-
-            new_modules.append((name, child))
-
-            # Check if we should inject after this layer
-            if child.__class__.__name__ in self.QUANT_TARGET_LAYERS:
-                inj_layer = QuantFaultInjectionLayer(
-                    layer_id=self._layer_count,
-                    probability=config.probability,
-                    strategy=strategy,
-                    verbose=config.verbose,
-                )
-                self._injection_layers.append(inj_layer)
-                new_modules.append((f"fault_inj_{self._layer_count}", inj_layer))
-                self._layer_count += 1
-
-        # Replace Sequential contents
-        module._modules = OrderedDict(new_modules)
+                # Recurse into non-target children
+                self._inject_recursive(child, config, strategy, child_name)
 
     def remove(self, model: nn.Module) -> nn.Module:
         """Remove all fault injection layers from a model.
@@ -299,42 +216,18 @@ class FaultInjector:
         return model
 
     def _remove_recursive(self, module: nn.Module) -> None:
-        """Recursively remove fault injection layers.
+        """Recursively unwrap all injection wrappers.
 
         Args:
             module: Module to process.
         """
-        # Handle Sequential modules
-        if isinstance(module, nn.Sequential):
-            # Filter out injection layers
-            new_modules = [
-                (name, child)
-                for name, child in module.named_children()
-                if not isinstance(child, QuantFaultInjectionLayer)
-            ]
-            module._modules = OrderedDict(new_modules)
-
-        # Handle wrapped layers
         for name, child in list(module.named_children()):
             if isinstance(child, _InjectionWrapper):
                 # Unwrap the original layer
-                setattr(module, name, child.wrapped_layer)
-            elif isinstance(child, QuantFaultInjectionLayer):
-                # Skip (handled in Sequential case)
-                pass
+                self._set_child(module, name, child.wrapped_layer)
             else:
-                # Recurse
+                # Recurse into children
                 self._remove_recursive(child)
-
-    def update_epoch(self, model: nn.Module, epoch: int) -> None:
-        """Update epoch for all injection layers.
-
-        Args:
-            model: Model with injection layers.
-            epoch: Current epoch number.
-        """
-        # No-op: epoch handling removed for simplicity
-        pass
 
     def update_probability(
         self,
@@ -362,16 +255,6 @@ class FaultInjector:
         # No-op: counter handling removed for simplicity
         pass
 
-    def set_mode(self, model: nn.Module, mode: str) -> None:
-        """Set usage mode (train/eval) for all injection layers.
-
-        Args:
-            model: Model with injection layers.
-            mode: Either "train" or "eval".
-        """
-        # No-op: mode handling removed for simplicity
-        pass
-
     def set_enabled(self, model: nn.Module, enabled: bool) -> None:
         """Enable or disable injection for all layers.
 
@@ -391,22 +274,6 @@ class FaultInjector:
         """
         for layer in self._get_injection_layers(model):
             layer.statistics = statistics
-
-    def set_condition_injector(
-        self, model: nn.Module, num_iterations: int, step_interval: float
-    ) -> None:
-        """Set up the condition injector for training mode.
-
-        Pre-computes which iterations should have injection enabled
-        based on the step_interval probability.
-
-        Args:
-            model: Model with injection layers.
-            num_iterations: Number of iterations per epoch.
-            step_interval: Probability of injection per step (0-1).
-        """
-        # No-op: condition injector removed for simplicity
-        pass
 
     def get_num_layers(self, model: nn.Module) -> int:
         """Count the number of injection layers in a model.
@@ -442,48 +309,4 @@ class FaultInjector:
         return layers
 
 
-class _InjectionWrapper(nn.Module):
-    """Wrapper that applies fault injection after a layer.
 
-    This wrapper is used for non-Sequential layers where we can't
-    simply insert a new layer after the target.
-
-    Attributes:
-        wrapped_layer: The original layer being wrapped.
-        injection_layer: The fault injection layer.
-    """
-
-    def __init__(
-        self,
-        wrapped_layer: nn.Module,
-        injection_layer: QuantFaultInjectionLayer,
-    ) -> None:
-        """Initialize the wrapper.
-
-        Args:
-            wrapped_layer: Original layer to wrap.
-            injection_layer: Fault injection layer to apply after.
-        """
-        super().__init__()
-        self.wrapped_layer = wrapped_layer
-        self.injection_layer = injection_layer
-
-    def forward(self, x: Any) -> Any:
-        """Forward pass through wrapped layer then injection.
-
-        Args:
-            x: Input tensor.
-
-        Returns:
-            Output after wrapped layer and fault injection.
-        """
-        out = self.wrapped_layer(x)
-        return self.injection_layer(out)
-
-    def __repr__(self) -> str:
-        return (
-            f"_InjectionWrapper(\n"
-            f"  (wrapped): {self.wrapped_layer}\n"
-            f"  (injection): {self.injection_layer}\n"
-            f")"
-        )

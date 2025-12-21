@@ -209,7 +209,6 @@ class Trainer:
 
         # Setup fault injection for this epoch
         if self.fault_injector is not None and self.fault_config is not None:
-            self.fault_injector.update_epoch(self.model, epoch)
             self.fault_injector.reset_counters(self.model)
             
             # Set up condition injector for step_interval-based injection

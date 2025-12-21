@@ -42,7 +42,6 @@ Example:
 
     # Training loop
     for epoch in range(epochs):
-        injector.update_epoch(model, epoch)
         injector.reset_counters(model)
         # ... train ...
 
