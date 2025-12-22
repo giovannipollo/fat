@@ -40,7 +40,8 @@ from .quantized import (
     QuantResNet50,
     QuantResNet101,
     QuantResNet152,
-    QuantMobileNetV1,
+    QuantMobileNetCIFAR,
+    QuantMobileNetImageNet,
 )
 
 ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
@@ -70,8 +71,8 @@ QUANT_MODELS: Dict[str, ModelType] = {
     # Quantized CNV
     "quant_cnv": QuantCNV,
     # Quantized MobileNet
-    "quant_mobilenetv1": QuantMobileNetV1,
-    "quant_mobilenetv1_hw": QuantMobileNetV1,
+    "quant_mobilenet_cifar": QuantMobileNetCIFAR,
+    "quant_mobilenet_imagenet": QuantMobileNetImageNet,
     # Quantized ResNet (CIFAR-specific)
     "quant_resnet20": QuantResNet20,
     "quant_resnet32": QuantResNet32,
