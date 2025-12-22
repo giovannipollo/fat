@@ -3,20 +3,20 @@
 Provides standard neural network architectures for image classification
 using full-precision (float32) weights and activations.
 
-Available architectures:
-    - CNV: Compact Neural Vision network
-    - MobileNetV1: Lightweight mobile architecture
-    - VGG: VGG-11/13/16/19 variants
-    - ResNet CIFAR: ResNet-20/32/44/56/110 for 32x32 images
-    - ResNet ImageNet: ResNet-18/34/50/101/152 adapted for small images
+Organized by dataset type:
+- cifar/: Models for CIFAR-10/100 (32x32 images)
+  - CNV: Compact Neural Vision network
+  - MobileNetV1: Lightweight mobile architecture
+  - ResNet: ResNet-20/32/44/56/110 for 32x32 images
+- imagenet/: ImageNet-style models adapted for small images
+  - ResNet: ResNet-18/34/50/101/152 adapted for 32x32/28x28 images
 """
 
 from __future__ import annotations
 
-from .cnv import CNV
-from .mobilenet import MobileNetV1
-from .vgg import VGG11, VGG13, VGG16, VGG19
-from .resnet_cifar import (
+from .cifar.cnv import CNV
+from .cifar.mobilenet import MobileNetV1
+from .cifar.resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,
     ResNet20,
@@ -25,7 +25,7 @@ from .resnet_cifar import (
     ResNet56,
     ResNet110,
 )
-from .resnet_imagenet import (
+from .imagenet.resnet import (
     BasicBlock,
     Bottleneck,
     ResNetBase,
@@ -41,11 +41,6 @@ __all__ = [
     "CNV",
     # MobileNet
     "MobileNetV1",
-    # VGG
-    "VGG11",
-    "VGG13",
-    "VGG16",
-    "VGG19",
     # ResNet CIFAR
     "CIFARBasicBlock",
     "ResNetCIFAR",

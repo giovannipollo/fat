@@ -9,22 +9,22 @@ See: get_quantized_model for the main factory function
 
 from __future__ import annotations
 
-from .resnet_cifar import (
+from .cifar.resnet import (
     QuantResNet20,
     QuantResNet32,
     QuantResNet44,
     QuantResNet56,
     QuantResNet110,
 )
-from .resnet_imagenet import (
+from .imagenet.resnet import (
     QuantResNet18,
     QuantResNet34,
     QuantResNet50,
     QuantResNet101,
     QuantResNet152,
 )
-from .mobilenetv1 import QuantMobileNetV1
-from .cnv import QuantCNV
+from .cifar.mobilenetv1 import QuantMobileNetV1
+from .cifar.cnv import QuantCNV
 
 __all__ = [
     # ResNet CIFAR
