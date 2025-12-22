@@ -1,8 +1,8 @@
-# CIFAR-10 Quantized ResNet-20 (4-bit) Benchmark
+# CIFAR-10 MobileNetV1 Benchmark
 seed:
   enabled: true
-  value: 42
-  deterministic: false
+  value: 0
+  deterministic: true
 
 dataset:
   name: "cifar10"
@@ -11,14 +11,15 @@ dataset:
   num_workers: 4
 
 model:
-  name: "quant_resnet20"
+  name: "quant_mobilenetv1"
 
 quantization:
-  weight_bit_width: 4
-  act_bit_width: 4
+  in_weight_bit_width: 8 
+  weight_bit_width: 8
+  act_bit_width: 8
 
 training:
-  batch_size: 128
+  batch_size: 32
   epochs: 200
 
 optimizer:
@@ -34,7 +35,7 @@ scheduler:
 
 checkpoint:
   enabled: true
-  dir: "./experiments"
+  dir: "./experiments/benchmark/cifar10_quant_mobilenetv1"
   save_frequency: 50
   save_best: true
 

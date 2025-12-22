@@ -130,7 +130,7 @@ def get_dataset_config(dataset: str, first_stage_stride: bool = False) -> Datase
     )
 
 
-class QuantConvBlockHW(nn.Module):
+class QuantConvBlock(nn.Module):
     """Quantized convolution block with batch normalization and ReLU.
 
     Uses per-channel weight quantization and configurable per-channel
@@ -197,7 +197,7 @@ class QuantConvBlockHW(nn.Module):
         return x
 
 
-class QuantDwsConvBlockHW(nn.Module):
+class QuantDwsConvBlock(nn.Module):
     """Quantized Depthwise Separable Convolution Block for hardware.
 
     Consists of a depthwise convolution followed by a pointwise
@@ -228,7 +228,7 @@ class QuantDwsConvBlockHW(nn.Module):
         """
         super().__init__()
 
-        self.dw_conv = QuantConvBlockHW(
+        self.dw_conv = QuantConvBlock(
             in_channels=in_channels,
             out_channels=in_channels,
             groups=in_channels,
@@ -240,7 +240,7 @@ class QuantDwsConvBlockHW(nn.Module):
             act_bit_width=act_bit_width,
         )
 
-        self.pw_conv = QuantConvBlockHW(
+        self.pw_conv = QuantConvBlock(
             in_channels=in_channels,
             out_channels=out_channels,
             kernel_size=1,
@@ -258,7 +258,7 @@ class QuantDwsConvBlockHW(nn.Module):
         return x
 
 
-class QuantMobileNetV1HW(nn.Module):
+class QuantMobileNetV1(nn.Module):
     """Quantized MobileNetV1 optimized for hardware deployment.
 
     Uses per-channel weight quantization (CommonIntWeightPerChannelQuant)
@@ -357,7 +357,7 @@ class QuantMobileNetV1HW(nn.Module):
         features = nn.Sequential()
 
         # Initial convolution block
-        init_block = QuantConvBlockHW(
+        init_block = QuantConvBlock(
             in_channels=in_channels,
             out_channels=INIT_CHANNELS,
             kernel_size=3,
@@ -382,7 +382,7 @@ class QuantMobileNetV1HW(nn.Module):
                 use_per_channel_act_scaling = True
 
             for unit_idx, (out_channels, stride) in enumerate(stage_units):
-                block = QuantDwsConvBlockHW(
+                block = QuantDwsConvBlock(
                     in_channels=current_channels,
                     out_channels=out_channels,
                     stride=stride,

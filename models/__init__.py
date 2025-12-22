@@ -2,7 +2,7 @@
 
 Provides a unified interface for creating neural network models
 through a registry pattern. Includes ResNet (CIFAR and ImageNet variants),
-VGG, MobileNet, CNV architectures, and their quantized versions using Brevitas.
+MobileNet, CNV architectures, and their quantized versions using Brevitas.
 
 See Also:
     get_model: Main factory function.
@@ -17,10 +17,6 @@ import torch.nn as nn
 from .standard import (
     CNV,
     MobileNetV1,
-    VGG11,
-    VGG13,
-    VGG16,
-    VGG19,
     ResNet20,
     ResNet32,
     ResNet44,
@@ -44,12 +40,7 @@ from .quantized import (
     QuantResNet50,
     QuantResNet101,
     QuantResNet152,
-    QuantVGG11,
-    QuantVGG13,
-    QuantVGG16,
-    QuantVGG19,
     QuantMobileNetV1,
-    QuantMobileNetV1HW,
 )
 
 ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
@@ -72,11 +63,6 @@ MODELS: Dict[str, ModelType] = {
     "resnet50": ResNet50,
     "resnet101": ResNet101,
     "resnet152": ResNet152,
-    # VGG
-    "vgg11": VGG11,
-    "vgg13": VGG13,
-    "vgg16": VGG16,
-    "vgg19": VGG19,
 }
 """Registry mapping model names to their implementation classes/factories."""
 
@@ -85,7 +71,7 @@ QUANT_MODELS: Dict[str, ModelType] = {
     "quant_cnv": QuantCNV,
     # Quantized MobileNet
     "quant_mobilenetv1": QuantMobileNetV1,
-    "quant_mobilenetv1_hw": QuantMobileNetV1HW,
+    "quant_mobilenetv1_hw": QuantMobileNetV1,
     # Quantized ResNet (CIFAR-specific)
     "quant_resnet20": QuantResNet20,
     "quant_resnet32": QuantResNet32,
@@ -98,11 +84,6 @@ QUANT_MODELS: Dict[str, ModelType] = {
     "quant_resnet50": QuantResNet50,
     "quant_resnet101": QuantResNet101,
     "quant_resnet152": QuantResNet152,
-    # Quantized VGG
-    "quant_vgg11": QuantVGG11,
-    "quant_vgg13": QuantVGG13,
-    "quant_vgg16": QuantVGG16,
-    "quant_vgg19": QuantVGG19,
 }
 """Registry mapping quantized model names to their implementation classes."""
 

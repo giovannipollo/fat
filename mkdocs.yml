@@ -114,7 +114,6 @@ nav:
       - Registry: api/models/index.md
       - CNV: api/models/cnv.md
       - MobileNet: api/models/mobilenet.md
-      - VGG: api/models/vgg.md
       - ResNet CIFAR: api/models/resnet_cifar.md
       - ResNet ImageNet: api/models/resnet_imagenet.md
       - Quantized: api/models/quantized.md

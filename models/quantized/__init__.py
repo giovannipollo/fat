@@ -23,9 +23,7 @@ from .resnet_imagenet import (
     QuantResNet101,
     QuantResNet152,
 )
-from .vgg import QuantVGG11, QuantVGG13, QuantVGG16, QuantVGG19
-from .mobilenet import QuantMobileNetV1
-from .mobilenet_hw import QuantMobileNetV1HW
+from .mobilenetv1 import QuantMobileNetV1
 from .cnv import QuantCNV
 
 __all__ = [
@@ -41,14 +39,9 @@ __all__ = [
     "QuantResNet50",
     "QuantResNet101",
     "QuantResNet152",
-    # VGG
-    "QuantVGG11",
-    "QuantVGG13",
-    "QuantVGG16",
-    "QuantVGG19",
     # MobileNet
     "QuantMobileNetV1",
-    "QuantMobileNetV1HW",
+    "QuantMobileNetV1",
     # CNV
     "QuantCNV",
 ]
