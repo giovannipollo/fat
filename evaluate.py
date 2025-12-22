@@ -66,7 +66,7 @@ def evaluate_with_faults(
     
     # Enable injection for evaluation
     injector.set_enabled(model, True)
-    injector.reset_counters(model)
+
     
     if statistics is not None:
         injector.set_statistics(model, statistics)
@@ -333,7 +333,7 @@ def main() -> None:
     
     print(f"\nFault Injection Configuration:")
     print(f"  Injection layers: {num_layers}")
-    print(f"  Mode: {fault_config.mode}")
+    print(f"  Applu During: {fault_config.apply_during}")
     print(f"  Injection type: {fault_config.injection_type}")
     if args.sweep:
         print(f"  Probability sweep: {args.sweep}")
@@ -356,7 +356,7 @@ def main() -> None:
         "dataset": dataset.name,
         "num_injection_layers": num_layers,
         "fault_config": {
-            "mode": fault_config.mode,
+            "apply_during": fault_config.apply_during,
             "injection_type": fault_config.injection_type,
         },
         "baseline_accuracy": baseline_acc,

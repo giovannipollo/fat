@@ -27,7 +27,6 @@ Example:
     config = FaultInjectionConfig(
         enabled=True,
         probability=5.0,
-        mode="full_model",
         injection_type="random",
         apply_during="train",
     )
