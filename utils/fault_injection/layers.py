@@ -105,8 +105,20 @@ class QuantFaultInjectionLayer(nn.Module):
         # Get bit width as integer
         bit_width_int = int(bit_width.item())
 
-        # Generate random fault mask
-        condition_tensor = torch.rand(shape, device=device) < self.probability / 100.0
+        # Calculate exact number of elements to inject
+        total_elements = torch.numel(x.value)
+        num_to_inject = int(self.probability / 100.0 * total_elements)
+
+        if num_to_inject > 0:
+            # Randomly select positions to inject
+            flat_indices = torch.randperm(total_elements, device=device)[:num_to_inject]
+
+            # Create boolean mask
+            condition_tensor = torch.zeros(total_elements, dtype=torch.bool, device=device)
+            condition_tensor[flat_indices] = True
+            condition_tensor = condition_tensor.view(shape)
+        else:
+            condition_tensor = torch.zeros(shape, dtype=torch.bool, device=device)
 
         # If no faults to inject (all False mask), return early
         if not condition_tensor.any():

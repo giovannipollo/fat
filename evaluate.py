@@ -9,10 +9,13 @@ Usage:
 Example:
     # Evaluate with default fault injection settings from config
     python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth
-    
+
     # Override fault injection probability
     python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --probability 10.0
-    
+
+    # Run multiple times with different seeds to average results
+    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --num-runs 10
+
     # Sweep across multiple probabilities
     python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --sweep 0,1,5,10,20,50
 """
@@ -233,13 +236,6 @@ def main() -> None:
         help="Override injection type",
     )
     parser.add_argument(
-        "--mode",
-        type=str,
-        choices=["full_model", "layer"],
-        default=None,
-        help="Override injection mode",
-    )
-    parser.add_argument(
         "--sweep",
         type=str,
         default=None,
@@ -249,7 +245,7 @@ def main() -> None:
         "--num-runs",
         type=int,
         default=1,
-        help="Number of runs per probability (for averaging)",
+        help="Number of runs per configuration (for averaging results)",
     )
     parser.add_argument(
         "--output",
@@ -266,13 +262,13 @@ def main() -> None:
 
     # Load configuration
     config: Dict[str, Any] = load_config(args.config)
-    
+
     # Set seed for reproducibility
     seed_config: Dict[str, Any] = config.get("seed", {})
+    base_seed: int = seed_config.get("value", 42) if seed_config.get("enabled", False) else 42
     if seed_config.get("enabled", False):
-        seed: int = seed_config.get("value", 42)
-        set_seed(seed, deterministic=True)
-        print(f"Random seed: {seed}")
+        set_seed(base_seed, deterministic=True)
+        print(f"Random seed: {base_seed}")
     
     # Setup device
     device = get_device()
@@ -320,7 +316,6 @@ def main() -> None:
     
     # Set defaults if not specified
     fi_config.setdefault("probability", 5.0)
-    fi_config.setdefault("mode", "full_model")
     fi_config.setdefault("injection_type", "random")
     fi_config.setdefault("track_statistics", True)
     
@@ -332,9 +327,9 @@ def main() -> None:
     num_layers = injector.get_num_layers(model)
     
     print(f"\nFault Injection Configuration:")
-    print(f"  Injection layers: {num_layers}")
-    print(f"  Applu During: {fault_config.apply_during}")
-    print(f"  Injection type: {fault_config.injection_type}")
+    print(f"Injection layers: {num_layers}")
+    print(f"Apply During: {fault_config.apply_during}")
+    print(f"Injection type: {fault_config.injection_type}")
     if args.sweep:
         print(f"  Probability sweep: {args.sweep}")
     else:
@@ -385,24 +380,52 @@ def main() -> None:
     else:
         # Single probability evaluation
         print(f"Evaluating with {fault_config.probability}% fault probability...")
-        statistics = FaultStatistics(num_layers=num_layers)
-        fault_acc, _, _ = evaluate_with_faults(
-            model, test_loader, device, injector, statistics, not args.no_progress
+        if args.num_runs > 1:
+            print(f"Running {args.num_runs} times with different seeds...")
+
+        run_accuracies = []
+        run_statistics = []
+
+        for run in range(args.num_runs):
+            if args.num_runs > 1:
+                # Set different seed for each run
+                run_seed = base_seed + run
+                set_seed(run_seed, deterministic=True)
+                print(f"  Run {run + 1}/{args.num_runs} (seed: {run_seed})...")
+
+            statistics = FaultStatistics(num_layers=num_layers)
+            fault_acc, _, _ = evaluate_with_faults(
+                model, test_loader, device, injector, statistics, not args.no_progress
+            )
+            run_accuracies.append(fault_acc)
+            run_statistics.append(statistics)
+
+        avg_fault_acc = sum(run_accuracies) / len(run_accuracies)
+        std_fault_acc = (
+            (sum((a - avg_fault_acc) ** 2 for a in run_accuracies) / len(run_accuracies))
+            ** 0.5
+            if args.num_runs > 1
+            else 0.0
         )
-        
+
         results["fault_probability"] = fault_config.probability
-        results["fault_accuracy"] = fault_acc
-        results["accuracy_degradation"] = baseline_acc - fault_acc
-        
+        results["fault_accuracies"] = run_accuracies
+        results["fault_accuracy"] = avg_fault_acc
+        results["fault_accuracy_std"] = std_fault_acc
+        results["accuracy_degradation"] = baseline_acc - avg_fault_acc
+        results["num_runs"] = args.num_runs
+
         print(f"\nResults:")
         print(f"  Baseline accuracy:   {baseline_acc:.2f}%")
-        print(f"  Fault accuracy:      {fault_acc:.2f}%")
-        print(f"  Accuracy degradation: {baseline_acc - fault_acc:+.2f}%")
-        
-        # Print statistics
+        print(f"  Fault accuracy:      {avg_fault_acc:.2f}% (std: {std_fault_acc:.2f}%)")
+        print(f"  Accuracy degradation: {baseline_acc - avg_fault_acc:+.2f}%")
+
+        # Print statistics (from the last run, or could aggregate)
         if fault_config.track_statistics:
             print("\n" + "-" * 60)
-            statistics.print_report()
+            # For multiple runs, show statistics from the last run
+            # Could be enhanced to aggregate statistics across runs
+            run_statistics[-1].print_report()
     
     # Save results
     if args.output:

@@ -67,7 +67,7 @@ fault_injection:
 
   # Fault probability (0-100%)
   # Percentage of activations that will be modified when injection is active
-  probability: 3.0
+  probability: 7
 
   # Injection type (fault model):
   # - "random": Add random values within quantization range
@@ -86,4 +86,4 @@ fault_injection:
   track_statistics: true
 
   # Verbose output for debugging
-  verbose: true
+  verbose: false
