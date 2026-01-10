@@ -46,6 +46,7 @@ from .quantized import (
     QuantResNet152,
     QuantMobileNetV1FinnCIFAR,
     QuantMobileNetV1FinnImageNet,
+    QuantMobileNetV1CIFAR,
 )
 
 ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
@@ -95,12 +96,17 @@ DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
         "cifar100": "QuantMobileNetV1FinnCIFAR",
         "imagenet": "QuantMobileNetV1FinnImageNet",
     },
+    "quant_mobilenetv1": {
+        "cifar10": "QuantMobileNetV1CIFAR",
+        "cifar100": "QuantMobileNetV1CIFAR",
+    },
 }
 """Mapping of model variants by dataset. Used to resolve base model names to implementation classes based on dataset."""
 
 INTERNAL_REGISTRY: Dict[str, ModelType] = {
     "QuantMobileNetV1FinnCIFAR": QuantMobileNetV1FinnCIFAR,
     "QuantMobileNetV1FinnImageNet": QuantMobileNetV1FinnImageNet,
+    "QuantMobileNetV1CIFAR": QuantMobileNetV1CIFAR,
 }
 """Internal registry for implementation classes not directly accessible by name."""
 
