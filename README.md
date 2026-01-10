@@ -74,19 +74,27 @@ scheduler:
 Full documentation is available in the `docs/` directory. To view it locally:
 
 ```bash
+# Install documentation dependencies
 pip install -r docs/requirements.txt
-mkdocs serve
-```
 
-Then open http://127.0.0.1:8000 in your browser.
+# Build HTML documentation
+cd docs
+sphinx-build -b html . _build/html
+
+# Open in browser
+open _build/html/index.html  # macOS
+# or
+xdg-open _build/html/index.html  # Linux
+```
 
 ### Documentation Contents
 
-- [Getting Started](docs/getting-started/installation.md) - Installation and quick start guide
-- [Models](docs/models/index.md) - Available architectures and how to add new ones
-- [Datasets](docs/datasets/index.md) - Supported datasets and how to add new ones
-- [Configuration](docs/configuration/index.md) - Complete configuration reference
-- [API Reference](docs/api/index.md) - Python API documentation
+- [Getting Started](docs/getting-started/installation.html) - Installation and quick start guide
+- [Models](docs/models/index.html) - Available architectures and how to add new ones
+- [Datasets](docs/datasets/index.html) - Supported datasets and how to add new ones
+- [Configuration](docs/configuration/index.html) - Complete configuration reference
+- [Fault Injection](docs/fault_injection/overview.html) - Comprehensive fault injection framework documentation
+- [API Reference](docs/fault_injection/api.html) - Python API documentation
 
 ## Project Structure
 
@@ -100,7 +108,7 @@ fat/
 │   │   └── resnet_imagenet/  # ResNet for ImageNet (18, 34, 50, 101, 152)
 │   └── quantized/        # Quantized models (Brevitas)
 ├── utils/            # Training utilities
-├── docs/             # MkDocs documentation
+├── docs/             # Sphinx documentation
 └── train.py          # Main entry point
 ```
 

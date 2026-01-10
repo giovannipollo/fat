@@ -1,0 +1,45 @@
+/* Custom styles for FAT documentation */
+
+/* Better spacing for diagrams */
+.mermaid {
+    margin: 2em 0;
+}
+
+/* Better readability for code blocks */
+.highlight pre {
+    line-height: 1.5;
+}
+
+/* Improve table readability */
+table.docutils {
+    border-collapse: collapse;
+    margin: 1.5em 0;
+}
+
+table.docutils th,
+table.docutils td {
+    padding: 0.5em 0.75em;
+    border: 1px solid #ddd;
+}
+
+/* Better admonition styling */
+.admonition {
+    margin: 1.5em 0;
+    padding: 1em;
+    border-left: 4px solid #2980B9;
+}
+
+.admonition-title {
+    font-weight: bold;
+}
+
+/* Better section spacing */
+div.body h1,
+div.body h2,
+div.body h3,
+div.body h4,
+div.body h5,
+div.body h6 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
