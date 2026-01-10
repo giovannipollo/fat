@@ -5,7 +5,7 @@ Quantized versions of ImageNet architectures adapted for small images.
 
 from __future__ import annotations
 
-from .mobilenetv1 import QuantMobileNetV1
+from .mobilenetv1_finn import QuantMobileNetV1Finn
 from .resnet import (
     QuantResNet18,
     QuantResNet34,
@@ -15,7 +15,7 @@ from .resnet import (
 )
 
 __all__ = [
-    "QuantMobileNetV1",
+    "QuantMobileNetV1Finn",
     "QuantResNet18",
     "QuantResNet34",
     "QuantResNet50",

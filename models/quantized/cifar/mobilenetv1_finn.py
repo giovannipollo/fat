@@ -49,57 +49,23 @@ INIT_CHANNELS: int = 32
 #: Final number of channels (output of last stage)
 FINAL_CHANNELS: int = 1024
 
-#: Stage configuration for ImageNet-sized inputs (224x224).
-#: Downsampling at first unit of stages 2-5.
-IMAGENET_STAGE_CONFIG: List[List[Tuple[int, int]]] = [
-    # Stage 1: 32 -> 64 (no downsampling)
+#: Stage configuration for CIFAR-sized inputs (32x32).
+#: Each tuple is (out_channels, stride).
+#: Downsampling at stage 4 last unit and stage 5 second unit.
+CIFAR_STAGE_CONFIG: List[List[Tuple[int, int]]] = [
+    # Stage 1: 32 -> 64
     [(64, 1)],
-    # Stage 2: 64 -> 128 -> 128, downsample at first unit
-    [(128, 2), (128, 1)],
-    # Stage 3: 128 -> 256 -> 256, downsample at first unit
-    [(256, 2), (256, 1)],
-    # Stage 4: 256 -> 512 (x6), downsample at first unit
-    [(512, 2), (512, 1), (512, 1), (512, 1), (512, 1), (512, 1)],
-    # Stage 5: 512 -> 1024 -> 1024, downsample at first unit
-    [(1024, 2), (1024, 1)],
-]
-
-#: Stage configuration for ImageNet with first stage stride.
-#: Downsampling at first unit of all stages.
-IMAGENET_FIRST_STRIDE_STAGE_CONFIG: List[List[Tuple[int, int]]] = [
-    # Stage 1: 32 -> 64, downsample at first unit
-    [(64, 2)],
-    # Stage 2: 64 -> 128 -> 128, downsample at first unit
-    [(128, 2), (128, 1)],
-    # Stage 3: 128 -> 256 -> 256, downsample at first unit
-    [(256, 2), (256, 1)],
-    # Stage 4: 256 -> 512 (x6), downsample at first unit
-    [(512, 2), (512, 1), (512, 1), (512, 1), (512, 1), (512, 1)],
-    # Stage 5: 512 -> 1024 -> 1024, downsample at first unit
-    [(1024, 2), (1024, 1)],
+    # Stage 2: 64 -> 128 -> 128
+    [(128, 1), (128, 1)],
+    # Stage 3: 128 -> 256 -> 256
+    [(256, 1), (256, 1)],
+    # Stage 4: 256 -> 512 (x6), downsample at last unit
+    [(512, 1), (512, 1), (512, 1), (512, 1), (512, 1), (512, 2)],
+    # Stage 5: 512 -> 1024 -> 1024, downsample at second unit
+    [(1024, 1), (1024, 2)],
 ]
 
 
-def get_dataset_config(first_stage_stride: bool = False) -> DatasetConfig:
-    """Get the ImageNet configuration.
-
-    Args:
-        first_stage_stride: Whether to use stride=2 in first stage.
-
-    Returns:
-        DatasetConfig with appropriate parameters.
-    """
-    if first_stage_stride:
-        stage_config = IMAGENET_FIRST_STRIDE_STAGE_CONFIG
-    else:
-        stage_config = IMAGENET_STAGE_CONFIG
-
-    return DatasetConfig(
-        avg_pool_kernel_size=7,
-        first_layer_stride=2,
-        first_layer_padding=0,
-        stage_config=stage_config,
-    )
 
 
 class QuantConvBlock(nn.Module):
@@ -230,7 +196,7 @@ class QuantDwsConvBlock(nn.Module):
         return x
 
 
-class QuantMobileNetV1(nn.Module):
+class QuantMobileNetV1Finn(nn.Module):
     """Quantized MobileNetV1 optimized for hardware deployment.
 
     Uses per-channel weight quantization (CommonIntWeightPerChannelQuant)
@@ -258,7 +224,6 @@ class QuantMobileNetV1(nn.Module):
         in_channels: int = 3,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
-        dataset: str = "cifar10",
         first_layer_bit_width: int = 8,
         last_layer_bit_width: int = 8,
         first_stage_stride: bool = False,
@@ -283,7 +248,12 @@ class QuantMobileNetV1(nn.Module):
         self.act_bit_width = act_bit_width
 
         # Get dataset-specific configuration
-        config = get_dataset_config(first_stage_stride)
+        config = DatasetConfig(
+            avg_pool_kernel_size=8,
+            first_layer_stride=1,
+            first_layer_padding=1,
+            stage_config=CIFAR_STAGE_CONFIG,
+        )
 
         self.features = self._build_features(
             in_channels=in_channels,

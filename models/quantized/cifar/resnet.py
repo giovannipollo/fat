@@ -66,6 +66,49 @@ class QuantBasicBlock(nn.Module):
 
         self.downsample = downsample
 
+    def _make_quant_conv2d(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int = 1,
+        padding: int = 0,
+        weight_bit_width: int = 8,
+    ) -> qnn.QuantConv2d:
+        """Create quantized convolution layer.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            kernel_size: Size of the convolving kernel.
+            stride: Stride of the convolution.
+            padding: Zero-padding added to both sides.
+            weight_bit_width: Bit width for weight quantization.
+
+        Returns:
+            Quantized convolution layer.
+        """
+        return qnn.QuantConv2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            bias=False,
+            weight_bit_width=weight_bit_width,
+        )
+
+    def _make_quant_relu(self, bit_width: int = 8) -> qnn.QuantReLU:
+        """Create quantized ReLU activation.
+
+        Args:
+            bit_width: Bit width for activation quantization.
+
+        Returns:
+            Quantized ReLU layer.
+        """
+        return qnn.QuantReLU(bit_width=bit_width)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with residual connection.
 
@@ -150,6 +193,77 @@ class QuantResNetCIFAR(nn.Module):
 
         # Weight initialization
         self._initialize_weights()
+
+    def _make_quant_identity(self, bit_width: int = 8) -> qnn.QuantIdentity:
+        """Create quantized identity layer for input quantization.
+
+        Args:
+            bit_width: Bit width for activation quantization.
+
+        Returns:
+            Quantized identity layer.
+        """
+        return qnn.QuantIdentity(bit_width=bit_width)
+
+    def _make_quant_conv2d(
+        self,
+        in_channels: int,
+        out_channels: int,
+        kernel_size: int,
+        stride: int = 1,
+        padding: int = 0,
+        weight_bit_width: int = 8,
+    ) -> qnn.QuantConv2d:
+        """Create quantized convolution layer.
+
+        Args:
+            in_channels: Number of input channels.
+            out_channels: Number of output channels.
+            kernel_size: Size of the convolving kernel.
+            stride: Stride of the convolution.
+            padding: Zero-padding added to both sides.
+            weight_bit_width: Bit width for weight quantization.
+
+        Returns:
+            Quantized convolution layer.
+        """
+        return qnn.QuantConv2d(
+            in_channels,
+            out_channels,
+            kernel_size,
+            stride=stride,
+            padding=padding,
+            bias=False,
+            weight_bit_width=weight_bit_width,
+        )
+
+    def _make_quant_relu(self, bit_width: int = 8) -> qnn.QuantReLU:
+        """Create quantized ReLU activation.
+
+        Args:
+            bit_width: Bit width for activation quantization.
+
+        Returns:
+            Quantized ReLU layer.
+        """
+        return qnn.QuantReLU(bit_width=bit_width)
+
+    def _make_quant_linear(
+        self, in_features: int, out_features: int, weight_bit_width: int = 8
+    ) -> qnn.QuantLinear:
+        """Create quantized linear layer.
+
+        Args:
+            in_features: Number of input features.
+            out_features: Number of output features.
+            weight_bit_width: Bit width for weight quantization.
+
+        Returns:
+            Quantized linear layer.
+        """
+        return qnn.QuantLinear(
+            in_features, out_features, bias=True, weight_bit_width=weight_bit_width
+        )
 
     def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
         """Build a stage of quantized residual blocks.
