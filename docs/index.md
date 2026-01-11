@@ -25,6 +25,8 @@ A modular PyTorch training framework for image classification, with support for 
 
 ## Quick Example
 
+Create a YAML configuration file `configs/my_experiment.yaml`:
+
 ```yaml title="configs/my_experiment.yaml"
 dataset:
   name: "cifar10"
@@ -47,6 +49,8 @@ scheduler:
   T_max: 200
   warmup_epochs: 5
 ```
+
+Then run the training script:
 
 ```bash
 python train.py --config configs/my_experiment.yaml
@@ -74,46 +78,14 @@ fat/
 
 ## Next Steps
 
-<div class="grid cards" markdown>
+## Next Steps
 
--   :material-download:{ .lg .middle } **Installation**
+- **[Installation](getting-started/installation.md)**: Install the framework and its dependencies  
 
-    ---
+- **[Quick Start](getting-started/quickstart.md)**: Train your first model in minutes  
 
-    Install the framework and its dependencies
+- **[Models](models/index.md)**: Explore available model architectures
 
-    [:octicons-arrow-right-24: Getting Started](getting-started/installation.md)
+- **[Configuration](configuration/index.md)**: Learn about all configuration options
 
--   :material-rocket-launch:{ .lg .middle } **Quick Start**
-
-    ---
-
-    Train your first model in minutes
-
-    [:octicons-arrow-right-24: Quick Start](getting-started/quickstart.md)
-
--   :material-brain:{ .lg .middle } **Models**
-
-    ---
-
-    Explore available model architectures
-
-    [:octicons-arrow-right-24: Models](models/index.md)
-
--   :material-cog:{ .lg .middle } **Configuration**
-
-    ---
-
-    Learn about all configuration options
-
-    [:octicons-arrow-right-24: Configuration](configuration/index.md)
-
--   :material-code-tags:{ .lg .middle } **API Reference**
-
-    ---
-
-    Complete API documentation
-
-    [:octicons-arrow-right-24: API Reference](api/index.md)
-
-</div>
+- **[API Reference](api/index.md)**: Complete API documentation

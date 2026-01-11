@@ -10,23 +10,23 @@ To build the HTML documentation:
 
 1. Install dependencies:
 
-.. code-block:: bash
+```bash
 
-    pip install -r requirements.txt
+pip install -r requirements.txt
 
 2. Build the documentation:
 
-.. code-block:: bash
+```bash
 
-    cd docs
-    sphinx-build -b html . _build/html
+cd docs
+sphinx-build -b html . _build/html
 
 3. Open the documentation:
 
-.. code-block:: bash
+```bash
 
-    open _build/html/index.html    # On macOS
-    xdg-open _build/html/index.html # On Linux
+open _build/html/index.html    # On macOS
+xdg-open _build/html/index.html # On Linux
 
 Documentation Structure
 ---------------------

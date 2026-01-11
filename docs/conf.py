@@ -22,7 +22,11 @@ extensions = [
     'sphinx.ext.inheritance_diagram',
     'sphinx.ext.todo',
     'sphinxcontrib.mermaid',
+    'myst_parser',
 ]
+
+# MyST configuration
+myst_fence_as_directive = ["mermaid"]
 
 # Napoleon configuration (Google-style docstrings)
 napoleon_google_docstring = True
@@ -87,7 +91,7 @@ html_theme_options = {
     'style_external_links': False,
     'vcs_pageview_mode': '',
     'style_nav_header_background': '#2980B9',
-    'collapse_navigation': True,
+    'collapse_navigation': False,
     'sticky_navigation': True,
     'navigation_depth': 4,
     'includehidden': True,
@@ -101,7 +105,7 @@ html_encoding = 'utf-8'
 html_css_files = []
 
 # The suffix(es) of source filenames
-source_suffix = '.rst'
+source_suffix = '.md'
 
 # The master toctree document
 master_doc = 'index'
