@@ -105,7 +105,7 @@ html_encoding = 'utf-8'
 html_css_files = []
 
 # The suffix(es) of source filenames
-source_suffix = '.md'
+source_suffix = ['.md']
 
 # The master toctree document
 master_doc = 'index'

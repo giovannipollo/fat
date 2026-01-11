@@ -2,8 +2,61 @@
 
 A modular PyTorch training framework for image classification, with support for CIFAR-10/100, MNIST, and FashionMNIST datasets.
 
-!!! warning "Python Version"
-    Tested with Python 3.12.3
+```{warning}
+Python Version Tested with Python 3.12.3
+```
+
+```{toctree}
+:hidden:
+:includehidden:
+:maxdepth: 2
+:caption: Getting Started
+
+getting-started/installation
+getting-started/quickstart
+```
+
+```{toctree}
+:hidden:
+:includehidden:
+:maxdepth: 2
+:caption: Framework Components
+
+models/index
+datasets/index
+configuration/index
+```
+
+```{toctree}
+:hidden:
+:includehidden:
+:maxdepth: 3
+:caption: Fault Injection Documentation
+
+fault_injection/overview
+fault_injection/injector
+fault_injection/wrapper
+fault_injection/layers
+fault_injection/config
+fault_injection/statistics
+fault_injection/functions
+fault_injection/strategies/index
+fault_injection/strategies/base
+fault_injection/strategies/random
+fault_injection/strategies/lsb_flip
+fault_injection/strategies/msb_flip
+fault_injection/strategies/full_flip
+fault_injection/api
+```
+
+```{toctree}
+:hidden:
+:includehidden:
+:maxdepth: 1
+:caption: Other
+
+benchmarks
+```
 
 ## Features
 
@@ -78,8 +131,6 @@ fat/
 
 ## Next Steps
 
-## Next Steps
-
 - **[Installation](getting-started/installation.md)**: Install the framework and its dependencies  
 
 - **[Quick Start](getting-started/quickstart.md)**: Train your first model in minutes  
@@ -89,3 +140,5 @@ fat/
 - **[Configuration](configuration/index.md)**: Learn about all configuration options
 
 - **[API Reference](api/index.md)**: Complete API documentation
+
+
