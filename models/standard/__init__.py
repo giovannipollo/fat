@@ -15,7 +15,7 @@ Organized by dataset type:
 from __future__ import annotations
 
 from .cifar.cnv import CNV
-from .cifar.mobilenet import MobileNetV1
+from .cifar.mobilenetv1 import MobileNetV1
 from .cifar.resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,

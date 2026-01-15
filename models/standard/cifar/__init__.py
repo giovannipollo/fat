@@ -6,7 +6,7 @@ Models optimized for small image datasets like CIFAR-10/100 (32x32 images).
 from __future__ import annotations
 
 from .cnv import CNV
-from .mobilenet import MobileNetV1
+from .mobilenetv1 import MobileNetV1
 from .resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,
