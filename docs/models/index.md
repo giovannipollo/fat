@@ -1,10 +1,8 @@
-Models Overview
-===============
+# Models Overview
 
 The framework supports multiple model architectures for both standard and quantized training.
 
-Available Models
-----------------
+## Available Models
 
 ```{toctree}
    :maxdepth: 1

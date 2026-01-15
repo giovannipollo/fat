@@ -32,7 +32,6 @@ typing_extensions==4.15.0
 brevitas==0.6.0
 black==25.11.0
 pytest==9.0.2
-Sphinx==8.2.3
-sphinx-rtd-theme==3.0.2
-sphinxcontrib-mermaid==1.2.3
-sphinx-autobuild==2025.8.25
+mkdocstrings==1.0.0
+mkdocstrings-python==2.0.0
+mkdocs-material==9.7.0

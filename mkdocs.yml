@@ -1,0 +1,85 @@
+site_name: FAT - Training Framework
+site_description: A modular PyTorch training framework for image classification with fault-aware training
+repo_url: https://github.com/giovannipollo/fat
+repo_name: giovannipollo/fat
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - toc.follow
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+  - Framework Components:
+      - Models: models/index.md
+      - Datasets: datasets/index.md
+      - Configuration: configuration/index.md
+  - Fault Injection:
+      - Overview: fault_injection/overview.md
+      - Injector: fault_injection/injector.md
+      - Wrapper: fault_injection/wrapper.md
+      - Layers: fault_injection/layers.md
+      - Configuration: fault_injection/config.md
+      - Statistics: fault_injection/statistics.md
+      - Functions: fault_injection/functions.md
+      - Strategies:
+          - Overview: fault_injection/strategies/index.md
+          - Base: fault_injection/strategies/base.md
+          - Random: fault_injection/strategies/random.md
+          - LSB Flip: fault_injection/strategies/lsb_flip.md
+          - MSB Flip: fault_injection/strategies/msb_flip.md
+          - Full Flip: fault_injection/strategies/full_flip.md
+      - API: fault_injection/api.md
+  - Other:
+      - Benchmarks: benchmarks.md
