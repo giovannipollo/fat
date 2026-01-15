@@ -63,15 +63,9 @@ To build and view the documentation:
 pip install -r docs/requirements.txt
 
 # Build HTML documentation
-cd docs
-sphinx-build -b html . _build/html
-
-# Open in browser
-open _build/html/index.html  # macOS
-# or
-xdg-open _build/html/index.html  # Linux
+mkdocs serve --dev-addr localhost:8000 --livereload
 ```
 
 ## Next Steps
 
-After installation, proceed to the Quick Start guide to train your first model.
+After installation, proceed to the [Quick Start Guide](quickstart.md) to train your first model!

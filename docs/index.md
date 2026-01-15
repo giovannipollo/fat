@@ -1,65 +1,10 @@
 # FAT - Training Framework
-
 A modular PyTorch training framework for image classification, with support for CIFAR-10/100, MNIST, and FashionMNIST datasets.
 
-```{warning}
-Python Version Tested with Python 3.12.3
-```
-
-```{toctree}
-:hidden:
-:includehidden:
-:maxdepth: 2
-:caption: Getting Started
-
-getting-started/installation
-getting-started/quickstart
-```
-
-```{toctree}
-:hidden:
-:includehidden:
-:maxdepth: 2
-:caption: Framework Components
-
-models/index
-datasets/index
-configuration/index
-```
-
-```{toctree}
-:hidden:
-:includehidden:
-:maxdepth: 3
-:caption: Fault Injection Documentation
-
-fault_injection/overview
-fault_injection/injector
-fault_injection/wrapper
-fault_injection/layers
-fault_injection/config
-fault_injection/statistics
-fault_injection/functions
-fault_injection/strategies/index
-fault_injection/strategies/base
-fault_injection/strategies/random
-fault_injection/strategies/lsb_flip
-fault_injection/strategies/msb_flip
-fault_injection/strategies/full_flip
-fault_injection/api
-```
-
-```{toctree}
-:hidden:
-:includehidden:
-:maxdepth: 1
-:caption: Other
-
-benchmarks
-```
+!!! warning "Python Version"
+    **Tested with Python 3.12.3**
 
 ## Features
-
 - **Modular architecture** with pluggable components (optimizer, scheduler, loss, logging, checkpoints)
 - Multiple model architectures (ResNet, VGG, MobileNet, CNV)
 - **Quantization-aware training (QAT)** with Brevitas for all model architectures
@@ -77,7 +22,6 @@ benchmarks
 - Progress bars with tqdm
 
 ## Quick Example
-
 Create a YAML configuration file `configs/my_experiment.yaml`:
 
 ```yaml title="configs/my_experiment.yaml"
@@ -110,7 +54,6 @@ python train.py --config configs/my_experiment.yaml
 ```
 
 ## Project Structure
-
 ```
 fat/
 ├── configs/              # YAML configuration files
@@ -130,15 +73,7 @@ fat/
 ```
 
 ## Next Steps
-
 - **[Installation](getting-started/installation.md)**: Install the framework and its dependencies  
-
 - **[Quick Start](getting-started/quickstart.md)**: Train your first model in minutes  
-
 - **[Models](models/index.md)**: Explore available model architectures
-
 - **[Configuration](configuration/index.md)**: Learn about all configuration options
-
-- **[API Reference](api/index.md)**: Complete API documentation
-
-

@@ -1,5 +1,3 @@
-.. _fault_injection_overview:
-
 Fault Injection System Overview
 =============================
 
