@@ -2,13 +2,13 @@
 seed:
   enabled: true
   value: 0
-  deterministic: true
+  deterministic: false
 
 dataset:
   name: "cifar10"
   root: "./data"
   download: true
-  num_workers: 4
+  num_workers: 24
 
 model:
   name: "quant_mobilenetv1"
@@ -35,7 +35,7 @@ scheduler:
 
 checkpoint:
   enabled: true
-  dir: "./experiments/benchmark/cifar10_quant_mobilenetv1"
+  dir: "./experiments/benchmark/quant_mobilenetv1"
   save_frequency: 50
   save_best: true
 

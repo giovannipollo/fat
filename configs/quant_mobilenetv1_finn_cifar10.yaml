@@ -1,0 +1,57 @@
+# Quantized MobileNetV1 on CIFAR-10
+# Quantization-aware training (QAT) using Brevitas
+# Expected accuracy: ~88-90% after 200 epochs (slightly lower than FP32)
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+  # val_split: 0.1
+
+model:
+  name: "quant_mobilenetv1_finn"
+
+quantization:
+  in_weight_bit_width: 8 
+  weight_bit_width: 4
+  act_bit_width: 4
+
+training:
+  batch_size: 32
+  epochs: 200
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  momentum: 0.9
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 0
+  step_size: 1
+
+loss:
+  name: "sqr_hinge"
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
