@@ -21,6 +21,7 @@ import torch.nn as nn
 from .standard import (
     CNV,
     MobileNetV1,
+    MobileNetV1Finn,
     ResNet20,
     ResNet32,
     ResNet44,
@@ -57,6 +58,7 @@ MODELS: Dict[str, ModelType] = {
     "cnv": CNV,
     # MobileNet
     "mobilenetv1": MobileNetV1,
+    "mobilenetv1_finn": MobileNetV1Finn,
     # ResNet (CIFAR-specific)
     "resnet20": ResNet20,
     "resnet32": ResNet32,
