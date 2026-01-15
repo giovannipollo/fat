@@ -1,7 +1,9 @@
-"""Quantized MobileNetV1 for CIFAR datasets using Brevitas.
+"""MobileNetV1 architecture adapted for small images.
 
-Implements quantized versions of CIFAR-specific MobileNetV1 architecture
-with configurable bit widths for weights and activations.
+Implementation of MobileNetV1 with depthwise separable convolutions,
+adapted for CIFAR-10/100 (32x32) and MNIST (28x28) inputs.
+
+See: https://arxiv.org/abs/1704.04861
 """
 
 from __future__ import annotations
@@ -12,13 +14,18 @@ import torch
 import torch.nn as nn
 import brevitas.nn as qnn
 
+from brevitas.quant import IntBias
+from utils.weight_quant import CommonIntWeightPerChannelQuant
+from utils.weight_quant import CommonIntWeightPerTensorQuant
+from utils.weight_quant import CommonUintActQuant
+
 
 class QuantDepthwiseSeparableBlock(nn.Module):
-    """Quantized Depthwise Separable Convolution Block for CIFAR MobileNetV1.
+    """Depthwise Separable Convolution Block.
 
-    Consists of a quantized depthwise convolution (per-channel spatial filtering)
-    followed by a quantized pointwise convolution (1x1 cross-channel mixing),
-    both with batch normalization and quantized ReLU activations.
+    Consists of a depthwise convolution (per-channel spatial filtering)
+    followed by a pointwise convolution (1x1 cross-channel mixing).
+    This reduces computation compared to standard convolutions.
     """
 
     def __init__(
@@ -28,44 +35,46 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         stride: int = 1,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ):
-        """Initialize quantized depthwise separable block.
+        """Initialize depthwise separable block.
 
         Args:
             in_planes: Number of input channels.
             out_planes: Number of output channels.
             stride: Stride for the depthwise convolution.
-            weight_bit_width: Bit width for weight quantization.
-            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
-        self.dw_conv = qnn.QuantConv2d(
-            in_planes,
-            in_planes,
+        # Depthwise convolution
+        self.conv1 = qnn.QuantConv2d(
+            in_channels=in_planes,
+            out_channels=in_planes,
             kernel_size=3,
             stride=stride,
             padding=1,
             groups=in_planes,
             bias=False,
+            weight_quant=weight_quant,
             weight_bit_width=weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(in_planes)
-        self.relu1 = qnn.QuantReLU(bit_width=act_bit_width)
 
-        self.pw_conv = qnn.QuantConv2d(
-            in_planes,
-            out_planes,
+        # Pointwise convolution
+        self.conv2 = qnn.QuantConv2d(
+            in_channels=in_planes,
+            out_channels=out_planes,
             kernel_size=1,
             stride=1,
             padding=0,
             bias=False,
+            weight_quant=weight_quant,
             weight_bit_width=weight_bit_width,
         )
         self.bn2 = nn.BatchNorm2d(out_planes)
-        self.relu2 = qnn.QuantReLU(bit_width=act_bit_width)
+        self.relu = qnn.QuantReLU(act_quant=CommonUintActQuant, bit_width=act_bit_width)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through quantized depthwise separable block.
+        """Forward pass through depthwise separable block.
 
         Args:
             x: Input tensor of shape (N, C_in, H, W).
@@ -73,24 +82,24 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         Returns:
             Output tensor of shape (N, C_out, H', W').
         """
-        out: torch.Tensor = self.relu1(self.bn1(self.dw_conv(x)))
-        out = self.relu2(self.bn2(self.pw_conv(out)))
+        out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn2(self.conv2(out)))
         return out
 
 
 class QuantMobileNetV1(nn.Module):
-    """Quantized CIFAR-specific MobileNetV1 architecture.
+    """MobileNetV1 adapted for small images.
 
-    Quantized version following the standard CIFAR-10 MobileNetV1 architecture
-    with configurable bit widths for weights and activations.
-    Modified for 32x32 inputs: initial stride=1 to preserve resolution,
-    reduced downsampling to prevent features from becoming too small.
+    Modified from the original ImageNet architecture:
+    - Initial stride is 1 (vs 2) to preserve resolution for 32x32 inputs
+    - Fewer downsampling operations to prevent features from becoming too small
+    - Supports both RGB (3-channel) and grayscale (1-channel) inputs
 
     Architecture:
-        - Initial 3x3 conv -> 32 channels (stride=1)
-        - 13 quantized depthwise separable blocks
-        - Global average pooling (kernel_size=2)
-        - Quantized fully connected classifier
+        - Initial 3x3 conv -> 32 channels
+        - 13 depthwise separable blocks
+        - Global average pooling
+        - Fully connected classifier
     """
 
     #: Architecture configuration: list of (out_channels, stride) tuples
@@ -116,81 +125,80 @@ class QuantMobileNetV1(nn.Module):
         in_channels: int = 3,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        first_layer_bit_width: int = 8,
+        last_layer_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ):
-        """Initialize quantized CIFAR MobileNetV1.
+        """Initialize MobileNetV1.
 
         Args:
             num_classes: Number of output classes.
             in_channels: Number of input channels (3 for RGB, 1 for grayscale).
-            weight_bit_width: Bit width for weight quantization.
-            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
+
         self.in_channels: int = in_channels
-        self.weight_bit_width = weight_bit_width
-        self.act_bit_width = act_bit_width
 
-        self.quant_inp = qnn.QuantIdentity(bit_width=act_bit_width)
-
+        # Initial Conv Layer
+        # NOTE: Stride is 1 here (vs 2 in ImageNet) to preserve resolution for 32x32 inputs
         self.conv1 = qnn.QuantConv2d(
-            in_channels,
-            32,
+            in_channels=in_channels,
+            out_channels=32,
             kernel_size=3,
             stride=1,
             padding=1,
             bias=False,
-            weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
+            weight_bit_width=first_layer_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(32)
-        self.relu = qnn.QuantReLU(bit_width=act_bit_width)
+        self.relu = qnn.QuantReLU(act_quant=CommonUintActQuant, bit_width=act_bit_width)
 
-        self.layers = self._make_layers(in_planes=32)
-
-        self.avgpool = nn.AvgPool2d(kernel_size=2)
-
-        self.fc = qnn.QuantLinear(
-            1024,
-            num_classes,
-            bias=True,
+        # MobileNet Body
+        self.layers = self._make_layers(
+            in_planes=32,
             weight_bit_width=weight_bit_width,
+            act_bit_width=act_bit_width,
+            weight_quant=weight_quant,
         )
 
-        self._initialize_weights()
+        # Classifier
+        self.linear = qnn.QuantLinear(
+            in_features=1024,
+            out_features=num_classes,
+            bias=False,
+            weight_quant=CommonIntWeightPerTensorQuant,
+            weight_bit_width=last_layer_bit_width,
+        )
 
-    def _make_layers(self, in_planes: int) -> nn.Sequential:
-        """Build the sequence of quantized depthwise separable blocks.
+    def _make_layers(
+        self, in_planes: int, weight_bit_width: int, act_bit_width: int, weight_quant
+    ) -> nn.Sequential:
+        """Build the sequence of depthwise separable blocks.
 
         Args:
             in_planes: Number of input channels to the first block.
 
         Returns:
-            Sequential container of quantized depthwise separable blocks.
+            Sequential container of depthwise separable blocks.
         """
         layers: List[nn.Module] = []
         for out_planes, stride in self.CFG:
             layers.append(
                 QuantDepthwiseSeparableBlock(
-                    in_planes,
-                    out_planes,
-                    stride,
-                    self.weight_bit_width,
-                    self.act_bit_width,
+                    in_planes=in_planes,
+                    out_planes=out_planes,
+                    stride=stride,
+                    weight_bit_width=weight_bit_width,
+                    act_bit_width=act_bit_width,
+                    weight_quant=weight_quant,
                 )
             )
             in_planes = out_planes
         return nn.Sequential(*layers)
 
-    def _initialize_weights(self) -> None:
-        """Initialize weights using Kaiming initialization."""
-        for m in self.modules():
-            if isinstance(m, qnn.QuantConv2d):
-                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-            elif isinstance(m, nn.BatchNorm2d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through quantized MobileNetV1.
+        """Forward pass through MobileNetV1.
 
         Args:
             x: Input tensor of shape (N, C, H, W).
@@ -198,10 +206,9 @@ class QuantMobileNetV1(nn.Module):
         Returns:
             Output logits of shape (N, num_classes).
         """
-        out: torch.Tensor = self.quant_inp(x)
-        out = self.relu(self.bn1(self.conv1(out)))
+        out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
         out = self.layers(out)
-        out = self.avgpool(out)
+        out = torch.nn.functional.avg_pool2d(out, 2)
         out = out.view(out.size(0), -1)
-        out = self.fc(out)
+        out = self.linear(out)
         return out
