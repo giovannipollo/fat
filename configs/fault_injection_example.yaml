@@ -82,6 +82,11 @@ fault_injection:
   # - "both": During both training and evaluation
   apply_during: "train"
 
+  # Target layers to inject faults after:
+  # Available: "QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d", "QuantLinear"
+  # Default (if not specified): ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+  target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+
   # Track injection statistics (RMSE, cosine similarity, etc.)
   track_statistics: true
 

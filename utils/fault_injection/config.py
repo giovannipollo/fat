@@ -19,6 +19,7 @@ class FaultInjectionConfig:
         probability: Injection probability as percentage (0-100).
         injection_type: Type of fault - "random", "lsb_flip", "msb_flip", "full_flip".
         apply_during: When to inject - "train", "eval", or "both".
+        target_layers: List of layer types to inject after (e.g., ["QuantConv2d", "QuantReLU"]).
         track_statistics: Enable statistics tracking (RMSE, cosine similarity).
         verbose: Print injection details.
 
@@ -39,6 +40,9 @@ class FaultInjectionConfig:
     probability: float = 0.0
     injection_type: str = "random"
     apply_during: str = "eval"
+    target_layers: List[str] = field(
+        default_factory=lambda: ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+    )
     track_statistics: bool = False
     verbose: bool = False
 
@@ -49,6 +53,16 @@ class FaultInjectionConfig:
     )
     _VALID_APPLY_DURING: List[str] = field(
         default_factory=lambda: ["train", "eval", "both"],
+        repr=False,
+    )
+    _VALID_TARGET_LAYERS: List[str] = field(
+        default_factory=lambda: [
+            "QuantIdentity",
+            "QuantReLU",
+            "QuantHardTanh",
+            "QuantConv2d",
+            "QuantLinear",
+        ],
         repr=False,
     )
 
@@ -82,6 +96,10 @@ class FaultInjectionConfig:
             probability=config.get("probability", 0.0),
             injection_type=config.get("injection_type", "random"),
             apply_during=config.get("apply_during", "eval"),
+            target_layers=config.get(
+                "target_layers",
+                ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"],
+            ),
             track_statistics=config.get("track_statistics", False),
             verbose=config.get("verbose", False),
         )
@@ -108,6 +126,13 @@ class FaultInjectionConfig:
                 f"apply_during must be one of {self._VALID_APPLY_DURING}, "
                 f"got '{self.apply_during}'"
             )
+
+        for layer in self.target_layers:
+            if layer not in self._VALID_TARGET_LAYERS:
+                raise ValueError(
+                    f"target_layers must be one of {self._VALID_TARGET_LAYERS}, "
+                    f"got '{layer}'"
+                )
 
     def should_inject_during_training(self) -> bool:
         """Check if injection should occur during training.
@@ -136,6 +161,7 @@ class FaultInjectionConfig:
             "probability": self.probability,
             "injection_type": self.injection_type,
             "apply_during": self.apply_during,
+            "target_layers": self.target_layers,
             "track_statistics": self.track_statistics,
             "verbose": self.verbose,
         }

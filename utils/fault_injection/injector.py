@@ -21,11 +21,12 @@ class FaultInjector:
     """Transforms models to add fault injection layers at runtime.
 
     This class analyzes a model's structure and inserts fault injection
-    layers after target layers (QuantIdentity, QuantReLU, etc.) without
-    modifying the original model definition.
+    layers after target layers (QuantIdentity, QuantReLU, QuantConv2d, etc.)
+    without modifying the original model definition.
 
     The injector supports:
     - Runtime insertion of fault injection layers
+    - Configurable target layers via YAML config
     - Parameter updates (probability, epoch, etc.)
     - Statistics tracking
     - Full removal of injection layers
@@ -43,14 +44,16 @@ class FaultInjector:
         ```
 
     Attributes:
-        QUANT_TARGET_LAYERS: Set of layer class names to inject after.
+        QUANT_TARGET_LAYERS: Set of layer class names to inject after (default).
+            Can be overridden via config.target_layers.
     """
 
-    # Layer types to inject after (Brevitas quantized activation layers)
+    # Layer types to inject after (Brevitas quantized layers)
     QUANT_TARGET_LAYERS: Set[str] = {
         "QuantIdentity",
         "QuantReLU",
         "QuantHardTanh",
+        "QuantConv2d",
     }
 
     def __init__(self) -> None:
@@ -85,6 +88,7 @@ class FaultInjector:
         # Reset state
         self._layer_count = 0
         self._injection_layers = []
+        self._target_layers = set(config.target_layers)
         self.config = config
 
         # Always inject into all layers (full model)
@@ -115,7 +119,8 @@ class FaultInjector:
         Returns:
             True if module is a target layer type.
         """
-        return module.__class__.__name__ in self.QUANT_TARGET_LAYERS
+        target_layers = getattr(self, "_target_layers", self.QUANT_TARGET_LAYERS)
+        return module.__class__.__name__ in target_layers
 
     def _create_injection_layer(
         self,
