@@ -15,8 +15,7 @@ from .resnet import (
     ResNet32,
     ResNet44,
     ResNet56,
-    ResNet110,
-    MobileNetV1Finn
+    ResNet110
 )
 
 __all__ = [

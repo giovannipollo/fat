@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from .cifar.cnv import CNV
 from .cifar.mobilenetv1 import MobileNetV1
-from cifar.mobilenetv1_finn import MobileNetV1Finn
+from .cifar.mobilenetv1_finn import MobileNetV1Finn
 from .cifar.resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,
