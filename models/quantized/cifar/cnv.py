@@ -89,6 +89,7 @@ class QuantCNV(nn.Module):
                 bias=False,
                 weight_quant=CommonWeightQuant,
                 weight_bit_width=in_weight_bit_width,
+                return_quant_tensor=True,
             )
         )
         self.conv_features.append(nn.BatchNorm2d(64, eps=1e-4))
@@ -114,6 +115,7 @@ class QuantCNV(nn.Module):
                     weight_bit_width=weight_bit_width,
                     bias=False,
                     weight_quant=CommonWeightQuant,
+                    return_quant_tensor=True,
                 )
             )
             current_channels = out_channels
@@ -141,6 +143,7 @@ class QuantCNV(nn.Module):
                     bias=False,
                     weight_bit_width=weight_bit_width,
                     weight_quant=CommonWeightQuant,
+                    return_quant_tensor=True,
                 )
             )
             self.linear_features.append(nn.BatchNorm1d(out_features, eps=1e-4))
@@ -163,6 +166,7 @@ class QuantCNV(nn.Module):
                 bias=False,
                 weight_bit_width=weight_bit_width,
                 weight_quant=CommonWeightQuant,
+                return_quant_tensor=True,
             )
         )
 
@@ -196,11 +200,21 @@ class QuantCNV(nn.Module):
         """
 
         for mod in self.conv_features:
-            x = mod(x)
+            if mod.__class__.__name__ == "BatchNorm2d":
+                # The BatchNorm2d expects a regular tensor, not a QuantTensor
+                # so we extract the value before passing it in
+                x = mod(x.value)
+            else:
+                x = mod(x)
 
         x = x.view(x.shape[0], -1)
 
         for mod in self.linear_features:
-            x = mod(x)
+            if mod.__class__.__name__ == "BatchNorm1d" or mod.__class__.__name__ == "TensorNorm":
+                # The BatchNorm1d and TensorNorm expect a regular tensor, not a QuantTensor
+                # so we extract the value before passing it in
+                x = mod(x.value)
+            else:
+                x = mod(x)
 
         return x
