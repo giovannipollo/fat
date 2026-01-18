@@ -93,11 +93,12 @@ class ExperimentManager:
         """
         model_name: str = self.config["model"]["name"].lower()
         timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        precision: str = self._get_precision()
 
         if custom_name:
-            return f"{custom_name}_{model_name}_{timestamp}"
+            return f"{custom_name}_{timestamp}_{model_name}_{precision}"
         else:
-            return f"{model_name}_{timestamp}"
+            return f"{timestamp}_{model_name}_{precision}"
 
     def _get_dataset_name(self) -> str:
         """Get the dataset name from config.
@@ -106,6 +107,21 @@ class ExperimentManager:
             Dataset name string in lowercase.
         """
         return self.config["dataset"]["name"].lower()
+
+    def _get_precision(self) -> str:
+        """Get the precision string based on quantization config.
+
+        Returns:
+            Precision string (e.g., 'inw8_w4_a4' or 'fp32').
+        """
+        quant_config: Optional[Dict[str, Any]] = self.config.get("quantization")
+        if quant_config is not None:
+            weight_bit_width: int = quant_config.get("weight_bit_width", 8)
+            in_weight_bit_width: int = quant_config.get("in_weight_bit_width", 8)
+            act_bit_width: int = quant_config.get("act_bit_width", 8)
+            return f"inw{in_weight_bit_width}_w{weight_bit_width}_a{act_bit_width}"
+        else:
+            return "fp32"
 
     def _setup_experiment_dir(
         self,
@@ -122,9 +138,13 @@ class ExperimentManager:
         """
         base_path: Path = Path(base_dir)
         dataset_name: str = self._get_dataset_name()
+        precision_folder: str = self._get_precision()
+        model_name: str = self.config["model"]["name"].lower()
         experiment_name: str = self._generate_experiment_name(custom_name)
 
-        self.experiment_dir = base_path / dataset_name / experiment_name
+        self.experiment_dir = (
+            base_path / dataset_name / model_name / precision_folder / experiment_name
+        )
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.tensorboard_dir = self.experiment_dir / "tensorboard"
 
@@ -146,9 +166,12 @@ class ExperimentManager:
 
         if YAML_AVAILABLE:
             import yaml as yaml_module
+
             config_path: Path = self.experiment_dir / "config.yaml"
             with open(config_path, "w") as f:
-                yaml_module.dump(self.config, f, default_flow_style=False, sort_keys=False)
+                yaml_module.dump(
+                    self.config, f, default_flow_style=False, sort_keys=False
+                )
         else:
             # Fallback: save as simple text representation
             config_path = self.experiment_dir / "config.txt"
@@ -215,7 +238,9 @@ class ExperimentManager:
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
             if test_acc is not None:
-                print(f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)")
+                print(
+                    f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)"
+                )
             else:
                 print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
 
