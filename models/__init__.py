@@ -145,6 +145,7 @@ def get_model(config: Dict[str, Any]) -> nn.Module:
           num_classes: 10
 
         quantization:
+          in_weight_bit_width: 8
           weight_bit_width: 4
           act_bit_width: 4
         ```
@@ -187,11 +188,12 @@ def get_model(config: Dict[str, Any]) -> nn.Module:
     # Check if this is a quantized model
     if model_name.startswith("quant_"):
         quant_config: Dict[str, Any] = config.get("quantization", {})
+        in_weight_bit_width: int = quant_config.get("in_weight_bit_width")
         weight_bit_width: int = quant_config.get("weight_bit_width")
         act_bit_width: int = quant_config.get("act_bit_width")
-        if weight_bit_width is None or act_bit_width is None:
+        if weight_bit_width is None or act_bit_width is None or in_weight_bit_width is None:
             raise ValueError(
-                "Quantized models require 'weight_bit_width' and 'act_bit_width' "
+                "Quantized models require 'weight_bit_width', 'in_weight_bit_width', and 'act_bit_width' "
                 "in config['quantization']"
             )
 
@@ -199,6 +201,7 @@ def get_model(config: Dict[str, Any]) -> nn.Module:
             num_classes=num_classes,
             in_channels=in_channels,
             weight_bit_width=weight_bit_width,
+            in_weight_bit_width=in_weight_bit_width,
             act_bit_width=act_bit_width,
         )
 
