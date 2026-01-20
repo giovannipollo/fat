@@ -49,7 +49,9 @@ class _InjectionWrapper(nn.Module):
             Output after wrapped layer and fault injection.
         """
         out = self.wrapped_layer(x)
-        return self.injection_layer(out)
+        if out.bit_width is not None:
+            out = self.injection_layer(out)
+        return out
 
     def __repr__(self) -> str:
         return (
