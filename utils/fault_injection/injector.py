@@ -11,10 +11,10 @@ from typing import Any, List, Optional, Set
 import torch.nn as nn
 
 from .config import FaultInjectionConfig
-from .layers import QuantActivationFaultInjectionLayer
+from .activations.activation_layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics
 from .strategies import get_strategy
-from .wrapper import _ActivationFaultInjectionWrapper
+from .activations.activation_wrapper import _ActivationFaultInjectionWrapper
 
 
 class FaultInjector:

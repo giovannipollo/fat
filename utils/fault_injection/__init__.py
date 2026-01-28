@@ -51,9 +51,9 @@ Example:
 from __future__ import annotations
 
 from .config import FaultInjectionConfig
-from .functions import ActivationFaultInjectionFunction
+from .activations.activation_functions import ActivationFaultInjectionFunction
 from .injector import FaultInjector
-from .layers import QuantActivationFaultInjectionLayer
+from .activations.activation_layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics, LayerStatistics
 from .strategies import (
     InjectionStrategy,

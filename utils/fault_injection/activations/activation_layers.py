@@ -14,8 +14,8 @@ from torch import Tensor
 
 from brevitas.quant_tensor import QuantTensor
 
-from .functions import ActivationFaultInjectionFunction
-from .strategies import InjectionStrategy, get_strategy
+from .activation_functions import ActivationFaultInjectionFunction
+from ..strategies import InjectionStrategy, get_strategy
 
 if TYPE_CHECKING:
     from .statistics import FaultStatistics

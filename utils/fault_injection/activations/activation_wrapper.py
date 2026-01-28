@@ -10,7 +10,7 @@ from typing import Any
 
 import torch.nn as nn
 
-from .layers import QuantActivationFaultInjectionLayer
+from .activation_layers import QuantActivationFaultInjectionLayer
 
 
 class _ActivationFaultInjectionWrapper(nn.Module):
