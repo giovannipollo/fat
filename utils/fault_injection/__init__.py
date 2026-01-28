@@ -1,13 +1,13 @@
-"""Fault injection framework for quantized neural networks.
+"""Activation fault injection framework for quantized neural networks.
 
-This module provides tools for injecting faults into quantized neural networks
+This module provides tools for injecting activation faults into quantized neural networks
 to enable fault-aware training (FAT) and fault resilience evaluation.
 
 Main Components:
-    - FaultInjectionConfig: Configuration dataclass for fault injection parameters
-    - FaultInjector: Runtime model transformer that adds fault injection layers
+    - FaultInjectionConfig: Configuration dataclass for activation fault injection parameters
+    - FaultInjector: Runtime model transformer that adds activation fault injection layers
     - FaultStatistics: Statistics tracking for injection analysis
-    - QuantFaultInjectionLayer: Layer that injects faults into QuantTensor activations
+    - QuantFaultInjectionLayer: Layer that injects activation faults into QuantTensor activations
 
 Injection Strategies:
     - RandomStrategy: Adds random values to activations
@@ -31,7 +31,7 @@ Example:
         apply_during="train",
     )
 
-    # Inject fault layers into model
+    # Inject activation fault layers into model
     injector = FaultInjector()
     model = injector.inject(model, config)
 
@@ -51,7 +51,7 @@ Example:
 from __future__ import annotations
 
 from .config import FaultInjectionConfig
-from .functions import FaultInjectionFunction
+from .functions import ActivationFaultInjectionFunction
 from .injector import FaultInjector
 from .layers import QuantFaultInjectionLayer
 from .statistics import FaultStatistics, LayerStatistics
@@ -68,7 +68,7 @@ __all__ = [
     # Configuration
     "FaultInjectionConfig",
     # Functions
-    "FaultInjectionFunction",
+    "ActivationFaultInjectionFunction",
     # Injector
     "FaultInjector",
     # Layers

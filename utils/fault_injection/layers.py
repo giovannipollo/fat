@@ -1,4 +1,4 @@
-"""Fault injection layers for quantized models.
+"""Activation fault injection layers for quantized models.
 
 Provides layers that can be inserted into quantized models to inject
 faults into activations. Supports both training (FAT) and evaluation modes.
@@ -14,7 +14,7 @@ from torch import Tensor
 
 from brevitas.quant_tensor import QuantTensor
 
-from .functions import FaultInjectionFunction
+from .functions import ActivationFaultInjectionFunction
 from .strategies import InjectionStrategy, get_strategy
 
 if TYPE_CHECKING:
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 
 
 class QuantFaultInjectionLayer(nn.Module):
-    """Fault injection layer for Brevitas QuantTensor outputs.
+    """Activation fault injection layer for Brevitas QuantTensor outputs.
 
     This layer intercepts QuantTensor activations and injects faults
     based on the configured probability and injection strategy.
@@ -56,7 +56,7 @@ class QuantFaultInjectionLayer(nn.Module):
         strategy: Optional[InjectionStrategy] = None,
         verbose: bool = False,
     ) -> None:
-        """Initialize the fault injection layer.
+        """Initialize the activation fault injection layer.
 
         Args:
             layer_id: Unique identifier for this layer.
@@ -70,7 +70,7 @@ class QuantFaultInjectionLayer(nn.Module):
         self.probability = probability
         self.verbose = verbose
 
-        # Strategy for fault injection
+        # Strategy for activation fault injection
         if strategy is None:
             strategy = get_strategy("random")
         self.strategy = strategy
@@ -81,13 +81,13 @@ class QuantFaultInjectionLayer(nn.Module):
         self.statistics: Optional["FaultStatistics"] = None
 
     def forward(self, x: QuantTensor) -> QuantTensor:
-        """Forward pass with optional fault injection.
+        """Forward pass with optional activation fault injection.
 
         Args:
             x: Input QuantTensor from previous layer.
 
         Returns:
-            QuantTensor with injected faults (if enabled and conditions met).
+            QuantTensor with injected activation faults (if enabled and conditions met).
         """
         # Skip injection if disabled or probability is 0
         if not self.injection_enabled or self.probability <= 0.0:
@@ -140,8 +140,8 @@ class QuantFaultInjectionLayer(nn.Module):
         # Convert back to float with scale
         injected_float = injected_int.float() * scale
 
-        # Apply fault injection with zeroed gradients at faulty positions
-        output_value = FaultInjectionFunction.apply(
+        # Apply activation fault injection with zeroed gradients at faulty positions
+        output_value = ActivationFaultInjectionFunction.apply(
             x.value,
             injected_float,
             condition_tensor,
@@ -176,7 +176,7 @@ class QuantFaultInjectionLayer(nn.Module):
         )
 
     def set_probability(self, probability: float) -> None:
-        """Set the injection probability.
+        """Set the activation injection probability.
 
         Args:
             probability: New probability (0-100).
@@ -184,9 +184,9 @@ class QuantFaultInjectionLayer(nn.Module):
         self.probability = probability
 
     def set_enabled(self, enabled: bool) -> None:
-        """Enable or disable fault injection.
+        """Enable or disable activation fault injection.
 
         Args:
-            enabled: Whether to enable injection.
+            enabled: Whether to enable activation injection.
         """
         self.injection_enabled = enabled
