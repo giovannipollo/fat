@@ -25,7 +25,7 @@ from .scheduler import SchedulerFactory, SchedulerType
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
 from .loss import LossFactory
-from .fault_injection import FaultInjectionConfig, FaultInjector, FaultStatistics
+from .fault_injection import FaultInjectionConfig, ActivationFaultInjector, FaultStatistics
 
 
 class Trainer:
@@ -37,7 +37,7 @@ class Trainer:
     - SchedulerFactory: Creates schedulers with warmup support
     - ExperimentManager: Handles checkpoints and experiment organization
     - MetricsLogger: Handles TensorBoard and console logging
-    - FaultInjector: Optional fault injection for fault-aware training
+    - ActivationFaultInjector: Optional fault injection for fault-aware training
     
     Features:
         - Progress bars with tqdm
@@ -129,7 +129,7 @@ class Trainer:
         self.show_progress: bool = progress_config.get("enabled", True)
 
         # Setup fault injection (if configured)
-        self.fault_injector: Optional[FaultInjector] = None
+        self.fault_injector: Optional[ActivationFaultInjector] = None
         self.fault_config: Optional[FaultInjectionConfig] = None
         self.fault_statistics: Optional[FaultStatistics] = None
         self._setup_fault_injection(config)
@@ -161,7 +161,7 @@ class Trainer:
         self.fault_config = FaultInjectionConfig.from_dict(fi_config)
         
         # Create injector and inject layers
-        self.fault_injector = FaultInjector()
+        self.fault_injector = ActivationFaultInjector()
         self.model = self.fault_injector.inject(self.model, self.fault_config)
 
         if self.fault_config.verbose:

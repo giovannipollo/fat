@@ -20,7 +20,7 @@ from .loss import LossFactory
 # Fault injection framework
 from .fault_injection import (
     FaultInjectionConfig,
-    FaultInjector,
+    ActivationFaultInjector,
     FaultStatistics,
     QuantActivationFaultInjectionLayer
 )
@@ -40,7 +40,7 @@ __all__ = [
     "LossFactory",
     # Fault injection
     "FaultInjectionConfig",
-    "FaultInjector",
+    "ActivationFaultInjector",
     "FaultStatistics",
     "QuantActivationFaultInjectionLayer",
 ]

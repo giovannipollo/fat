@@ -1,6 +1,6 @@
-"""Model injector for fault injection.
+"""Model injector for activation fault injection.
 
-Provides the FaultInjector class that transforms models at runtime
+Provides ActivationFaultInjector class that transforms models at runtime
 to add fault injection layers after target quantized layers.
 """
 
@@ -17,8 +17,8 @@ from .strategies import get_strategy
 from .activations.activation_wrapper import _ActivationFaultInjectionWrapper
 
 
-class FaultInjector:
-    """Transforms models to add fault injection layers at runtime.
+class ActivationFaultInjector:
+    """Transforms models to add activation fault injection layers at runtime.
 
     This class analyzes a model's structure and inserts fault injection
     layers after target layers (QuantIdentity, QuantReLU, QuantConv2d, etc.)
@@ -33,8 +33,12 @@ class FaultInjector:
 
     Example:
         ```python
-        injector = FaultInjector()
-        config = FaultInjectionConfig(enabled=True, probability=5.0)
+        injector = ActivationFaultInjector()
+        config = FaultInjectionConfig(
+            enabled=True,
+            target_type="activation",
+            probability=5.0
+        )
 
         # Inject layers
         model = injector.inject(model, config)
@@ -57,7 +61,7 @@ class FaultInjector:
     }
 
     def __init__(self) -> None:
-        """Initialize the fault injector."""
+        """Initialize the activation fault injector."""
         self._layer_count: int = 0
         self._injection_layers: List[QuantActivationFaultInjectionLayer] = []
 
@@ -80,7 +84,7 @@ class FaultInjector:
 
         Note:
             The model is modified in-place. The returned model is
-            the same object as the input.
+            the same object as input.
         """
         if not config.enabled:
             return model
@@ -300,6 +304,3 @@ class FaultInjector:
                     layers.append(module.activation_injection_layer)
                     seen_ids.add(id(module.activation_injection_layer))
         return layers
-
-
-

@@ -1,16 +1,17 @@
-"""Activation fault injection framework for quantized neural networks.
+"""Fault injection framework for quantized neural networks.
 
-This module provides tools for injecting activation faults into quantized neural networks
-to enable fault-aware training (FAT) and fault resilience evaluation.
+This module provides tools for injecting activation and weight faults into quantized
+neural networks to enable fault-aware training (FAT) and fault resilience evaluation.
 
 Main Components:
-    - FaultInjectionConfig: Configuration dataclass for activation fault injection parameters
-    - FaultInjector: Runtime model transformer that adds activation fault injection layers
+    - FaultInjectionConfig: Configuration dataclass for fault injection parameters (supports activation and weight)
+    - ActivationFaultInjector: Runtime model transformer that adds activation fault injection layers
+    - FaultInjector: Backward compatibility alias for ActivationFaultInjector (deprecated)
     - FaultStatistics: Statistics tracking for injection analysis
     - QuantActivationFaultInjectionLayer: Layer that injects activation faults into QuantTensor activations
 
 Injection Strategies:
-    - RandomStrategy: Adds random values to activations
+    - RandomStrategy: Adds random values to activations/weights
     - LSBFlipStrategy: Flips least significant bits
     - MSBFlipStrategy: Flips most significant bits
     - FullFlipStrategy: Flips all bits
@@ -19,20 +20,21 @@ Example:
     ```python
     from utils.fault_injection import (
         FaultInjectionConfig,
-        FaultInjector,
+        ActivationFaultInjector,
         FaultStatistics,
     )
 
     # Create configuration
     config = FaultInjectionConfig(
         enabled=True,
+        target_type="activation",
         probability=5.0,
         injection_type="random",
         apply_during="train",
     )
 
     # Inject activation fault layers into model
-    injector = FaultInjector()
+    injector = ActivationFaultInjector()
     model = injector.inject(model, config)
 
     # Optional: Track statistics
@@ -52,7 +54,7 @@ from __future__ import annotations
 
 from .config import FaultInjectionConfig
 from .activations.activation_functions import ActivationFaultInjectionFunction
-from .injector import FaultInjector
+from .activation_injector import ActivationFaultInjector
 from .activations.activation_layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics, LayerStatistics
 from .strategies import (
@@ -69,8 +71,8 @@ __all__ = [
     "FaultInjectionConfig",
     # Functions
     "ActivationFaultInjectionFunction",
-    # Injector
-    "FaultInjector",
+    # Injectors
+    "ActivationFaultInjector",
     # Layers
     "QuantActivationFaultInjectionLayer",
     # Statistics
