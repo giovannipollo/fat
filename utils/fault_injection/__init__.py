@@ -73,7 +73,6 @@ __all__ = [
     "FaultInjector",
     # Layers
     "QuantActivationFaultInjectionLayer",
-    "ErrInjLayer",  # Alias for compatibility
     # Statistics
     "FaultStatistics",
     "LayerStatistics",
