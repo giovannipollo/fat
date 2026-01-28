@@ -52,6 +52,7 @@ Example:
 
 from __future__ import annotations
 
+from .base_injector import BaseFaultInjector
 from .config import FaultInjectionConfig
 from .activations.activation_functions import ActivationFaultInjectionFunction
 from .activation_injector import ActivationFaultInjector
@@ -66,13 +67,19 @@ from .strategies import (
     get_strategy,
 )
 
+# Backward compatibility alias (deprecated)
+FaultInjector = ActivationFaultInjector
+
 __all__ = [
     # Configuration
     "FaultInjectionConfig",
+    # Base classes
+    "BaseFaultInjector",
     # Functions
     "ActivationFaultInjectionFunction",
     # Injectors
     "ActivationFaultInjector",
+    "FaultInjector",  # Backward compatibility (deprecated)
     # Layers
     "QuantActivationFaultInjectionLayer",
     # Statistics

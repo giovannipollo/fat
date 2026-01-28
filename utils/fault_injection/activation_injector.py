@@ -10,6 +10,7 @@ from typing import Any, List, Optional, Set
 
 import torch.nn as nn
 
+from .base_injector import BaseFaultInjector
 from .config import FaultInjectionConfig
 from .activations.activation_layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics
@@ -17,7 +18,7 @@ from .strategies import get_strategy
 from .activations.activation_wrapper import _ActivationFaultInjectionWrapper
 
 
-class ActivationFaultInjector:
+class ActivationFaultInjector(BaseFaultInjector):
     """Transforms models to add activation fault injection layers at runtime.
 
     This class analyzes a model's structure and inserts fault injection
