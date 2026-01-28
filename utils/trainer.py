@@ -25,7 +25,11 @@ from .scheduler import SchedulerFactory, SchedulerType
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
 from .loss import LossFactory
-from .fault_injection import FaultInjectionConfig, ActivationFaultInjector, FaultStatistics
+from .fault_injection import (
+    FaultInjectionConfig,
+    ActivationFaultInjector,
+    FaultStatistics,
+)
 
 
 class Trainer:
@@ -129,9 +133,14 @@ class Trainer:
         self.show_progress: bool = progress_config.get("enabled", True)
 
         # Setup fault injection (if configured)
-        self.fault_injector: Optional[ActivationFaultInjector] = None
-        self.fault_config: Optional[FaultInjectionConfig] = None
-        self.fault_statistics: Optional[FaultStatistics] = None
+        self.act_fault_injector: Optional[ActivationFaultInjector] = None
+        self.act_fault_config: Optional[FaultInjectionConfig] = None
+        self.act_fault_statistics: Optional[FaultStatistics] = None
+        
+        self.weight_fault_injector: Optional[Any] = None
+        self.weight_fault_config: Optional[FaultInjectionConfig] = None
+        self.weight_fault_statistics: Optional[FaultStatistics] = None
+        
         self._setup_fault_injection(config)
 
         # Resume from checkpoint if specified
@@ -150,39 +159,44 @@ class Trainer:
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
         
+        Supports both activation and weight fault injection independently.
+        Each can be enabled/disabled separately in the config.
+        
         Args:
             config: Full configuration dictionary.
         """
-        fi_config = config.get("fault_injection", {})
-        if not fi_config.get("enabled", False):
-            return
+        # Setup activation fault injection
+        act_config = config.get("activation_fault_injection", {})
+        if act_config.get("enabled", False):
+            self.act_fault_config = FaultInjectionConfig.from_dict(act_config)
+            self.act_fault_injector = ActivationFaultInjector()
+            self.model = self.act_fault_injector.inject(self.model, self.act_fault_config)
+            
+            if self.act_fault_config.verbose:
+                # Print model architecture with injection layers
+                for name, module in self.model.named_modules():
+                    print(f"{name}: {module}")
+            
+            # Setup statistics tracking if enabled
+            if self.act_fault_config.track_statistics:
+                num_layers = self.act_fault_injector.get_num_layers(self.model)
+                self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
+                self.act_fault_injector.set_statistics(self.model, self.act_fault_statistics)
+            
+            # Log setup
+            if self.act_fault_config.verbose:
+                num_layers = self.act_fault_injector.get_num_layers(self.model)
+                print(f"Activation fault injection enabled: {num_layers} injection layers added")
+                print(f"  Probability: {self.act_fault_config.probability}%")
+                print(f"  Injection type: {self.act_fault_config.injection_type}")
+                print(f"  Apply during: {self.act_fault_config.apply_during}")
         
-        # Create configuration from YAML
-        self.fault_config = FaultInjectionConfig.from_dict(fi_config)
-        
-        # Create injector and inject layers
-        self.fault_injector = ActivationFaultInjector()
-        self.model = self.fault_injector.inject(self.model, self.fault_config)
-
-        if self.fault_config.verbose:
-            # Print the model architecture with injection layers
-            for name, module in self.model.named_modules():
-                print(f"{name}: {module}")
-        
-        # Setup statistics tracking if enabled
-        if self.fault_config.track_statistics:
-            num_layers = self.fault_injector.get_num_layers(self.model)
-            self.fault_statistics = FaultStatistics(num_layers=num_layers)
-            self.fault_injector.set_statistics(self.model, self.fault_statistics)
-        
-        # Log setup
-        if self.fault_config.verbose:
-            num_layers = self.fault_injector.get_num_layers(self.model)
-            print(f"Fault injection enabled: {num_layers} injection layers added")
-            print("  Mode: full_model")
-            print(f"  Probability: {self.fault_config.probability}%")
-            print(f"  Injection type: {self.fault_config.injection_type}")
-            print(f"  Apply during: {self.fault_config.apply_during}")
+        # Setup weight fault injection (placeholder - will be implemented in Phase 4)
+        weight_config = config.get("weight_fault_injection", {})
+        if weight_config.get("enabled", False):
+            # TODO: Implement weight fault injector in Phase 4
+            print("Weight fault injection not yet implemented")
+            self.weight_fault_config = FaultInjectionConfig.from_dict(weight_config)
 
     @property
     def has_validation(self) -> bool:
@@ -208,17 +222,14 @@ class Trainer:
         total = 0
 
         # Setup fault injection for this epoch
-        if self.fault_injector is not None and self.fault_config is not None:
-            
-            # Set up condition injector for step_interval-based injection
-            # No step interval setup needed for simplified injection
+        if self.act_fault_injector is not None and self.act_fault_config is not None:
             
             # Set mode based on apply_during config
-            apply_during = self.fault_config.apply_during
+            apply_during = self.act_fault_config.apply_during
             if apply_during in ("train", "both"):
-                self.fault_injector.set_enabled(self.model, True)
+                self.act_fault_injector.set_enabled(self.model, True)
             else:
-                self.fault_injector.set_enabled(self.model, False)
+                self.act_fault_injector.set_enabled(self.model, False)
 
         # Create progress bar
         if self.show_progress:
@@ -288,12 +299,12 @@ class Trainer:
         total = 0
 
         # Setup fault injection for evaluation
-        if self.fault_injector is not None and self.fault_config is not None:
-            apply_during = self.fault_config.apply_during
+        if self.act_fault_injector is not None and self.act_fault_config is not None:
+            apply_during = self.act_fault_config.apply_during
             if apply_during in ("eval", "both"):
-                self.fault_injector.set_enabled(self.model, True)
+                self.act_fault_injector.set_enabled(self.model, True)
             else:
-                self.fault_injector.set_enabled(self.model, False)
+                self.act_fault_injector.set_enabled(self.model, False)
 
         # Create progress bar for evaluation
         if self.show_progress:
@@ -373,12 +384,12 @@ class Trainer:
         )
 
         # Log fault injection info
-        if self.fault_injector is not None and self.fault_config is not None:
-            num_layers = self.fault_injector.get_num_layers(self.model)
-            print(f"Fault injection: {num_layers} layers, "
-                  f"prob={self.fault_config.probability}%, "
+        if self.act_fault_injector is not None and self.act_fault_config is not None:
+            num_layers = self.act_fault_injector.get_num_layers(self.model)
+            print(f"Activation fault injection: {num_layers} layers, "
+                  f"prob={self.act_fault_config.probability}%, "
                   f"mode=full_model, "
-                  f"type={self.fault_config.injection_type}")
+                  f"type={self.act_fault_config.injection_type}")
 
         for epoch in range(self.start_epoch, epochs):
             train_loss, train_acc = self.train_epoch(epoch)
@@ -454,16 +465,16 @@ class Trainer:
             self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
 
         # Print fault injection statistics
-        if self.fault_statistics is not None:
+        if self.act_fault_statistics is not None:
             print("\n" + "=" * 60)
-            self.fault_statistics.print_report()
+            self.act_fault_statistics.print_report()
             
             # Save statistics to experiment directory
             experiment_dir = self.experiment.get_experiment_dir()
             if experiment_dir is not None:
                 import os
                 stats_path = os.path.join(experiment_dir, "fault_injection_stats.json")
-                self.fault_statistics.save_to_file(stats_path)
+                self.act_fault_statistics.save_to_file(stats_path)
                 print(f"Fault injection statistics saved to: {stats_path}")
 
         # Log completion
