@@ -7,7 +7,7 @@ Main Components:
     - FaultInjectionConfig: Configuration dataclass for activation fault injection parameters
     - FaultInjector: Runtime model transformer that adds activation fault injection layers
     - FaultStatistics: Statistics tracking for injection analysis
-    - QuantFaultInjectionLayer: Layer that injects activation faults into QuantTensor activations
+    - QuantActivationFaultInjectionLayer: Layer that injects activation faults into QuantTensor activations
 
 Injection Strategies:
     - RandomStrategy: Adds random values to activations
@@ -53,7 +53,7 @@ from __future__ import annotations
 from .config import FaultInjectionConfig
 from .functions import ActivationFaultInjectionFunction
 from .injector import FaultInjector
-from .layers import QuantFaultInjectionLayer
+from .layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics, LayerStatistics
 from .strategies import (
     InjectionStrategy,
@@ -72,7 +72,7 @@ __all__ = [
     # Injector
     "FaultInjector",
     # Layers
-    "QuantFaultInjectionLayer",
+    "QuantActivationFaultInjectionLayer",
     "ErrInjLayer",  # Alias for compatibility
     # Statistics
     "FaultStatistics",

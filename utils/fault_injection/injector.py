@@ -11,7 +11,7 @@ from typing import Any, List, Optional, Set
 import torch.nn as nn
 
 from .config import FaultInjectionConfig
-from .layers import QuantFaultInjectionLayer
+from .layers import QuantActivationFaultInjectionLayer
 from .statistics import FaultStatistics
 from .strategies import get_strategy
 from .wrapper import _ActivationFaultInjectionWrapper
@@ -59,7 +59,7 @@ class FaultInjector:
     def __init__(self) -> None:
         """Initialize the fault injector."""
         self._layer_count: int = 0
-        self._injection_layers: List[QuantFaultInjectionLayer] = []
+        self._injection_layers: List[QuantActivationFaultInjectionLayer] = []
 
     def inject(
         self,
@@ -68,7 +68,7 @@ class FaultInjector:
     ) -> nn.Module:
         """Add fault injection layers to a model.
 
-        Walks the model graph and inserts QuantFaultInjectionLayer
+        Walks the model graph and inserts QuantActivationFaultInjectionLayer
         instances after each target layer.
 
         Args:
@@ -126,7 +126,7 @@ class FaultInjector:
         self,
         config: FaultInjectionConfig,
         strategy: Any,
-    ) -> QuantFaultInjectionLayer:
+    ) -> QuantActivationFaultInjectionLayer:
         """Create a new injection layer and track it.
 
         Args:
@@ -134,9 +134,9 @@ class FaultInjector:
             strategy: Injection strategy instance.
 
         Returns:
-            New QuantFaultInjectionLayer instance.
+            New QuantActivationFaultInjectionLayer instance.
         """
-        layer = QuantFaultInjectionLayer(
+        layer = QuantActivationFaultInjectionLayer(
             layer_id=self._layer_count,
             probability=config.probability,
             strategy=strategy,
@@ -279,7 +279,7 @@ class FaultInjector:
         """
         return len(self._get_injection_layers(model))
 
-    def _get_injection_layers(self, model: nn.Module) -> List[QuantFaultInjectionLayer]:
+    def _get_injection_layers(self, model: nn.Module) -> List[QuantActivationFaultInjectionLayer]:
         """Get all injection layer instances from a model.
 
         Args:
@@ -291,7 +291,7 @@ class FaultInjector:
         layers = []
         seen_ids = set()
         for module in model.modules():
-            if isinstance(module, QuantFaultInjectionLayer):
+            if isinstance(module, QuantActivationFaultInjectionLayer):
                 if id(module) not in seen_ids:
                     layers.append(module)
                     seen_ids.add(id(module))

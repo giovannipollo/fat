@@ -22,7 +22,7 @@ from .fault_injection import (
     FaultInjectionConfig,
     FaultInjector,
     FaultStatistics,
-    QuantFaultInjectionLayer,
+    QuantActivationFaultInjectionLayer
 )
 
 __all__ = [
@@ -42,5 +42,5 @@ __all__ = [
     "FaultInjectionConfig",
     "FaultInjector",
     "FaultStatistics",
-    "QuantFaultInjectionLayer",
+    "QuantActivationFaultInjectionLayer",
 ]

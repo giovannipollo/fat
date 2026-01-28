@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from .statistics import FaultStatistics
 
 
-class QuantFaultInjectionLayer(nn.Module):
+class QuantActivationFaultInjectionLayer(nn.Module):
     """Activation fault injection layer for Brevitas QuantTensor outputs.
 
     This layer intercepts QuantTensor activations and injects faults
@@ -40,7 +40,7 @@ class QuantFaultInjectionLayer(nn.Module):
 
     Example:
         ```python
-        layer = QuantFaultInjectionLayer(
+        layer = QuantActivationFaultInjectionLayer(
             layer_id=0,
             probability=5.0,
             strategy=RandomStrategy(),
