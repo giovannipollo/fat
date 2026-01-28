@@ -14,7 +14,7 @@ from .config import FaultInjectionConfig
 from .layers import QuantFaultInjectionLayer
 from .statistics import FaultStatistics
 from .strategies import get_strategy
-from .wrapper import _InjectionWrapper
+from .wrapper import _ActivationFaultInjectionWrapper
 
 
 class FaultInjector:
@@ -174,7 +174,7 @@ class FaultInjector:
         """Recursively inject fault layers by wrapping target children.
 
         Uses a unified approach for all module types (Sequential, ModuleList,
-        and regular modules) by wrapping target layers with _InjectionWrapper.
+        and regular modules) by wrapping target layers with _ActivationFaultInjectionWrapper.
 
         Args:
             module: Current module to process.
@@ -195,7 +195,7 @@ class FaultInjector:
                     print(f"    Found target layer, wrapping with injection")
 
                 inj_layer = self._create_injection_layer(config, strategy)
-                wrapper = _InjectionWrapper(child, inj_layer)
+                wrapper = _ActivationFaultInjectionWrapper(child, inj_layer)
                 self._set_child(module, child_name, wrapper)
 
                 if config.verbose:
@@ -224,7 +224,7 @@ class FaultInjector:
             module: Module to process.
         """
         for name, child in list(module.named_children()):
-            if isinstance(child, _InjectionWrapper):
+            if isinstance(child, _ActivationFaultInjectionWrapper):
                 # Unwrap the original layer
                 self._set_child(module, name, child.wrapped_layer)
             else:
@@ -295,10 +295,10 @@ class FaultInjector:
                 if id(module) not in seen_ids:
                     layers.append(module)
                     seen_ids.add(id(module))
-            elif isinstance(module, _InjectionWrapper):
-                if id(module.injection_layer) not in seen_ids:
-                    layers.append(module.injection_layer)
-                    seen_ids.add(id(module.injection_layer))
+            elif isinstance(module, _ActivationFaultInjectionWrapper):
+                if id(module.activation_injection_layer) not in seen_ids:
+                    layers.append(module.activation_injection_layer)
+                    seen_ids.add(id(module.activation_injection_layer))
         return layers
 
 
