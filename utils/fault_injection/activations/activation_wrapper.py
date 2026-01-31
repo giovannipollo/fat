@@ -48,9 +48,17 @@ class _ActivationFaultInjectionWrapper(nn.Module):
         Returns:
             Output after wrapped layer and activation fault injection.
         """
-        out = self.wrapped_layer(x)
-        if out.bit_width is not None:
-            out = self.activation_injection_layer(out)
+        if self.wrapped_layer.__class__.__name__ == "QuantConv2d" or self.wrapped_layer.__class__.__name__ == "QuantLinear":
+            # For Conv2d and Linear, apply injection before the layer if bit_width is present
+            if hasattr(x, 'bit_width') and x.bit_width is not None:
+                out = self.activation_injection_layer(x)
+                out = self.wrapped_layer(out)
+            else:
+                out = self.wrapped_layer(x)
+        else:
+            out = self.wrapped_layer(x)
+            if hasattr(x, 'bit_width') and x.bit_width is not None:
+                out = self.activation_injection_layer(out)
         return out
 
     def __repr__(self) -> str:
