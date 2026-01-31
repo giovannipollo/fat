@@ -84,7 +84,6 @@ from .strategies import (
     get_strategy,
 )
 from .weights.weight_hooks import WeightFaultInjectionHook
-from .weights.weight_functions import WeightFaultInjectionFunction
 
 # Backward compatibility alias (deprecated)
 FaultInjector = ActivationFaultInjector
@@ -100,6 +99,8 @@ __all__ = [
     "FaultInjector",  # Backward compatibility (deprecated)
     # Layers
     "QuantActivationFaultInjectionLayer",
+    # Activation injection components
+    "ActivationFaultInjectionFunction",
     # Statistics
     "FaultStatistics",
     "LayerStatistics",
@@ -112,5 +113,4 @@ __all__ = [
     "get_strategy",
     # Weight injection components
     "WeightFaultInjectionHook",
-    "WeightFaultInjectionFunction",
 ]

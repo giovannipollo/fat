@@ -184,6 +184,11 @@ class WeightFaultInjector(BaseFaultInjector):
         Returns:
             Model without injection hooks.
         """
+        # Remove gradient hooks first
+        for hook in self._injection_hooks:
+            hook.remove_hooks()
+        
+        # Remove forward hooks
         for handle in self._hook_handles:
             handle.remove()
         
