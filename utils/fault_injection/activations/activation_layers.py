@@ -125,8 +125,11 @@ class QuantActivationFaultInjectionLayer(nn.Module):
             return x
 
         # Convert to integer representation
-        inv_scale = 1.0 / scale
-        int_tensor = torch.round(x.value * inv_scale).to(torch.int32)
+        if zero_point is not None:
+            int_tensor = torch.round(x.value / scale) + zero_point
+        else:
+            int_tensor = torch.round(x.value / scale)
+        int_tensor = int_tensor.to(torch.int32)
 
         # Apply injection strategy
         injected_int = self.strategy.inject(
@@ -138,7 +141,10 @@ class QuantActivationFaultInjectionLayer(nn.Module):
         )
 
         # Convert back to float with scale
-        injected_float = injected_int.float() * scale
+        if zero_point is not None:
+            injected_float = (injected_int - zero_point).float() * scale
+        else:
+            injected_float = injected_int.float() * scale
 
         # Apply activation fault injection with zeroed gradients at faulty positions
         output_value = ActivationFaultInjectionFunction.apply(
