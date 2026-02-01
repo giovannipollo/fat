@@ -206,7 +206,7 @@ class WeightFaultInjectionHook:
         if self._original_weight is None:
             self._original_weight = module.weight.data.clone()
 
-        # Update weight data (replace entire weight tensor)
+        # Update weight data with faulty weights
         with torch.no_grad():
             module.weight.data.copy_(faulty_weights)
 
