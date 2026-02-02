@@ -45,7 +45,7 @@ class RandomStrategy(InjectionStrategy):
 
         # Generate random values to add
         rand_tensor = torch.randint(
-            low=min_val,
+            low=min_val + 1,
             high=max_val + 1,
             size=int_tensor.shape,
             device=device,
