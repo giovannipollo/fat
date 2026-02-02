@@ -66,11 +66,11 @@ class InjectionStrategy(ABC):
             Tuple of (min_value, max_value, range_size).
         """
         if signed:
-            min_val = -(2 ** (bit_width - 1)) + 1
+            min_val = -(2 ** (bit_width - 1))
             max_val = (2 ** (bit_width - 1)) - 1
         else:
-            min_val = 1
-            max_val = 2 ** bit_width
+            min_val = 0
+            max_val = (2 ** bit_width) - 1
 
         range_size = max_val - min_val + 1
         return min_val, max_val, range_size
