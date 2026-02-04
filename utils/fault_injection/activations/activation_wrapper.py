@@ -57,7 +57,7 @@ class _ActivationFaultInjectionWrapper(nn.Module):
                 out = self.wrapped_layer(x)
         else:
             out = self.wrapped_layer(x)
-            if hasattr(x, 'bit_width') and x.bit_width is not None:
+            if hasattr(out, 'bit_width') and out.bit_width is not None:
                 out = self.activation_injection_layer(out)
         return out
 
