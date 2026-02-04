@@ -283,7 +283,12 @@ class ExperimentManager:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
 
         # Save periodic checkpoint
-        checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
+        # Include phase name in filename for multi-phase training
+        if phase_info is not None and phase_info.get("mode") == "multi_phase":
+            phase_name = phase_info.get("phase_name", "unknown")
+            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}_{phase_name}.pt"
+        else:
+            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
 
         # Save latest checkpoint (always overwritten)

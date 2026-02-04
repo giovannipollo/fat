@@ -21,6 +21,7 @@ import torch.distributed as dist
 from datasets import get_dataset
 from models import get_model
 from utils import get_device, load_config, Trainer, set_seed
+from utils.config_validator import validate_config, ConfigValidationError
 
 
 def main() -> None:
@@ -60,6 +61,16 @@ def main() -> None:
     local_rank = int(os.environ.get("LOCAL_RANK", 0))
     rank = int(os.environ.get("RANK", 0))
     world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+    # Validate configuration (only on rank 0)
+    if rank == 0:
+        try:
+            validate_config(config)
+        except ConfigValidationError as e:
+            print(f"Configuration error: {e}")
+            print("Please fix the configuration and try again.")
+            import sys
+            sys.exit(1)
 
     if is_distributed:
         dist.init_process_group(backend="nccl")

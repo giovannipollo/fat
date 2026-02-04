@@ -28,6 +28,7 @@ from .fault_injection import (
 # Multi-phase training
 from .phase_config import PhaseConfig
 from .phase_manager import PhaseManager, create_phase_manager
+from .config_validator import ConfigValidator, validate_config, ConfigValidationError
 
 __all__ = [
     # Core utilities
@@ -51,4 +52,8 @@ __all__ = [
     "PhaseConfig",
     "PhaseManager",
     "create_phase_manager",
+    # Configuration validation
+    "ConfigValidator",
+    "validate_config",
+    "ConfigValidationError",
 ]

@@ -185,6 +185,8 @@ class Trainer:
                 self.device,
             )
 
+            # Validate phase resumption
+            self._validate_phase_resumption(phase_info, self.start_epoch)
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
         
@@ -942,9 +944,9 @@ class Trainer:
 
         # Resolve special values
         if checkpoint_path == "best":
-            ckpt_file = self.experiment.checkpoints_dir / "best.pt"
+            ckpt_file = self.experiment.checkpoint_dir / "best.pt"
         elif checkpoint_path == "latest":
-            ckpt_file = self.experiment.checkpoints_dir / "latest.pt"
+            ckpt_file = self.experiment.checkpoint_dir / "latest.pt"
         else:
             ckpt_file = Path(checkpoint_path)
             if not ckpt_file.is_absolute():
@@ -973,3 +975,46 @@ class Trainer:
         self.best_acc = best_acc
 
         print(f"Checkpoint loaded: best_acc={best_acc:.2f}%")
+
+    def _validate_phase_resumption(
+        self, loaded_phase_info: Optional[Dict[str, Any]], start_epoch: int
+    ) -> None:
+        """Validate that checkpoint phase matches current config.
+
+        Args:
+            loaded_phase_info: Phase info from loaded checkpoint.
+            start_epoch: Epoch to resume from.
+        """
+        if loaded_phase_info is None:
+            # Old checkpoint format without phase info
+            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
+                print(
+                    "WARNING: Loaded checkpoint is in legacy format (no phase info). "
+                    "Resuming multi-phase training from legacy checkpoint."
+                )
+            return
+
+        if loaded_phase_info.get("mode") == "single_phase":
+            # Checkpoint from single-phase training
+            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
+                print(
+                    "WARNING: Resuming multi-phase training from single-phase checkpoint. "
+                    "Phase info will be inferred from epoch number."
+                )
+            return
+
+        # Multi-phase checkpoint
+        loaded_phase_idx = loaded_phase_info.get("phase_idx", -1)
+        if self.phase_manager is not None:
+            current_phase_idx = self.phase_manager.get_phase_at_epoch(start_epoch)
+
+            if loaded_phase_idx != current_phase_idx:
+                loaded_phase_name = loaded_phase_info.get("phase_name", "unknown")
+                current_phase = self.phase_manager.get_phase_by_index(current_phase_idx)
+                current_phase_name = current_phase.name if current_phase else "unknown"
+
+                print(
+                    f"WARNING: Checkpoint was saved in phase {loaded_phase_idx} "
+                    f"({loaded_phase_name}) but resuming in phase {current_phase_idx} "
+                    f"({current_phase_name}). Ensure config phases match checkpoint."
+                )
