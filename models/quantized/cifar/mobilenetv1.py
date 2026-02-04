@@ -125,7 +125,7 @@ class QuantMobileNetV1(nn.Module):
         in_channels: int = 3,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
-        first_layer_bit_width: int = 8,
+        in_weight_bit_width: int = 8,
         last_layer_bit_width: int = 8,
         weight_quant=CommonIntWeightPerChannelQuant,
     ):
@@ -149,7 +149,7 @@ class QuantMobileNetV1(nn.Module):
             padding=1,
             bias=False,
             weight_quant=weight_quant,
-            weight_bit_width=first_layer_bit_width,
+            weight_bit_width=in_weight_bit_width,
         )
         self.bn1 = nn.BatchNorm2d(32)
         self.relu = qnn.QuantReLU(act_quant=CommonUintActQuant, bit_width=act_bit_width)
