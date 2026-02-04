@@ -1,0 +1,97 @@
+# Fault-Aware Fine-Tuning Example
+# This configuration loads a pre-trained quant_cnv model and fine-tunes with fault injection
+
+# Seed configuration
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+# Dataset configuration
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+# Model configuration
+model:
+  name: "quant_cnv"
+
+# Quantization settings
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 4
+  act_bit_width: 4
+
+# Loss function
+loss:
+  name: "sqr_hinge"
+
+# Training configuration
+training:
+  batch_size: 256
+
+# Optimizer configuration
+optimizer:
+  name: "adam"
+  learning_rate: 0.001  # Lower LR for fine-tuning
+  weight_decay: 0.0
+
+# Scheduler configuration
+scheduler:
+  name: "cosine"
+  warmup_epochs: 0
+
+weight_fault_injection:
+  enabled: false
+
+# AMP configuration
+amp:
+  enabled: false
+
+# TensorBoard
+tensorboard:
+  enabled: true
+
+# Progress bar
+progress:
+  enabled: true
+
+# Checkpoint configuration
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true
+  # Resume from the pre-trained checkpoint
+  resume: "/path/to/pretrained_fat_model/checkpoint.pt"
+
+# Multi-phase configuration
+phases:
+  # Single phase: Fault-aware fine-tuning
+  - name: "fault_aware_finetuning"
+    epochs: 50
+    optimizer:
+      learning_rate: 0.001  # Even lower LR for fine-tuning
+
+    scheduler:
+      T_max: 50  # Match phase duration
+
+    activation_fault_injection:
+      enabled: true
+      probability: 5
+      injection_type: "random"
+      apply_during: "train"  # Inject faults during training
+      target_layers: ["QuantReLU"]
+      track_statistics: true  # Track fault statistics
+      verbose: false
+
+    # Uncomment to use weight fault injection instead of activation
+    # weight_fault_injection:
+    #   enabled: true
+    #   probability: 5.0
+    #   injection_type: "random"
+    #   apply_during: "train"
+    #   target_layers: ["QuantConv2d"]
+    #   track_statistics: true
