@@ -143,19 +143,21 @@ class ExperimentManager:
         activation_fault_injection: Dict[str, Any] = self.config.get(
             "activation_fault_injection", {}
         )
+        activation_fault_injection_probability = activation_fault_injection.get("probability", 0)
         weight_fault_injection: Dict[str, Any] = self.config.get(
             "weight_fault_injection", {}
         )
+        weight_fault_injection_probability = weight_fault_injection.get("probability", 0)
         print(activation_fault_injection)
         print(weight_fault_injection)
         if activation_fault_injection.get(
             "enabled", False
         ) and weight_fault_injection.get("enabled", False):
-            return "weight_and_activation"
+            return f"weight_{weight_fault_injection_probability}_activation_{activation_fault_injection_probability}"
         elif weight_fault_injection.get("enabled", False):
-            return "weight"
+            return f"weight_{weight_fault_injection_probability}"
         elif activation_fault_injection.get("enabled", False):
-            return "activation"
+            return f"activation_{activation_fault_injection_probability}"
         else:
             return ""
 
