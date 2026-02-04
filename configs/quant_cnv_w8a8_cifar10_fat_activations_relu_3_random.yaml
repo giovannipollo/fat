@@ -1,0 +1,134 @@
+# Fault-Aware Training (FAT) Example Configuration
+# Quantized CNV on CIFAR-10 with fault injection enabled
+#
+# This configuration demonstrates training with fault injection
+# to improve model resilience against hardware faults.
+#
+# Usage:
+#   python train.py --config configs/fault_injection_example.yaml
+#
+# For evaluation only:
+#   python evaluate.py --config configs/fault_injection_example.yaml --checkpoint path/to/checkpoint.pth
+
+seed:
+  enabled: true
+  value: 2
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_cnv"
+
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 8
+  act_bit_width: 8
+
+loss:
+  name: "sqr_hinge"
+
+training:
+  batch_size: 256
+  epochs: 300
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.01
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 300
+  warmup_epochs: 0
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
+
+# Activation Fault Injection Configuration
+activation_fault_injection:
+  # Enable/disable activation fault injection
+  enabled: true
+
+  # Target type (must be "activation" for this section)
+  target_type: activation
+
+  # Fault probability (0-100%)
+  # Percentage of activations that will be modified when injection is active
+  probability: 3
+
+  # Injection type (fault model):
+  # - "random": Add random values within quantization range
+  # - "lsb_flip": Flip least significant bit
+  # - "msb_flip": Flip most significant bit
+  # - "full_flip": Flip all bits
+  injection_type: "random"
+
+  # When to apply fault injection:
+  # - "train": Only during training forward pass
+  # - "eval": Only during evaluation
+  # - "both": During both training and evaluation
+  apply_during: "train"
+
+  # Target layers to inject faults after:
+  # Available: "QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d", "QuantLinear"
+  # Default (if not specified): ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+  target_layers: ["QuantReLU"]
+
+  # Track injection statistics (RMSE, cosine similarity, etc.)
+  track_statistics: true
+
+  # Verbose output for debugging
+  verbose: false
+
+# # Weight Fault Injection Configuration
+# weight_fault_injection:
+#   # Enable/disable weight fault injection
+#   enabled: false
+
+#   # Target type (must be "weight" for this section)
+#   target_type: weight
+
+#   # Fault probability (0-100%)
+#   # Percentage of weight elements that will be modified when injection is active
+#   probability: 2
+
+#   # Injection type (fault model):
+#   # - "random": Add random values within quantization range
+#   # - "lsb_flip": Flip least significant bit
+#   # - "msb_flip": Flip most significant bit
+#   # - "full_flip": Flip all bits
+#   injection_type: "lsb_flip"
+
+#   # When to apply fault injection:
+#   # - "train": Only during training forward pass
+#   # - "eval": Only during evaluation
+#   # - "both": During both training and evaluation
+#   apply_during: "both"
+
+#   # Target layers to inject faults into:
+#   # Available: "QuantConv2d", "QuantLinear"
+#   # Default (if not specified): ["QuantConv2d", "QuantLinear"]
+#   target_layers: ["QuantConv2d"]
+
+#   # Track injection statistics (RMSE, cosine similarity, etc.)
+#   track_statistics: true
+
+#   # Verbose output for debugging
+#   verbose: false
