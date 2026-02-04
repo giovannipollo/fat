@@ -35,6 +35,7 @@ from .fault_injection import (
     WeightFaultInjector,
     FaultStatistics,
 )
+from .phase_manager import PhaseManager, create_phase_manager
 
 
 class Trainer:
@@ -124,6 +125,16 @@ class Trainer:
         self.start_epoch: int = 0
         self.best_acc: float = 0.0
 
+        # Initialize PhaseManager for multi-phase training
+        self.phase_manager: Optional[PhaseManager] = create_phase_manager(config)
+        if self.phase_manager is not None:
+            self.total_epochs = self.phase_manager.get_total_epochs()
+            if self.rank == 0:
+                print(f"Multi-phase training enabled: {self.phase_manager.get_num_phases()} phases, "
+                      f"{self.total_epochs} total epochs")
+        else:
+            self.total_epochs = config["training"]["epochs"]
+
         # Setup loss function
         self.criterion: nn.Module = LossFactory.create(config)
         
@@ -165,7 +176,7 @@ class Trainer:
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         resume_path: Optional[str] = checkpoint_config.get("resume")
         if resume_path:
-            self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
+            self.start_epoch, self.best_acc, phase_info = self.experiment.load_checkpoint(
                 resume_path,
                 self.model,
                 self.optimizer,
@@ -174,6 +185,8 @@ class Trainer:
                 self.device,
             )
 
+            # Validate phase resumption
+            self._validate_phase_resumption(phase_info, self.start_epoch)
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
         
@@ -422,10 +435,20 @@ class Trainer:
     def train(self) -> None:
         """Run the full training loop.
 
+        Handles both single-phase and multi-phase training.
+        """
+        if self.phase_manager is not None and self.phase_manager.is_multi_phase():
+            self._train_multi_phase()
+        else:
+            self._train_single_phase()
+
+    def _train_single_phase(self) -> None:
+        """Run the full training loop (single-phase legacy mode).
+
         Executes training for the configured number of epochs,
         handling validation/test evaluation, checkpointing, and logging.
         """
-        epochs: int = self.config["training"]["epochs"]
+        epochs: int = self.total_epochs
         model_name: str = self.config["model"]["name"]
         eval_name: str = "Val" if self.has_validation else "Test"
 
@@ -518,6 +541,10 @@ class Trainer:
                     scaler=self.scaler,
                     is_best=is_best,
                     test_acc=test_acc if is_best and self.has_validation else None,
+                    act_fault_injector=self.act_fault_injector,
+                    weight_fault_injector=self.weight_fault_injector,
+                    act_fault_config=self.act_fault_config,
+                    weight_fault_config=self.weight_fault_config,
                 )
 
                 # Log best model to file
@@ -573,3 +600,431 @@ class Trainer:
 
             # Close logger
             self.logger.close()
+
+    def _train_multi_phase(self) -> None:
+        """Run multi-phase training loop with phase transitions.
+
+        Iterates through all epochs, detecting phase transitions and applying
+        phase-specific configurations dynamically.
+        """
+        assert self.phase_manager is not None
+        assert self.phase_manager.is_multi_phase()
+
+        # Determine evaluation name
+        eval_name = "Val" if self.has_validation else "Test"
+
+        # Test frequency
+        test_frequency = self.config["training"].get("test_frequency", 10)
+
+        # Log multi-phase training start
+        if self.rank == 0:
+            self._log_multi_phase_start()
+
+        # Track current phase
+        current_phase_idx = -1
+
+        # Main epoch loop
+        for epoch in range(self.start_epoch, self.total_epochs):
+            # Check for phase transition
+            new_phase_idx = self.phase_manager.get_phase_at_epoch(epoch)
+
+            if new_phase_idx != current_phase_idx:
+                # Phase transition detected
+                current_phase_idx = new_phase_idx
+                current_phase = self.phase_manager.get_phase_by_index(current_phase_idx)
+
+                if current_phase is not None and self.rank == 0:
+                    self._handle_phase_transition(epoch, current_phase)
+
+            # Get current phase config
+            phase_config = self.phase_manager.get_merged_config(epoch)
+
+            # Apply phase-specific configuration
+            if self.rank == 0:
+                self._apply_phase_config(phase_config, epoch)
+
+            # Train epoch
+            train_loss, train_acc = self.train_epoch(epoch)
+
+            # Scheduler step
+            if self.scheduler is not None:
+                self.scheduler.step()
+                lr = self.scheduler.get_last_lr()[0]
+            else:
+                lr = phase_config["optimizer"]["learning_rate"]
+
+            # Evaluation
+            if self.has_validation:
+                eval_loss, eval_acc = self.validate()
+            else:
+                eval_loss, eval_acc = self.test()
+
+            # Check if best model
+            is_best = eval_acc > self.best_acc
+            if is_best:
+                self.best_acc = eval_acc
+
+            # Optional test evaluation
+            test_loss, test_acc = None, None
+            if self.has_validation:
+                is_periodic_test = test_frequency > 0 and (
+                    (epoch + 1) % test_frequency == 0 or epoch == self.total_epochs - 1
+                )
+                if is_best or is_periodic_test:
+                    test_loss, test_acc = self.test()
+
+            # Logging
+            if self.rank == 0:
+                phase_info = self.phase_manager.get_phase_info(epoch)
+                self.logger.log_epoch(
+                    epoch=epoch,
+                    total_epochs=self.total_epochs,
+                    lr=lr,
+                    train_loss=train_loss,
+                    train_acc=train_acc,
+                    eval_loss=eval_loss,
+                    eval_acc=eval_acc,
+                    eval_name=eval_name,
+                    test_loss=test_loss,
+                    test_acc=test_acc,
+                    is_best=is_best,
+                    phase_info=phase_info,
+                )
+
+            # Checkpointing
+            if self.rank == 0 and self.experiment.should_save(epoch, is_best):
+                model_to_save = self.model.module if self.is_distributed else self.model
+                phase_info = self.phase_manager.get_phase_info(epoch)
+                self.experiment.save_checkpoint(
+                    epoch=epoch,
+                    model=model_to_save,
+                    optimizer=self.optimizer,
+                    scheduler=self.scheduler,
+                    best_acc=self.best_acc,
+                    current_acc=eval_acc,
+                    scaler=self.scaler,
+                    is_best=is_best,
+                    test_acc=test_acc if is_best and self.has_validation else None,
+                    phase_info=phase_info,
+                    act_fault_injector=self.act_fault_injector,
+                    weight_fault_injector=self.weight_fault_injector,
+                    act_fault_config=self.act_fault_config,
+                    weight_fault_config=self.weight_fault_config,
+                )
+
+                # Log best model to file
+                if is_best:
+                    self.logger.log_best_model(
+                        epoch=epoch,
+                        val_acc=eval_acc,
+                        test_acc=test_acc if self.has_validation else None,
+                    )
+
+        # Final evaluation on test set (if we used validation during training)
+        if self.has_validation and self.rank == 0:
+            print("\nRunning final evaluation on test set...")
+            final_test_loss, final_test_acc = self.test()
+            self.logger.log_final_test(final_test_loss, final_test_acc, self.total_epochs)
+
+        # Print fault injection statistics
+        if self.rank == 0:
+            if self.act_fault_statistics is not None:
+                print("\n" + "=" * 60)
+                print("Activation Fault Injection Statistics:")
+                print("=" * 60)
+                self.act_fault_statistics.print_report()
+
+                # Save statistics to experiment directory
+                experiment_dir = self.experiment.get_experiment_dir()
+                if experiment_dir is not None:
+                    stats_path = os.path.join(experiment_dir, "activation_fault_injection_stats.json")
+                    self.act_fault_statistics.save_to_file(stats_path)
+                    print(f"Activation fault injection statistics saved to: {stats_path}")
+
+            if self.weight_fault_statistics is not None:
+                print("\n" + "=" * 60)
+                print("Weight Fault Injection Statistics:")
+                print("=" * 60)
+                self.weight_fault_statistics.print_report()
+
+                # Save statistics to experiment directory
+                experiment_dir = self.experiment.get_experiment_dir()
+                if experiment_dir is not None:
+                    stats_path = os.path.join(experiment_dir, "weight_fault_injection_stats.json")
+                    self.weight_fault_statistics.save_to_file(stats_path)
+                    print(f"Weight fault injection statistics saved to: {stats_path}")
+
+            # Log completion
+            self.logger.log_training_complete(self.best_acc, eval_name)
+
+            experiment_dir = self.experiment.get_experiment_dir()
+            if experiment_dir is not None:
+                print(f"Results saved to: {experiment_dir}")
+
+            # Close logger
+            self.logger.close()
+
+    def _log_multi_phase_start(self) -> None:
+        """Log multi-phase training configuration at start."""
+        assert self.phase_manager is not None
+
+        print("\n" + "=" * 80)
+        print("MULTI-PHASE TRAINING CONFIGURATION")
+        print("=" * 80)
+        print(f"Total Phases: {self.phase_manager.get_num_phases()}")
+        print(f"Total Epochs: {self.phase_manager.get_total_epochs()}")
+        print()
+
+        for idx in range(self.phase_manager.get_num_phases()):
+            phase = self.phase_manager.get_phase_by_index(idx)
+            if phase is not None:
+                print(f"Phase {idx + 1}: {phase.name}")
+                print(f"  Epochs: {phase.epochs} (range: [{phase.start_epoch}, {phase.end_epoch}))")
+
+                if phase.optimizer is not None:
+                    print(f"  Optimizer: Custom config")
+                if phase.scheduler is not None:
+                    print(f"  Scheduler: Custom config")
+                if phase.activation_fault_injection is not None:
+                    print(f"  Activation FI: Custom config")
+                if phase.weight_fault_injection is not None:
+                    print(f"  Weight FI: Custom config")
+                if phase.load_checkpoint is not None:
+                    print(f"  Load checkpoint: {phase.load_checkpoint}")
+
+                print()
+
+        print("=" * 80 + "\n")
+
+    def _handle_phase_transition(self, epoch: int, phase) -> None:
+        """Handle transition to a new training phase.
+
+        Args:
+            epoch: Current epoch number (start of new phase).
+            phase: New PhaseConfig to transition to.
+        """
+        from .phase_config import PhaseConfig
+
+        assert isinstance(phase, PhaseConfig)
+
+        print("\n" + "=" * 80)
+        print(f"PHASE TRANSITION: Starting Phase {phase.phase_idx + 1}/"
+              f"{self.phase_manager.get_num_phases()}")
+        print(f"Phase Name: {phase.name}")
+        print(f"Epoch Range: [{phase.start_epoch}, {phase.end_epoch})")
+        print(f"Duration: {phase.epochs} epochs")
+        print("=" * 80)
+
+        # Load checkpoint if specified
+        if phase.load_checkpoint is not None:
+            self._load_phase_checkpoint(phase.load_checkpoint)
+
+        # Get merged config for this phase
+        phase_config = self.phase_manager.get_merged_config(epoch)
+
+        # Recreate optimizer if overridden
+        if phase.optimizer is not None:
+            print(f"Recreating optimizer with phase-specific config...")
+            old_lr = self.optimizer.param_groups[0]["lr"]
+            self._recreate_optimizer(phase_config)
+            new_lr = self.optimizer.param_groups[0]["lr"]
+            print(f"  Learning rate: {old_lr} → {new_lr}")
+
+        # Recreate scheduler if overridden
+        if phase.scheduler is not None:
+            print(f"Recreating scheduler with phase-specific config...")
+            self._recreate_scheduler(phase_config)
+
+        # Update fault injection if overridden
+        if phase.activation_fault_injection is not None:
+            print(f"Updating activation fault injection config...")
+            self._update_fault_injection(phase_config, "activation")
+
+        if phase.weight_fault_injection is not None:
+            print(f"Updating weight fault injection config...")
+            self._update_fault_injection(phase_config, "weight")
+
+        print("=" * 80 + "\n")
+
+    def _apply_phase_config(self, phase_config: Dict[str, Any], epoch: int) -> None:
+        """Apply phase-specific configuration for current epoch.
+
+        Args:
+            phase_config: Merged configuration for current phase.
+            epoch: Current epoch number.
+        """
+        # Config is already merged, fault injection is applied in train_epoch/evaluate
+        pass
+
+    def _recreate_optimizer(self, config: Dict[str, Any]) -> None:
+        """Recreate optimizer with new configuration.
+
+        Args:
+            config: Configuration with 'optimizer' section.
+        """
+        old_lr = self.optimizer.param_groups[0]["lr"] if self.optimizer else None
+
+        self.optimizer = OptimizerFactory.create(self.model, config)
+
+        new_lr = self.optimizer.param_groups[0]["lr"]
+
+        if old_lr is not None and old_lr != new_lr:
+            print(f"  Optimizer learning rate changed: {old_lr} → {new_lr}")
+
+    def _recreate_scheduler(self, config: Dict[str, Any]) -> None:
+        """Recreate learning rate scheduler with new configuration.
+
+        Args:
+            config: Configuration with 'scheduler' section.
+        """
+        if "scheduler" in config and config["scheduler"].get("name"):
+            self.scheduler = SchedulerFactory.create(self.optimizer, config)
+            print(f"  Scheduler recreated: {config['scheduler']['name']}")
+        else:
+            self.scheduler = None
+            print(f"  Scheduler disabled")
+
+    def _update_fault_injection(self, config: Dict[str, Any], target: str) -> None:
+        """Update fault injection configuration.
+
+        Args:
+            config: Configuration dictionary.
+            target: Either "activation" or "weight".
+        """
+        fi_key = f"{target}_fault_injection"
+
+        if fi_key not in config:
+            return
+
+        fi_dict = config[fi_key]
+        fi_config = FaultInjectionConfig.from_dict(fi_dict)
+
+        if target == "activation":
+            # Remove old injector if exists
+            if self.act_fault_injector is not None:
+                self.act_fault_injector.remove(self.model)
+
+            # Create new injector if enabled
+            if fi_config.enabled:
+                self.act_fault_injector = ActivationFaultInjector()
+                self.act_fault_config = fi_config
+                self.model = self.act_fault_injector.inject(self.model, fi_config)
+
+                if fi_config.track_statistics:
+                    num_layers = self.act_fault_injector.get_num_layers(self.model)
+                    self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
+                    self.act_fault_injector.set_statistics(self.model, self.act_fault_statistics)
+
+                print(f"  Activation fault injection enabled: "
+                      f"prob={fi_config.probability}%, type={fi_config.injection_type}")
+            else:
+                self.act_fault_injector = None
+                self.act_fault_config = None
+                print(f"  Activation fault injection disabled")
+
+        elif target == "weight":
+            # Remove old injector if exists
+            if self.weight_fault_injector is not None:
+                self.weight_fault_injector.remove(self.model)
+
+            if fi_config.enabled:
+                self.weight_fault_injector = WeightFaultInjector()
+                self.weight_fault_config = fi_config
+                self.model = self.weight_fault_injector.inject(self.model, fi_config)
+
+                if fi_config.track_statistics:
+                    num_layers = self.weight_fault_injector.get_num_layers(self.model)
+                    self.weight_fault_statistics = FaultStatistics(num_layers=num_layers)
+                    self.weight_fault_injector.set_statistics(self.model, self.weight_fault_statistics)
+
+                print(f"  Weight fault injection enabled: "
+                      f"prob={fi_config.probability}%, type={fi_config.injection_type}")
+            else:
+                self.weight_fault_injector = None
+                self.weight_fault_config = None
+                print(f"  Weight fault injection disabled")
+
+    def _load_phase_checkpoint(self, checkpoint_path: str) -> None:
+        """Load checkpoint at the start of a phase.
+
+        Args:
+            checkpoint_path: Path to checkpoint file or special value ("best", "latest").
+        """
+        from pathlib import Path
+
+        # Resolve special values
+        if checkpoint_path == "best":
+            ckpt_file = self.experiment.checkpoint_dir / "best.pt"
+        elif checkpoint_path == "latest":
+            ckpt_file = self.experiment.checkpoint_dir / "latest.pt"
+        else:
+            ckpt_file = Path(checkpoint_path)
+            if not ckpt_file.is_absolute():
+                # Try relative to experiment dir
+                ckpt_file = self.experiment.experiment_dir / checkpoint_path
+
+        if not ckpt_file.exists():
+            raise FileNotFoundError(
+                f"Phase checkpoint not found: {ckpt_file}. "
+                f"Ensure the checkpoint exists before this phase starts."
+            )
+
+        print(f"Loading phase checkpoint: {ckpt_file}")
+
+        # Load checkpoint using existing method
+        start_epoch, best_acc, phase_info = self.experiment.load_checkpoint(
+            checkpoint_path=str(ckpt_file),
+            model=self.model,
+            optimizer=self.optimizer,
+            scheduler=self.scheduler,
+            scaler=self.scaler,
+            device=self.device,
+        )
+
+        # Update best accuracy (but don't change start_epoch - phase controls that)
+        self.best_acc = best_acc
+
+        print(f"Checkpoint loaded: best_acc={best_acc:.2f}%")
+
+    def _validate_phase_resumption(
+        self, loaded_phase_info: Optional[Dict[str, Any]], start_epoch: int
+    ) -> None:
+        """Validate that checkpoint phase matches current config.
+
+        Args:
+            loaded_phase_info: Phase info from loaded checkpoint.
+            start_epoch: Epoch to resume from.
+        """
+        if loaded_phase_info is None:
+            # Old checkpoint format without phase info
+            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
+                print(
+                    "WARNING: Loaded checkpoint is in legacy format (no phase info). "
+                    "Resuming multi-phase training from legacy checkpoint."
+                )
+            return
+
+        if loaded_phase_info.get("mode") == "single_phase":
+            # Checkpoint from single-phase training
+            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
+                print(
+                    "WARNING: Resuming multi-phase training from single-phase checkpoint. "
+                    "Phase info will be inferred from epoch number."
+                )
+            return
+
+        # Multi-phase checkpoint
+        loaded_phase_idx = loaded_phase_info.get("phase_idx", -1)
+        if self.phase_manager is not None:
+            current_phase_idx = self.phase_manager.get_phase_at_epoch(start_epoch)
+
+            if loaded_phase_idx != current_phase_idx:
+                loaded_phase_name = loaded_phase_info.get("phase_name", "unknown")
+                current_phase = self.phase_manager.get_phase_by_index(current_phase_idx)
+                current_phase_name = current_phase.name if current_phase else "unknown"
+
+                print(
+                    f"WARNING: Checkpoint was saved in phase {loaded_phase_idx} "
+                    f"({loaded_phase_name}) but resuming in phase {current_phase_idx} "
+                    f"({current_phase_name}). Ensure config phases match checkpoint."
+                )
