@@ -13,9 +13,13 @@ Provides a complete training loop with support for:
 
 from __future__ import annotations
 
+import os
+
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 from torch.cuda.amp import autocast, GradScaler
+from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Any, Dict, Iterator, Optional, Tuple, Union
@@ -85,9 +89,10 @@ class Trainer:
         config: Dict[str, Any],
         device: torch.device,
         val_loader: Optional[DataLoader[Any]] = None,
+        local_rank: Optional[int] = None,
     ) -> None:
         """Initialize the trainer.
-        
+
         Args:
             model: The model to train (will be moved to device).
             train_loader: DataLoader for training data.
@@ -95,8 +100,20 @@ class Trainer:
             config: Full configuration dictionary.
             device: Compute device (cuda/mps/cpu).
             val_loader: Optional DataLoader for validation data.
+            local_rank: Local rank for distributed training (optional).
         """
+        self.local_rank: Optional[int] = local_rank
+        self.is_distributed: bool = local_rank is not None
+
         self.model: nn.Module = model.to(device)
+        if self.is_distributed:
+            self.model = DDP(self.model, device_ids=[local_rank])
+            self.rank = int(os.environ["RANK"])
+            self.world_size = int(os.environ["WORLD_SIZE"])
+        else:
+            self.rank = 0
+            self.world_size = 1
+
         self.train_loader: DataLoader[Any] = train_loader
         self.val_loader: Optional[DataLoader[Any]] = val_loader
         self.test_loader: DataLoader[Any] = test_loader
@@ -229,10 +246,10 @@ class Trainer:
 
     def train_epoch(self, epoch: int) -> Tuple[float, float]:
         """Train for one epoch.
-        
+
         Args:
             epoch: Current epoch number (for progress bar display).
-            
+
         Returns:
             Tuple of (average_loss, accuracy).
         """
@@ -241,19 +258,23 @@ class Trainer:
         correct = 0
         total = 0
 
+        # Set epoch for distributed sampler
+        if self.is_distributed and hasattr(self.train_loader, "sampler"):
+            self.train_loader.sampler.set_epoch(epoch)
+
         # Setup fault injection for this epoch
         if self.act_fault_injector is not None and self.act_fault_config is not None:
-            
+
             # Set up condition injector for step_interval-based injection
             # No step interval setup needed for simplified injection
-            
+
             # Set mode based on apply_during config
             apply_during = self.act_fault_config.apply_during
             if apply_during in ("train", "both"):
                 self.act_fault_injector.set_enabled(self.model, True)
             else:
                 self.act_fault_injector.set_enabled(self.model, False)
-        
+
         # Setup weight fault injection for this epoch
         if self.weight_fault_injector is not None and self.weight_fault_config is not None:
             apply_during = self.weight_fault_config.apply_during
@@ -263,7 +284,7 @@ class Trainer:
                 self.weight_fault_injector.set_enabled(self.model, False)
 
         # Create progress bar
-        if self.show_progress:
+        if self.show_progress and self.rank == 0:
             pbar = tqdm(
                 self.train_loader,
                 desc=f"Epoch {epoch + 1}",
@@ -293,7 +314,7 @@ class Trainer:
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
-            
+
             if hasattr(self.model, 'clip_weights'):
                 self.model.clip_weights(-1, 1)
 
@@ -303,7 +324,7 @@ class Trainer:
             correct += predicted.eq(labels).sum().item()
 
             # Update progress bar
-            if self.show_progress:
+            if self.show_progress and self.rank == 0:
                 current_acc = 100.0 * correct / total
                 pbar.set_postfix(
                     {"loss": f"{loss.item():.4f}", "acc": f"{current_acc:.2f}%"}
@@ -316,11 +337,11 @@ class Trainer:
     @torch.no_grad()
     def evaluate(self, loader: DataLoader[Any], desc: str = "Evaluating") -> Tuple[float, float]:
         """Evaluate model on a given dataloader.
-        
+
         Args:
             loader: DataLoader to evaluate on.
             desc: Description for progress bar.
-            
+
         Returns:
             Tuple of (average_loss, accuracy).
         """
@@ -336,7 +357,7 @@ class Trainer:
                 self.act_fault_injector.set_enabled(self.model, True)
             else:
                 self.act_fault_injector.set_enabled(self.model, False)
-        
+
         # Setup weight fault injection for evaluation
         if self.weight_fault_injector is not None and self.weight_fault_config is not None:
             apply_during = self.weight_fault_config.apply_during
@@ -346,7 +367,7 @@ class Trainer:
                 self.weight_fault_injector.set_enabled(self.model, False)
 
         # Create progress bar for evaluation
-        if self.show_progress:
+        if self.show_progress and self.rank == 0:
             pbar = tqdm(
                 loader,
                 desc=desc,
@@ -400,42 +421,43 @@ class Trainer:
 
     def train(self) -> None:
         """Run the full training loop.
-        
+
         Executes training for the configured number of epochs,
         handling validation/test evaluation, checkpointing, and logging.
         """
         epochs: int = self.config["training"]["epochs"]
         model_name: str = self.config["model"]["name"]
         eval_name: str = "Val" if self.has_validation else "Test"
-        
+
         # Test evaluation frequency (only when using validation set)
         training_config: Dict[str, Any] = self.config.get("training", {})
         test_frequency: int = training_config.get("test_frequency", 10)
 
         # Log training start
-        self.logger.log_training_start(
-            model_name=model_name,
-            epochs=epochs,
-            device=str(self.device),
-            has_validation=self.has_validation,
-            use_amp=self.use_amp,
-            experiment_dir=self.experiment.get_experiment_dir(),
-        )
+        if self.rank == 0:
+            self.logger.log_training_start(
+                model_name=model_name,
+                epochs=epochs,
+                device=str(self.device),
+                has_validation=self.has_validation,
+                use_amp=self.use_amp,
+                experiment_dir=self.experiment.get_experiment_dir(),
+            )
 
-        # Log fault injection info
-        if self.act_fault_injector is not None and self.act_fault_config is not None:
-            num_layers = self.act_fault_injector.get_num_layers(self.model)
-            print(f"Activation fault injection: {num_layers} layers, "
-                  f"prob={self.act_fault_config.probability}%, "
-                  f"mode=full_model, "
-                  f"type={self.act_fault_config.injection_type}")
-        
-        if self.weight_fault_injector is not None and self.weight_fault_config is not None:
-            num_layers = self.weight_fault_injector.get_num_layers(self.model)
-            print(f"Weight fault injection: {num_layers} hooks, "
-                  f"prob={self.weight_fault_config.probability}%, "
-                  f"mode=full_model, "
-                  f"type={self.weight_fault_config.injection_type}")
+            # Log fault injection info
+            if self.act_fault_injector is not None and self.act_fault_config is not None:
+                num_layers = self.act_fault_injector.get_num_layers(self.model)
+                print(f"Activation fault injection: {num_layers} layers, "
+                      f"prob={self.act_fault_config.probability}%, "
+                      f"mode=full_model, "
+                      f"type={self.act_fault_config.injection_type}")
+
+            if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+                num_layers = self.weight_fault_injector.get_num_layers(self.model)
+                print(f"Weight fault injection: {num_layers} hooks, "
+                      f"prob={self.weight_fault_config.probability}%, "
+                      f"mode=full_model, "
+                      f"type={self.weight_fault_config.injection_type}")
 
         for epoch in range(self.start_epoch, epochs):
             train_loss, train_acc = self.train_epoch(epoch)
@@ -469,24 +491,26 @@ class Trainer:
                     test_loss, test_acc = self.test()
 
             # Log epoch metrics
-            self.logger.log_epoch(
-                epoch=epoch,
-                total_epochs=epochs,
-                lr=lr,
-                train_loss=train_loss,
-                train_acc=train_acc,
-                eval_loss=eval_loss,
-                eval_acc=eval_acc,
-                eval_name=eval_name,
-                test_loss=test_loss,
-                test_acc=test_acc,
-            )
+            if self.rank == 0:
+                self.logger.log_epoch(
+                    epoch=epoch,
+                    total_epochs=epochs,
+                    lr=lr,
+                    train_loss=train_loss,
+                    train_acc=train_acc,
+                    eval_loss=eval_loss,
+                    eval_acc=eval_acc,
+                    eval_name=eval_name,
+                    test_loss=test_loss,
+                    test_acc=test_acc,
+                )
 
-            # Save checkpoint
-            if self.experiment.should_save(epoch, is_best):
+            # Save checkpoint (only on rank 0)
+            if self.rank == 0 and self.experiment.should_save(epoch, is_best):
+                model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
-                    model=self.model,
+                    model=model_to_save,
                     optimizer=self.optimizer,
                     scheduler=self.scheduler,
                     best_acc=self.best_acc,
@@ -495,7 +519,7 @@ class Trainer:
                     is_best=is_best,
                     test_acc=test_acc if is_best and self.has_validation else None,
                 )
-                
+
                 # Log best model to file
                 if is_best:
                     self.logger.log_best_model(
@@ -505,46 +529,47 @@ class Trainer:
                     )
 
         # Final evaluation on test set (if we used validation during training)
-        if self.has_validation:
+        if self.has_validation and self.rank == 0:
             print("\nRunning final evaluation on test set...")
             final_test_loss, final_test_acc = self.test()
             self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
 
         # Print fault injection statistics
-        if self.act_fault_statistics is not None:
-            print("\n" + "=" * 60)
-            print("Activation Fault Injection Statistics:")
-            print("=" * 60)
-            self.act_fault_statistics.print_report()
-            
-            # Save statistics to experiment directory
+        if self.rank == 0:
+            if self.act_fault_statistics is not None:
+                print("\n" + "=" * 60)
+                print("Activation Fault Injection Statistics:")
+                print("=" * 60)
+                self.act_fault_statistics.print_report()
+
+                # Save statistics to experiment directory
+                experiment_dir = self.experiment.get_experiment_dir()
+                if experiment_dir is not None:
+                    import os
+                    stats_path = os.path.join(experiment_dir, "activation_fault_injection_stats.json")
+                    self.act_fault_statistics.save_to_file(stats_path)
+                    print(f"Activation fault injection statistics saved to: {stats_path}")
+
+            if self.weight_fault_statistics is not None:
+                print("\n" + "=" * 60)
+                print("Weight Fault Injection Statistics:")
+                print("=" * 60)
+                self.weight_fault_statistics.print_report()
+
+                # Save statistics to experiment directory
+                experiment_dir = self.experiment.get_experiment_dir()
+                if experiment_dir is not None:
+                    import os
+                    stats_path = os.path.join(experiment_dir, "weight_fault_injection_stats.json")
+                    self.weight_fault_statistics.save_to_file(stats_path)
+                    print(f"Weight fault injection statistics saved to: {stats_path}")
+
+            # Log completion
+            self.logger.log_training_complete(self.best_acc, eval_name)
+
             experiment_dir = self.experiment.get_experiment_dir()
             if experiment_dir is not None:
-                import os
-                stats_path = os.path.join(experiment_dir, "activation_fault_injection_stats.json")
-                self.act_fault_statistics.save_to_file(stats_path)
-                print(f"Activation fault injection statistics saved to: {stats_path}")
-        
-        if self.weight_fault_statistics is not None:
-            print("\n" + "=" * 60)
-            print("Weight Fault Injection Statistics:")
-            print("=" * 60)
-            self.weight_fault_statistics.print_report()
-            
-            # Save statistics to experiment directory
-            experiment_dir = self.experiment.get_experiment_dir()
-            if experiment_dir is not None:
-                import os
-                stats_path = os.path.join(experiment_dir, "weight_fault_injection_stats.json")
-                self.weight_fault_statistics.save_to_file(stats_path)
-                print(f"Weight fault injection statistics saved to: {stats_path}")
+                print(f"Results saved to: {experiment_dir}")
 
-        # Log completion
-        self.logger.log_training_complete(self.best_acc, eval_name)
-        
-        experiment_dir = self.experiment.get_experiment_dir()
-        if experiment_dir is not None:
-            print(f"Results saved to: {experiment_dir}")
-
-        # Close logger
-        self.logger.close()
+            # Close logger
+            self.logger.close()

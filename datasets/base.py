@@ -243,26 +243,47 @@ class BaseDataset(ABC):
 
     def get_loaders(self) -> Tuple[DataLoader[Any], Optional[DataLoader[Any]], DataLoader[Any]]:
         """Get train, validation, and test data loaders.
-        
+
         Creates DataLoader instances with proper shuffling and
         worker initialization for reproducibility.
-        
+
         Returns:
             Tuple of (train_loader, val_loader, test_loader).
             val_loader is None if val_split was not specified.
         """
+        import os
+
+        # Check if running in distributed mode
+        is_distributed = "RANK" in os.environ and "WORLD_SIZE" in os.environ
+
         # Create a seeded generator for reproducible shuffling
         # This ensures the same batch order across runs with num_workers > 0
         generator: torch.Generator = torch.Generator().manual_seed(self.seed)
-        
-        train_loader: DataLoader[Any] = DataLoader(
-            self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            generator=generator,
-            worker_init_fn=_worker_init_fn,
-        )
+
+        # Use DistributedSampler for training in distributed mode
+        if is_distributed:
+            from torch.utils.data.distributed import DistributedSampler
+
+            train_sampler = DistributedSampler(
+                dataset=self.train_dataset
+            )
+            train_loader: DataLoader[Any] = DataLoader(
+                dataset=self.train_dataset,
+                batch_size=self.batch_size,
+                sampler=train_sampler,
+                shuffle=False,
+                num_workers=self.num_workers,
+                worker_init_fn=_worker_init_fn,
+            )
+        else:
+            train_loader: DataLoader[Any] = DataLoader(
+                dataset=self.train_dataset,
+                batch_size=self.batch_size,
+                shuffle=True,
+                num_workers=self.num_workers,
+                generator=generator,
+                worker_init_fn=_worker_init_fn,
+            )
 
         val_loader: Optional[DataLoader[Any]] = None
         if self.val_dataset is not None:
