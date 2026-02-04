@@ -903,7 +903,8 @@ class Trainer:
                 self.model = self.act_fault_injector.inject(self.model, fi_config)
 
                 if fi_config.track_statistics:
-                    self.act_fault_statistics = FaultStatistics()
+                    num_layers = self.act_fault_injector.get_num_layers(self.model)
+                    self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
                     self.act_fault_injector.set_statistics(self.model, self.act_fault_statistics)
 
                 print(f"  Activation fault injection enabled: "
@@ -924,7 +925,8 @@ class Trainer:
                 self.model = self.weight_fault_injector.inject(self.model, fi_config)
 
                 if fi_config.track_statistics:
-                    self.weight_fault_statistics = FaultStatistics()
+                    num_layers = self.weight_fault_injector.get_num_layers(self.model)
+                    self.weight_fault_statistics = FaultStatistics(num_layers=num_layers)
                     self.weight_fault_injector.set_statistics(self.model, self.weight_fault_statistics)
 
                 print(f"  Weight fault injection enabled: "

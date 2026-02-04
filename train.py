@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import warnings
 from typing import Any, Dict
 
 import torch
@@ -22,6 +23,9 @@ from datasets import get_dataset
 from models import get_model
 from utils import get_device, load_config, Trainer, set_seed
 from utils.config_validator import validate_config, ConfigValidationError
+
+# Suppress Brevitas pkg_resources deprecation warning
+warnings.filterwarnings("ignore", category=UserWarning, module="brevitas")
 
 
 def main() -> None:
@@ -116,10 +120,6 @@ def main() -> None:
     if rank == 0:
         print(f"Model: {config['model']['name']}")
 
-        # Save the model architecture to a file
-        with open("model_architecture.txt", "w") as f:
-            f.write(str(model))
-        print("Model architecture saved to model_architecture.txt")
     # Create trainer and start training
     trainer = Trainer(
         model=model,

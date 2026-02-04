@@ -1,0 +1,114 @@
+# Progressive Fault Hardening Configuration
+# Gradually increases fault injection probability across multiple phases
+
+# Seed configuration
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+# Dataset configuration
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+# Model configuration
+model:
+  name: "quant_cnv"
+
+# Quantization settings
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 4
+  act_bit_width: 4
+
+# Loss function
+loss:
+  name: "sqr_hinge"
+
+training:
+  batch_size: 256
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.01
+  weight_decay: 0.0001
+
+scheduler:
+  name: "cosine"
+  warmup_epochs: 5
+
+activation_fault_injection:
+  enabled: false
+  injection_type: "random"
+  apply_during: "train"
+  target_layers: ["QuantReLU", "QuantIdentity"]
+  track_statistics: true
+  verbose: false
+
+weight_fault_injection:
+  enabled: false
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 25
+  save_best: true
+
+phases:
+  # Phase 1: Clean training
+  - name: "clean_training"
+    epochs: 100
+    scheduler:
+      T_max: 100
+      warmup_epochs: 5
+
+  # Phase 2: Low fault exposure (2%)
+  - name: "low_fault_exposure"
+    epochs: 50
+    optimizer:
+      learning_rate: 0.005
+    scheduler:
+      T_max: 50
+      warmup_epochs: 0
+    activation_fault_injection:
+      enabled: true
+      probability: 2.0
+      apply_during: "train"
+
+  # Phase 3: Medium fault exposure (5%)
+  - name: "medium_fault_exposure"
+    epochs: 50
+    optimizer:
+      learning_rate: 0.002
+    scheduler:
+      T_max: 50
+      warmup_epochs: 0
+    activation_fault_injection:
+      enabled: true
+      probability: 5.0
+      apply_during: "train"
+
+  # Phase 4: High fault exposure (10%)
+  - name: "high_fault_exposure"
+    epochs: 50
+    optimizer:
+      learning_rate: 0.001
+    scheduler:
+      T_max: 50
+      warmup_epochs: 0
+    activation_fault_injection:
+      enabled: true
+      probability: 10.0
+      apply_during: "train"
