@@ -245,6 +245,7 @@ class ExperimentManager:
         scaler: Optional[Any] = None,
         is_best: bool = False,
         test_acc: Optional[float] = None,
+        phase_info: Optional[Dict[str, Any]] = None,
     ):
         """Save a model checkpoint.
 
@@ -258,6 +259,7 @@ class ExperimentManager:
             scaler: GradScaler for AMP (optional).
             is_best: Whether this is the best model so far.
             test_acc: Test accuracy (for best model with validation).
+            phase_info: Optional phase information for multi-phase training.
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
@@ -271,6 +273,10 @@ class ExperimentManager:
             "current_acc": current_acc,
             "config": self.config,
         }
+
+        # Save phase info if provided
+        if phase_info is not None:
+            checkpoint["phase_info"] = phase_info
 
         # Save scaler state if using AMP
         if scaler is not None:
@@ -306,7 +312,7 @@ class ExperimentManager:
         scheduler: Any,
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
-    ) -> Tuple[int, float]:
+    ) -> Tuple[int, float, Optional[Dict[str, Any]]]:
         """Load a model checkpoint.
 
         Args:
@@ -318,12 +324,12 @@ class ExperimentManager:
             device: Device to load the checkpoint to.
 
         Returns:
-            Tuple of (start_epoch, best_acc).
+            Tuple of (start_epoch, best_acc, phase_info).
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             print(f"Warning: Checkpoint not found at {checkpoint_path}")
-            return 0, 0.0
+            return 0, 0.0, None
 
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
@@ -340,9 +346,10 @@ class ExperimentManager:
 
         start_epoch: int = checkpoint["epoch"] + 1
         best_acc: float = checkpoint.get("best_acc", 0.0)
+        phase_info: Optional[Dict[str, Any]] = checkpoint.get("phase_info", None)
 
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
-        return start_epoch, best_acc
+        return start_epoch, best_acc, phase_info
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.

@@ -25,6 +25,10 @@ from .fault_injection import (
     QuantActivationFaultInjectionLayer
 )
 
+# Multi-phase training
+from .phase_config import PhaseConfig
+from .phase_manager import PhaseManager, create_phase_manager
+
 __all__ = [
     # Core utilities
     "get_device",
@@ -43,4 +47,8 @@ __all__ = [
     "ActivationFaultInjector",
     "FaultStatistics",
     "QuantActivationFaultInjectionLayer",
+    # Multi-phase training
+    "PhaseConfig",
+    "PhaseManager",
+    "create_phase_manager",
 ]
