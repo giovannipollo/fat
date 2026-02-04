@@ -131,6 +131,8 @@ class MetricsLogger:
         eval_name: str = "Val",
         test_loss: Optional[float] = None,
         test_acc: Optional[float] = None,
+        phase_info: Optional[Dict[str, Any]] = None,
+        is_best: bool = False,
     ) -> None:
         """Log metrics for an epoch.
 
@@ -145,20 +147,40 @@ class MetricsLogger:
             eval_name: Name of evaluation set ("Val" or "Test").
             test_loss: Optional test loss (when using validation).
             test_acc: Optional test accuracy (when using validation).
+            phase_info: Optional phase information for multi-phase training.
+            is_best: Whether this epoch achieved the best accuracy.
         """
         # Build log message
-        log_msg = (
-            f"Epoch [{epoch + 1}/{total_epochs}] "
-            f"LR: {lr:.5f} | "
-            f"Train Loss: {train_loss:.4f} | "
-            f"Train Acc: {train_acc:.2f}% | "
-            f"{eval_name} Loss: {eval_loss:.4f} | "
-            f"{eval_name} Acc: {eval_acc:.2f}%"
-        )
+        if phase_info is not None and phase_info.get("mode") == "multi_phase":
+            # Multi-phase logging
+            phase_str = f"[Phase {phase_info['phase_idx']+1}/{phase_info['total_phases']}: {phase_info['phase_name']}] "
+            progress_str = f"({phase_info['phase_progress']})"
+            log_msg = (
+                f"{phase_str}Epoch {epoch + 1}/{total_epochs} {progress_str} | "
+                f"LR: {lr:.5f} | "
+                f"Train Loss: {train_loss:.4f} | "
+                f"Train Acc: {train_acc:.2f}% | "
+                f"{eval_name} Loss: {eval_loss:.4f} | "
+                f"{eval_name} Acc: {eval_acc:.2f}%"
+            )
+        else:
+            # Single-phase logging
+            log_msg = (
+                f"Epoch [{epoch + 1}/{total_epochs}] "
+                f"LR: {lr:.5f} | "
+                f"Train Loss: {train_loss:.4f} | "
+                f"Train Acc: {train_acc:.2f}% | "
+                f"{eval_name} Loss: {eval_loss:.4f} | "
+                f"{eval_name} Acc: {eval_acc:.2f}%"
+            )
 
         # Add test metrics if available
         if test_loss is not None and test_acc is not None:
             log_msg += f" | Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%"
+
+        # Add best model indicator
+        if is_best:
+            log_msg += " [BEST]"
 
         # Console logging
         if self.console_enabled:

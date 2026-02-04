@@ -143,8 +143,13 @@ class SchedulerFactory:
         sched_config: Dict[str, Any] = config.get("scheduler", {})
         sched_name: str = sched_config.get("name", "cosine").lower()
         warmup_epochs: int = sched_config.get("warmup_epochs", 0)
-        total_epochs: int = config["training"]["epochs"]
 
+        # Handle multi-phase configs where epochs are in phases, not training.epochs
+        if "phases" in config:
+            total_epochs: int = sum(phase.get("epochs", 0) for phase in config["phases"])
+        else:
+            total_epochs: int = config["training"]["epochs"]
+        
         if sched_name not in cls.SCHEDULERS:
             available: List[str] = list(cls.SCHEDULERS.keys())
             raise ValueError(f"Unknown scheduler: {sched_name}. Available: {available}")

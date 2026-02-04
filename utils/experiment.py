@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+from .fault_injection import ActivationFaultInjector, WeightFaultInjector
 
 import torch
 
@@ -100,9 +101,15 @@ class ExperimentManager:
         precision: str = self._get_precision()
 
         if custom_name:
-            return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
+            if activation_or_weight == "":
+                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+            else:
+                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
         else:
-            return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
+            if activation_or_weight == "":
+                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+            else:
+                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
 
     def _get_dataset_name(self) -> str:
         """Get the dataset name from config.
@@ -139,7 +146,6 @@ class ExperimentManager:
             "weight" if weight fault injection is enabled,
             "none" if neither is enabled.
         """
-        print(self.config)
         activation_fault_injection: Dict[str, Any] = self.config.get(
             "activation_fault_injection", {}
         )
@@ -148,8 +154,6 @@ class ExperimentManager:
             "weight_fault_injection", {}
         )
         weight_fault_injection_probability = weight_fault_injection.get("probability", 0)
-        print(activation_fault_injection)
-        print(weight_fault_injection)
         if activation_fault_injection.get(
             "enabled", False
         ) and weight_fault_injection.get("enabled", False):
@@ -245,6 +249,11 @@ class ExperimentManager:
         scaler: Optional[Any] = None,
         is_best: bool = False,
         test_acc: Optional[float] = None,
+        phase_info: Optional[Dict[str, Any]] = None,
+        act_fault_injector: Optional["ActivationFaultInjector"] = None,
+        weight_fault_injector: Optional["WeightFaultInjector"] = None,
+        act_fault_config: Optional[Any] = None,
+        weight_fault_config: Optional[Any] = None,
     ):
         """Save a model checkpoint.
 
@@ -258,9 +267,24 @@ class ExperimentManager:
             scaler: GradScaler for AMP (optional).
             is_best: Whether this is the best model so far.
             test_acc: Test accuracy (for best model with validation).
+            phase_info: Optional phase information for multi-phase training.
+            act_fault_injector: Optional activation fault injector to remove before saving.
+            weight_fault_injector: Optional weight fault injector to remove before saving.
+            act_fault_config: Optional activation fault injection config for re-injection.
+            weight_fault_config: Optional weight fault injection config for re-injection.
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
+
+        # Remove fault injection wrappers/hooks before saving
+        needs_act_reinject = act_fault_injector is not None
+        needs_weight_reinject = weight_fault_injector is not None
+        
+        if needs_act_reinject:
+            model = act_fault_injector.remove(model)
+        
+        if needs_weight_reinject:
+            model = weight_fault_injector.remove(model)
 
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
@@ -272,12 +296,21 @@ class ExperimentManager:
             "config": self.config,
         }
 
+        # Save phase info if provided
+        if phase_info is not None:
+            checkpoint["phase_info"] = phase_info
+
         # Save scaler state if using AMP
         if scaler is not None:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
 
         # Save periodic checkpoint
-        checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
+        # Include phase name in filename for multi-phase training
+        if phase_info is not None and phase_info.get("mode") == "multi_phase":
+            phase_name = phase_info.get("phase_name", "unknown")
+            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}_{phase_name}.pt"
+        else:
+            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
 
         # Save latest checkpoint (always overwritten)
@@ -298,6 +331,13 @@ class ExperimentManager:
             else:
                 print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
 
+        # Re-inject fault injection wrappers/hooks after saving
+        if needs_act_reinject and act_fault_config is not None:
+            model = act_fault_injector.inject(model, act_fault_config)
+        
+        if needs_weight_reinject and weight_fault_config is not None:
+            model = weight_fault_injector.inject(model, weight_fault_config)
+
     def load_checkpoint(
         self,
         checkpoint_path: Union[str, Path],
@@ -306,7 +346,7 @@ class ExperimentManager:
         scheduler: Any,
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
-    ) -> Tuple[int, float]:
+    ) -> Tuple[int, float, Optional[Dict[str, Any]]]:
         """Load a model checkpoint.
 
         Args:
@@ -318,12 +358,12 @@ class ExperimentManager:
             device: Device to load the checkpoint to.
 
         Returns:
-            Tuple of (start_epoch, best_acc).
+            Tuple of (start_epoch, best_acc, phase_info).
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             print(f"Warning: Checkpoint not found at {checkpoint_path}")
-            return 0, 0.0
+            return 0, 0.0, None
 
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
@@ -340,9 +380,10 @@ class ExperimentManager:
 
         start_epoch: int = checkpoint["epoch"] + 1
         best_acc: float = checkpoint.get("best_acc", 0.0)
+        phase_info: Optional[Dict[str, Any]] = checkpoint.get("phase_info", None)
 
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
-        return start_epoch, best_acc
+        return start_epoch, best_acc, phase_info
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import warnings
 from typing import Any, Dict
 
 import torch
@@ -21,6 +22,10 @@ import torch.distributed as dist
 from datasets import get_dataset
 from models import get_model
 from utils import get_device, load_config, Trainer, set_seed
+from utils.config_validator import validate_config, ConfigValidationError
+
+# Suppress Brevitas pkg_resources deprecation warning
+warnings.filterwarnings("ignore", category=UserWarning, module="brevitas")
 
 
 def main() -> None:
@@ -60,6 +65,16 @@ def main() -> None:
     local_rank = int(os.environ.get("LOCAL_RANK", 0))
     rank = int(os.environ.get("RANK", 0))
     world_size = int(os.environ.get("WORLD_SIZE", 1))
+
+    # Validate configuration (only on rank 0)
+    if rank == 0:
+        try:
+            validate_config(config)
+        except ConfigValidationError as e:
+            print(f"Configuration error: {e}")
+            print("Please fix the configuration and try again.")
+            import sys
+            sys.exit(1)
 
     if is_distributed:
         dist.init_process_group(backend="nccl")
@@ -105,10 +120,6 @@ def main() -> None:
     if rank == 0:
         print(f"Model: {config['model']['name']}")
 
-        # Save the model architecture to a file
-        with open("model_architecture.txt", "w") as f:
-            f.write(str(model))
-        print("Model architecture saved to model_architecture.txt")
     # Create trainer and start training
     trainer = Trainer(
         model=model,
