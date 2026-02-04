@@ -15,6 +15,7 @@ import torch
 
 try:
     import yaml
+
     YAML_AVAILABLE: bool = True
 except ImportError:
     YAML_AVAILABLE = False
@@ -92,13 +93,16 @@ class ExperimentManager:
             Experiment name string (format: [prefix_]model_timestamp).
         """
         model_name: str = self.config["model"]["name"].lower()
+        sat_or_fat: str = self._get_sat_or_fat()
+        activation_or_weight: str = self._get_activation_or_weight_fault_injection()
+        dataset_name: str = self._get_dataset_name()
         timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
         precision: str = self._get_precision()
 
         if custom_name:
-            return f"{custom_name}_{timestamp}_{model_name}_{precision}"
+            return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
         else:
-            return f"{timestamp}_{model_name}_{precision}"
+            return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
 
     def _get_dataset_name(self) -> str:
         """Get the dataset name from config.
@@ -107,6 +111,53 @@ class ExperimentManager:
             Dataset name string in lowercase.
         """
         return self.config["dataset"]["name"].lower()
+
+    def _get_sat_or_fat(self) -> str:
+        """Determine if the experiment is SAT or FAT based on config.
+
+        Returns:
+            "sat" if no fault injection, "fat" if any fault injection enabled.
+        """
+        activation_fault_injection: Dict[str, Any] = self.config.get(
+            "activation_fault_injection", {}
+        )
+        weight_fault_injection: Dict[str, Any] = self.config.get(
+            "weight_fault_injection", {}
+        )
+        if activation_fault_injection.get(
+            "enabled", False
+        ) or weight_fault_injection.get("enabled", False):
+            return "fat"
+        else:
+            return "sat"
+
+    def _get_activation_or_weight_fault_injection(self) -> str:
+        """Determine if activation or weight fault injection is used.
+
+        Returns:
+            "activation" if activation fault injection is enabled,
+            "weight" if weight fault injection is enabled,
+            "none" if neither is enabled.
+        """
+        print(self.config)
+        activation_fault_injection: Dict[str, Any] = self.config.get(
+            "activation_fault_injection", {}
+        )
+        weight_fault_injection: Dict[str, Any] = self.config.get(
+            "weight_fault_injection", {}
+        )
+        print(activation_fault_injection)
+        print(weight_fault_injection)
+        if activation_fault_injection.get(
+            "enabled", False
+        ) and weight_fault_injection.get("enabled", False):
+            return "weight_and_activation"
+        elif weight_fault_injection.get("enabled", False):
+            return "weight"
+        elif activation_fault_injection.get("enabled", False):
+            return "activation"
+        else:
+            return ""
 
     def _get_precision(self) -> str:
         """Get the precision string based on quantization config.
@@ -138,12 +189,13 @@ class ExperimentManager:
         """
         base_path: Path = Path(base_dir)
         dataset_name: str = self._get_dataset_name()
+        sat_or_fat: str = self._get_sat_or_fat()
         precision_folder: str = self._get_precision()
         model_name: str = self.config["model"]["name"].lower()
         experiment_name: str = self._generate_experiment_name(custom_name)
 
         self.experiment_dir = (
-            base_path / dataset_name / model_name / precision_folder / experiment_name
+            base_path / sat_or_fat / dataset_name / model_name / precision_folder / experiment_name
         )
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.tensorboard_dir = self.experiment_dir / "tensorboard"
