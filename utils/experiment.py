@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+from .fault_injection import ActivationFaultInjector, WeightFaultInjector
 
 import torch
 
@@ -100,9 +101,15 @@ class ExperimentManager:
         precision: str = self._get_precision()
 
         if custom_name:
-            return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
+            if activation_or_weight == "":
+                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+            else:
+                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
         else:
-            return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
+            if activation_or_weight == "":
+                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+            else:
+                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
 
     def _get_dataset_name(self) -> str:
         """Get the dataset name from config.
@@ -139,7 +146,6 @@ class ExperimentManager:
             "weight" if weight fault injection is enabled,
             "none" if neither is enabled.
         """
-        print(self.config)
         activation_fault_injection: Dict[str, Any] = self.config.get(
             "activation_fault_injection", {}
         )
@@ -148,8 +154,6 @@ class ExperimentManager:
             "weight_fault_injection", {}
         )
         weight_fault_injection_probability = weight_fault_injection.get("probability", 0)
-        print(activation_fault_injection)
-        print(weight_fault_injection)
         if activation_fault_injection.get(
             "enabled", False
         ) and weight_fault_injection.get("enabled", False):
@@ -246,6 +250,10 @@ class ExperimentManager:
         is_best: bool = False,
         test_acc: Optional[float] = None,
         phase_info: Optional[Dict[str, Any]] = None,
+        act_fault_injector: Optional["ActivationFaultInjector"] = None,
+        weight_fault_injector: Optional["WeightFaultInjector"] = None,
+        act_fault_config: Optional[Any] = None,
+        weight_fault_config: Optional[Any] = None,
     ):
         """Save a model checkpoint.
 
@@ -260,9 +268,23 @@ class ExperimentManager:
             is_best: Whether this is the best model so far.
             test_acc: Test accuracy (for best model with validation).
             phase_info: Optional phase information for multi-phase training.
+            act_fault_injector: Optional activation fault injector to remove before saving.
+            weight_fault_injector: Optional weight fault injector to remove before saving.
+            act_fault_config: Optional activation fault injection config for re-injection.
+            weight_fault_config: Optional weight fault injection config for re-injection.
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
+
+        # Remove fault injection wrappers/hooks before saving
+        needs_act_reinject = act_fault_injector is not None
+        needs_weight_reinject = weight_fault_injector is not None
+        
+        if needs_act_reinject:
+            model = act_fault_injector.remove(model)
+        
+        if needs_weight_reinject:
+            model = weight_fault_injector.remove(model)
 
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
@@ -308,6 +330,13 @@ class ExperimentManager:
                 )
             else:
                 print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
+
+        # Re-inject fault injection wrappers/hooks after saving
+        if needs_act_reinject and act_fault_config is not None:
+            model = act_fault_injector.inject(model, act_fault_config)
+        
+        if needs_weight_reinject and weight_fault_config is not None:
+            model = weight_fault_injector.inject(model, weight_fault_config)
 
     def load_checkpoint(
         self,

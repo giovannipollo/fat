@@ -541,6 +541,10 @@ class Trainer:
                     scaler=self.scaler,
                     is_best=is_best,
                     test_acc=test_acc if is_best and self.has_validation else None,
+                    act_fault_injector=self.act_fault_injector,
+                    weight_fault_injector=self.weight_fault_injector,
+                    act_fault_config=self.act_fault_config,
+                    weight_fault_config=self.weight_fault_config,
                 )
 
                 # Log best model to file
@@ -702,6 +706,10 @@ class Trainer:
                     is_best=is_best,
                     test_acc=test_acc if is_best and self.has_validation else None,
                     phase_info=phase_info,
+                    act_fault_injector=self.act_fault_injector,
+                    weight_fault_injector=self.weight_fault_injector,
+                    act_fault_config=self.act_fault_config,
+                    weight_fault_config=self.weight_fault_config,
                 )
 
                 # Log best model to file
