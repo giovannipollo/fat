@@ -1,0 +1,38 @@
+# Single activation fault injection evaluation
+
+name: "activation_random_5pct"
+description: "Evaluate activation faults with 5% random injection"
+
+# Injection configurations
+injections:
+  - name: "activation"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "random"
+    target_layers:
+      - "QuantIdentity"
+      - "QuantReLU"
+      - "QuantHardTanh"
+      - "QuantConv2d"
+    track_statistics: true
+
+# Baseline evaluation
+baseline:
+  enabled: true
+  num_runs: 1
+
+# Runner configuration
+runner:
+  type: "single"
+  num_runs: 5
+
+# Output configuration
+output:
+  formats: ["console", "json"]
+  save_path: "./results/activation_{timestamp}.json"
+  verbose: true
+  show_progress: true
+
+# Random seed for reproducibility
+seed: null

@@ -1,0 +1,38 @@
+# Combined activation + weight fault injection
+
+name: "combined_activation_weight"
+description: "Evaluate combined activation and weight faults"
+
+# Multiple injections simultaneously
+injections:
+  - name: "activation"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "random"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: true
+  
+  - name: "weight"
+    enabled: true
+    target_type: "weight"
+    probability: 1.0
+    injection_type: "lsb_flip"
+    target_layers: ["QuantConv2d", "QuantLinear"]
+    track_statistics: true
+
+baseline:
+  enabled: true
+  num_runs: 1
+
+runner:
+  type: "single"
+  num_runs: 5
+
+output:
+  formats: ["console", "json"]
+  save_path: "./results/combined_{timestamp}.json"
+  verbose: true
+  show_progress: true
+
+seed: 42

@@ -1,0 +1,6 @@
+name: "baseline_evaluation"
+description: "Load and check the accuracy is the same"
+
+baseline:
+  enabled: true
+  num_runs: 1

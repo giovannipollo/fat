@@ -1,0 +1,30 @@
+# Probability sweep evaluation
+
+name: "activation_probability_sweep"
+description: "Sweep activation fault probability from 0% to 50%"
+
+injections:
+  - name: "activation"
+    enabled: true
+    target_type: "activation"
+    probability: 0.0
+    injection_type: "random"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: false
+
+baseline:
+  enabled: true
+  num_runs: 3
+
+runner:
+  type: "sweep"
+  probabilities: [0.0, 1.0, 5.0, 10.0, 20.0, 50.0]
+  num_runs: 5
+
+output:
+  formats: ["console", "json"]
+  save_path: "./results/sweep_{timestamp}.json"
+  verbose: true
+  show_progress: true
+
+seed: 42

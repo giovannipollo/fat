@@ -1,0 +1,30 @@
+# Inject faults into specific layers by index
+
+name: "first_layer_only"
+description: "Inject faults only into the first layer (index 0)"
+
+injections:
+  - name: "activation"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "random"
+    target_layers: ["QuantConv2d", "QuantReLU"]
+    target_layer_indices: [0]  # Only inject into first layer
+    track_statistics: true
+
+baseline:
+  enabled: true
+  num_runs: 3
+
+runner:
+  type: "single"
+  num_runs: 5
+
+output:
+  formats: ["console", "json"]
+  save_path: "./results/first_layer_{timestamp}.json"
+  verbose: true
+  show_progress: true
+
+seed: 42

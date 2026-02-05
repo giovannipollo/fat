@@ -1,0 +1,54 @@
+# Compare different injection strategies
+
+name: "injection_strategy_comparison"
+description: "Compare random, LSB flip, MSB flip, and full flip"
+
+# Each injection represents a strategy to compare
+injections:
+  - name: "random_5pct"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "random"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: true
+  
+  - name: "lsb_flip_5pct"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "lsb_flip"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: true
+  
+  - name: "msb_flip_5pct"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "msb_flip"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: true
+  
+  - name: "full_flip_5pct"
+    enabled: true
+    target_type: "activation"
+    probability: 5.0
+    injection_type: "full_flip"
+    target_layers: ["QuantIdentity", "QuantReLU", "QuantConv2d"]
+    track_statistics: true
+
+baseline:
+  enabled: true
+  num_runs: 3
+
+runner:
+  type: "comparison"
+  num_runs: 5
+
+output:
+  formats: ["console", "json"]
+  save_path: "./results/comparison_{timestamp}.json"
+  verbose: true
+  show_progress: true
+
+seed: 42

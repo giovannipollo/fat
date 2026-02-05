@@ -17,12 +17,13 @@ class BaseReporter(ABC):
         show_progress: Show progress indicators.
     """
 
-    def __init__(self, verbose: bool = True, show_progress: bool = True):
+    def __init__(self, verbose: bool = True, show_progress: bool = True, **kwargs):
         """Initialize reporter.
 
         Args:
             verbose: Enable verbose output.
             show_progress: Show progress bars/indicators.
+            **kwargs: Additional arguments (e.g., save_path for JSONReporter).
         """
         self.verbose = verbose
         self.show_progress = show_progress
