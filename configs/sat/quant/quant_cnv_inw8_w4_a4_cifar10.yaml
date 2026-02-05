@@ -12,16 +12,14 @@ dataset:
   root: "./data"
   download: true
   num_workers: 4
-  # val_split: 0.1
 
 model:
   name: "quant_cnv"
 
-# Quantization settings (Brevitas)
 quantization:
   in_weight_bit_width: 8  # Bit width for input quantization
-  weight_bit_width: 2   # Bit width for weight quantization
-  act_bit_width: 2      # Bit width for activation quantization
+  weight_bit_width: 4   # Bit width for weight quantization
+  act_bit_width: 4      # Bit width for activation quantization
 
 loss:
   name: "sqr_hinge"
@@ -40,9 +38,6 @@ scheduler:
   name: "cosine"
   T_max: 300
   warmup_epochs: 0
-
-amp:
-  enabled: false  # Disable AMP for quantized training
 
 tensorboard:
   enabled: true
