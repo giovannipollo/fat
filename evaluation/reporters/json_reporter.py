@@ -21,9 +21,7 @@ class JSONReporter(BaseReporter):
         indent: JSON indentation (None for compact).
     """
 
-    def __init__(
-        self, save_path: Optional[str] = None, indent: int = 2, **kwargs
-    ):
+    def __init__(self, save_path: Optional[str] = None, indent: int = 2, **kwargs):
         """Initialize JSON reporter.
 
         Args:

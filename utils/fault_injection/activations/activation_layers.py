@@ -114,7 +114,9 @@ class QuantActivationFaultInjectionLayer(nn.Module):
             flat_indices = torch.randperm(total_elements, device=device)[:num_to_inject]
 
             # Create boolean mask
-            condition_tensor = torch.zeros(total_elements, dtype=torch.bool, device=device)
+            condition_tensor = torch.zeros(
+                total_elements, dtype=torch.bool, device=device
+            )
             condition_tensor[flat_indices] = True
             condition_tensor = condition_tensor.view(shape)
         else:

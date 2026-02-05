@@ -146,10 +146,12 @@ class SchedulerFactory:
 
         # Handle multi-phase configs where epochs are in phases, not training.epochs
         if "phases" in config:
-            total_epochs: int = sum(phase.get("epochs", 0) for phase in config["phases"])
+            total_epochs: int = sum(
+                phase.get("epochs", 0) for phase in config["phases"]
+            )
         else:
             total_epochs: int = config["training"]["epochs"]
-        
+
         if sched_name not in cls.SCHEDULERS:
             available: List[str] = list(cls.SCHEDULERS.keys())
             raise ValueError(f"Unknown scheduler: {sched_name}. Available: {available}")

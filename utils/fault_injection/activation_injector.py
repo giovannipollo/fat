@@ -263,9 +263,7 @@ class ActivationFaultInjector(BaseFaultInjector):
         for layer in self._get_injection_layers(model):
             layer.set_enabled(enabled)
 
-    def set_layer_enabled(
-        self, model: nn.Module, layer_id: int, enabled: bool
-    ) -> None:
+    def set_layer_enabled(self, model: nn.Module, layer_id: int, enabled: bool) -> None:
         """Enable or disable injection for a specific layer.
 
         Args:
@@ -299,7 +297,9 @@ class ActivationFaultInjector(BaseFaultInjector):
         """
         return len(self._get_injection_layers(model))
 
-    def _get_injection_layers(self, model: nn.Module) -> List[QuantActivationFaultInjectionLayer]:
+    def _get_injection_layers(
+        self, model: nn.Module
+    ) -> List[QuantActivationFaultInjectionLayer]:
         """Get all injection layer instances from a model.
 
         Args:

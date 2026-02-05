@@ -74,6 +74,7 @@ def main() -> None:
             print(f"Configuration error: {e}")
             print("Please fix the configuration and try again.")
             import sys
+
             sys.exit(1)
 
     if is_distributed:

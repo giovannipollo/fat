@@ -147,10 +147,14 @@ class WeightFaultInjectionHook:
         num_faults = max(1, int(num_elements * self.probability / 100.0))
 
         # Create 1D mask
-        mask_flat = torch.zeros(num_elements, dtype=torch.bool, device=quant_weight.device)
+        mask_flat = torch.zeros(
+            num_elements, dtype=torch.bool, device=quant_weight.device
+        )
 
         # Select random indices
-        fault_indices = torch.randperm(num_elements, device=quant_weight.device)[:num_faults]
+        fault_indices = torch.randperm(num_elements, device=quant_weight.device)[
+            :num_faults
+        ]
 
         # Set fault positions to True
         mask_flat[fault_indices] = True

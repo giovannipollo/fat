@@ -9,10 +9,10 @@ Usage:
 Examples:
     # Probability sweep
     python evaluate.py --eval-config configs/evaluation/sweep.yaml
-    
+
     # Compare injection strategies
     python evaluate.py --eval-config configs/evaluation/comparison.yaml
-    
+
     # Combined weight + activation injection
     python evaluate.py --eval-config configs/evaluation/combined.yaml
 """
@@ -36,7 +36,7 @@ from evaluation.reporters import get_reporters
 
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments.
-    
+
     Returns:
         Parsed arguments
     """
@@ -45,7 +45,7 @@ def parse_args() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    
+
     # Required argument
     parser.add_argument(
         "--eval-config",
@@ -53,7 +53,7 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Path to evaluation configuration YAML",
     )
-    
+
     # Optional overrides
     parser.add_argument(
         "--num-runs",
@@ -78,7 +78,7 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Override random seed for reproducibility",
     )
-    
+
     return parser.parse_args()
 
 
@@ -88,12 +88,12 @@ def load_model_and_dataset(
     device: torch.device,
 ):
     """Load model and dataset from training config.
-    
+
     Args:
         train_config: Training configuration dict
         checkpoint_path: Path to model checkpoint
         device: Compute device
-        
+
     Returns:
         Tuple of (model, test_loader)
     """
@@ -101,20 +101,20 @@ def load_model_and_dataset(
     dataset = get_dataset(train_config)
     _, _, test_loader = dataset.get_loaders()
     print(f"Dataset: {dataset.name} ({len(test_loader)} test batches)")
-    
+
     # Create model
     if "num_classes" not in train_config["model"]:
         train_config["model"]["num_classes"] = dataset.num_classes
     if "in_channels" not in train_config["model"]:
         train_config["model"]["in_channels"] = dataset.in_channels
-    
+
     model = get_model(train_config)
     print(f"Model: {train_config['model']['name']}")
-    
+
     # Load checkpoint
     print(f"Loading checkpoint: {checkpoint_path}")
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-    
+
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
         if "best_acc" in checkpoint:
@@ -122,24 +122,24 @@ def load_model_and_dataset(
     else:
         # Assume it's just the state dict
         model.load_state_dict(checkpoint)
-    
+
     model = model.to(device)
-    
+
     return model, test_loader
 
 
 def main() -> None:
     """Main entry point for fault injection evaluation."""
     args = parse_args()
-    
+
     # Setup device
     device = get_device()
     print(f"Using device: {device}")
-    
+
     # Load evaluation configuration
     print(f"Loading evaluation config: {args.eval_config}")
     eval_config = EvaluationConfig.from_yaml(args.eval_config)
-    
+
     # Apply CLI overrides
     if args.num_runs is not None:
         eval_config.runner.num_runs = args.num_runs
@@ -149,16 +149,16 @@ def main() -> None:
         eval_config.output.show_progress = False
     if args.seed is not None:
         eval_config.seed = args.seed
-    
+
     # Validate evaluation config
     eval_config.validate()
-    
+
     # Get checkpoint path
     checkpoint_path = eval_config.checkpoint
     if not checkpoint_path:
         raise ValueError("Evaluation config must specify 'checkpoint' field")
     print(f"Checkpoint: {checkpoint_path}")
-    
+
     # Determine training config path
     if eval_config.train_config:
         train_config_path = eval_config.train_config
@@ -166,23 +166,21 @@ def main() -> None:
         # Infer train_config from checkpoint directory
         checkpoint_dir = Path(checkpoint_path).parent.parent
         train_config_path = str(checkpoint_dir / "config.yaml")
-        print(f"Training config inferred from checkpoint directory: {train_config_path}")
-    
+        print(
+            f"Training config inferred from checkpoint directory: {train_config_path}"
+        )
+
     # Load training configuration (for model/dataset)
     train_config: Dict[str, Any] = load_config(train_config_path)
-    
+
     # Set seed for reproducibility
     if eval_config.seed is not None:
         set_seed(eval_config.seed, deterministic=True)
         print(f"Random seed: {eval_config.seed}")
-    
+
     # Load model and dataset
-    model, test_loader = load_model_and_dataset(
-        train_config,
-        checkpoint_path,
-        device
-    )
-    
+    model, test_loader = load_model_and_dataset(train_config, checkpoint_path, device)
+
     # Create evaluator
     evaluator = Evaluator(
         config=eval_config,
@@ -190,7 +188,7 @@ def main() -> None:
         test_loader=test_loader,
         device=device,
     )
-    
+
     # Check if baseline-only evaluation
     enabled_injections = eval_config.get_enabled_injections()
     if len(enabled_injections) == 0:
@@ -206,17 +204,17 @@ def main() -> None:
             print(f"    Type: {injection.injection_type}")
             print(f"    Probability: {injection.probability}%")
             print(f"    Layers: {injection.target_layers}")
-    
+
     # Get runner
     runner = get_runner(eval_config, evaluator)
-    
+
     # Run evaluation
     print("\n" + "=" * 80)
     print(f"Starting evaluation: {eval_config.name}")
     print("=" * 80)
-    
+
     results = runner.run()
-    
+
     # Report results
     reporters = get_reporters(
         formats=eval_config.output.formats,
@@ -224,13 +222,13 @@ def main() -> None:
         verbose=eval_config.output.verbose,
         show_progress=eval_config.output.show_progress,
     )
-    
+
     for reporter in reporters:
         reporter.report(results)
-    
+
     # Cleanup
     evaluator.cleanup()
-    
+
     print("\nEvaluation complete!")
 
 

@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, TextIO, Type
 
 try:
     from torch.utils.tensorboard import SummaryWriter
+
     TENSORBOARD_AVAILABLE = True
 except ImportError:
     SummaryWriter = None  # type: ignore
@@ -237,7 +238,9 @@ class MetricsLogger:
         if test_acc is not None:
             msg = f"  -> New best model saved at epoch {epoch + 1}! (val: {val_acc:.2f}%, test: {test_acc:.2f}%)"
         else:
-            msg = f"  -> New best model saved at epoch {epoch + 1}! (acc: {val_acc:.2f}%)"
+            msg = (
+                f"  -> New best model saved at epoch {epoch + 1}! (acc: {val_acc:.2f}%)"
+            )
 
         # Only write to file, console output is handled by ExperimentManager
         self._write_to_file(msg)
@@ -271,7 +274,9 @@ class MetricsLogger:
         if use_amp:
             messages.append("Mixed precision training (AMP): enabled")
         if self.writer is not None:
-            messages.append(f"TensorBoard logging: enabled (log_dir: {self.writer.log_dir})")
+            messages.append(
+                f"TensorBoard logging: enabled (log_dir: {self.writer.log_dir})"
+            )
         if experiment_dir is not None:
             messages.append(f"Experiment directory: {experiment_dir}")
         messages.append("")  # Empty line

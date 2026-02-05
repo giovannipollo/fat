@@ -40,15 +40,15 @@ from .phase_manager import PhaseManager, create_phase_manager
 
 class Trainer:
     """Trainer class for training and evaluating models.
-    
+
     Orchestrates the training process using modular components:
-    
+
     - OptimizerFactory: Creates optimizers from config
     - SchedulerFactory: Creates schedulers with warmup support
     - ExperimentManager: Handles checkpoints and experiment organization
     - MetricsLogger: Handles TensorBoard and console logging
     - ActivationFaultInjector: Optional fault injection for fault-aware training
-    
+
     Features:
         - Progress bars with tqdm
         - Checkpoint saving/loading with meaningful experiment names
@@ -57,13 +57,13 @@ class Trainer:
         - TensorBoard logging
         - Config saving for experiment reproducibility
         - Fault injection for fault-aware training (FAT)
-    
+
     Example:
         ```python
         trainer = Trainer(model, train_loader, test_loader, config, device)
         trainer.train()
         ```
-    
+
     Attributes:
         model: The model being trained.
         train_loader: DataLoader for training data.
@@ -130,16 +130,20 @@ class Trainer:
         if self.phase_manager is not None:
             self.total_epochs = self.phase_manager.get_total_epochs()
             if self.rank == 0:
-                print(f"Multi-phase training enabled: {self.phase_manager.get_num_phases()} phases, "
-                      f"{self.total_epochs} total epochs")
+                print(
+                    f"Multi-phase training enabled: {self.phase_manager.get_num_phases()} phases, "
+                    f"{self.total_epochs} total epochs"
+                )
         else:
             self.total_epochs = config["training"]["epochs"]
 
         # Setup loss function
         self.criterion: nn.Module = LossFactory.create(config)
-        
+
         # Setup optimizer and scheduler using factories
-        self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(self.model, config)
+        self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(
+            self.model, config
+        )
         self.scheduler: SchedulerType = SchedulerFactory.create(self.optimizer, config)
 
         # Mixed precision training (AMP)
@@ -165,34 +169,37 @@ class Trainer:
         self.act_fault_injector: Optional[ActivationFaultInjector] = None
         self.act_fault_config: Optional[FaultInjectionConfig] = None
         self.act_fault_statistics: Optional[FaultStatistics] = None
-        
+
         self.weight_fault_injector: Optional[WeightFaultInjector] = None
         self.weight_fault_config: Optional[FaultInjectionConfig] = None
         self.weight_fault_statistics: Optional[FaultStatistics] = None
-        
+
         self._setup_fault_injection(config)
 
         # Resume from checkpoint if specified
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         resume_path: Optional[str] = checkpoint_config.get("resume")
         if resume_path:
-            self.start_epoch, self.best_acc, phase_info = self.experiment.load_checkpoint(
-                resume_path,
-                self.model,
-                self.optimizer,
-                self.scheduler,
-                self.scaler,
-                self.device,
+            self.start_epoch, self.best_acc, phase_info = (
+                self.experiment.load_checkpoint(
+                    resume_path,
+                    self.model,
+                    self.optimizer,
+                    self.scheduler,
+                    self.scaler,
+                    self.device,
+                )
             )
 
             # Validate phase resumption
             self._validate_phase_resumption(phase_info, self.start_epoch)
+
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
-        
+
         Supports both activation and weight fault injection independently.
         Each can be enabled/disabled separately in the config.
-        
+
         Args:
             config: Full configuration dictionary.
         """
@@ -201,49 +208,61 @@ class Trainer:
         if act_config.get("enabled", False):
             self.act_fault_config = FaultInjectionConfig.from_dict(act_config)
             self.act_fault_injector = ActivationFaultInjector()
-            self.model = self.act_fault_injector.inject(self.model, self.act_fault_config)
-            
+            self.model = self.act_fault_injector.inject(
+                self.model, self.act_fault_config
+            )
+
             if self.act_fault_config.verbose:
                 # Print model architecture with injection layers
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
-            
+
             # Setup statistics tracking if enabled
             if self.act_fault_config.track_statistics:
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
                 self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
-                self.act_fault_injector.set_statistics(self.model, self.act_fault_statistics)
-            
+                self.act_fault_injector.set_statistics(
+                    self.model, self.act_fault_statistics
+                )
+
             # Log setup
             if self.act_fault_config.verbose:
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
-                print(f"Activation fault injection enabled: {num_layers} injection layers added")
+                print(
+                    f"Activation fault injection enabled: {num_layers} injection layers added"
+                )
                 print(f"  Probability: {self.act_fault_config.probability}%")
                 print(f"  Injection type: {self.act_fault_config.injection_type}")
                 print(f"  Apply during: {self.act_fault_config.apply_during}")
-        
+
         # Setup weight fault injection
         weight_config = config.get("weight_fault_injection", {})
         if weight_config.get("enabled", False):
             self.weight_fault_config = FaultInjectionConfig.from_dict(weight_config)
             self.weight_fault_injector = WeightFaultInjector()
-            self.model = self.weight_fault_injector.inject(self.model, self.weight_fault_config)
-            
+            self.model = self.weight_fault_injector.inject(
+                self.model, self.weight_fault_config
+            )
+
             if self.weight_fault_config.verbose:
                 # Print model architecture with weight hooks
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
-            
+
             # Setup statistics tracking if enabled
             if self.weight_fault_config.track_statistics:
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
                 self.weight_fault_statistics = FaultStatistics(num_layers=num_layers)
-                self.weight_fault_injector.set_statistics(self.model, self.weight_fault_statistics)
-            
+                self.weight_fault_injector.set_statistics(
+                    self.model, self.weight_fault_statistics
+                )
+
             # Log setup
             if self.weight_fault_config.verbose:
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                print(f"Weight fault injection enabled: {num_layers} injection hooks added")
+                print(
+                    f"Weight fault injection enabled: {num_layers} injection hooks added"
+                )
                 print(f"  Probability: {self.weight_fault_config.probability}%")
                 print(f"  Injection type: {self.weight_fault_config.injection_type}")
                 print(f"  Apply during: {self.weight_fault_config.apply_during}")
@@ -251,7 +270,7 @@ class Trainer:
     @property
     def has_validation(self) -> bool:
         """Check if validation loader is available.
-        
+
         Returns:
             True if validation data is available.
         """
@@ -289,7 +308,10 @@ class Trainer:
                 self.act_fault_injector.set_enabled(self.model, False)
 
         # Setup weight fault injection for this epoch
-        if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+        if (
+            self.weight_fault_injector is not None
+            and self.weight_fault_config is not None
+        ):
             apply_during = self.weight_fault_config.apply_during
             if apply_during in ("train", "both"):
                 self.weight_fault_injector.set_enabled(self.model, True)
@@ -328,7 +350,7 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-            if hasattr(self.model, 'clip_weights'):
+            if hasattr(self.model, "clip_weights"):
                 self.model.clip_weights(-1, 1)
 
             running_loss += loss.item()
@@ -348,7 +370,9 @@ class Trainer:
         return avg_loss, accuracy
 
     @torch.no_grad()
-    def evaluate(self, loader: DataLoader[Any], desc: str = "Evaluating") -> Tuple[float, float]:
+    def evaluate(
+        self, loader: DataLoader[Any], desc: str = "Evaluating"
+    ) -> Tuple[float, float]:
         """Evaluate model on a given dataloader.
 
         Args:
@@ -372,7 +396,10 @@ class Trainer:
                 self.act_fault_injector.set_enabled(self.model, False)
 
         # Setup weight fault injection for evaluation
-        if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+        if (
+            self.weight_fault_injector is not None
+            and self.weight_fault_config is not None
+        ):
             apply_during = self.weight_fault_config.apply_during
             if apply_during in ("eval", "both"):
                 self.weight_fault_injector.set_enabled(self.model, True)
@@ -413,10 +440,10 @@ class Trainer:
 
     def validate(self) -> Tuple[float, float]:
         """Evaluate model on validation set.
-        
+
         Returns:
             Tuple of (average_loss, accuracy).
-            
+
         Raises:
             ValueError: If no validation set is available.
         """
@@ -426,7 +453,7 @@ class Trainer:
 
     def test(self) -> Tuple[float, float]:
         """Evaluate model on test set.
-        
+
         Returns:
             Tuple of (average_loss, accuracy).
         """
@@ -468,19 +495,29 @@ class Trainer:
             )
 
             # Log fault injection info
-            if self.act_fault_injector is not None and self.act_fault_config is not None:
+            if (
+                self.act_fault_injector is not None
+                and self.act_fault_config is not None
+            ):
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
-                print(f"Activation fault injection: {num_layers} layers, "
-                      f"prob={self.act_fault_config.probability}%, "
-                      f"mode=full_model, "
-                      f"type={self.act_fault_config.injection_type}")
+                print(
+                    f"Activation fault injection: {num_layers} layers, "
+                    f"prob={self.act_fault_config.probability}%, "
+                    f"mode=full_model, "
+                    f"type={self.act_fault_config.injection_type}"
+                )
 
-            if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+            if (
+                self.weight_fault_injector is not None
+                and self.weight_fault_config is not None
+            ):
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                print(f"Weight fault injection: {num_layers} hooks, "
-                      f"prob={self.weight_fault_config.probability}%, "
-                      f"mode=full_model, "
-                      f"type={self.weight_fault_config.injection_type}")
+                print(
+                    f"Weight fault injection: {num_layers} hooks, "
+                    f"prob={self.weight_fault_config.probability}%, "
+                    f"mode=full_model, "
+                    f"type={self.weight_fault_config.injection_type}"
+                )
 
         for epoch in range(self.start_epoch, epochs):
             train_loss, train_acc = self.train_epoch(epoch)
@@ -573,9 +610,14 @@ class Trainer:
                 experiment_dir = self.experiment.get_experiment_dir()
                 if experiment_dir is not None:
                     import os
-                    stats_path = os.path.join(experiment_dir, "activation_fault_injection_stats.json")
+
+                    stats_path = os.path.join(
+                        experiment_dir, "activation_fault_injection_stats.json"
+                    )
                     self.act_fault_statistics.save_to_file(stats_path)
-                    print(f"Activation fault injection statistics saved to: {stats_path}")
+                    print(
+                        f"Activation fault injection statistics saved to: {stats_path}"
+                    )
 
             if self.weight_fault_statistics is not None:
                 print("\n" + "=" * 60)
@@ -587,7 +629,10 @@ class Trainer:
                 experiment_dir = self.experiment.get_experiment_dir()
                 if experiment_dir is not None:
                     import os
-                    stats_path = os.path.join(experiment_dir, "weight_fault_injection_stats.json")
+
+                    stats_path = os.path.join(
+                        experiment_dir, "weight_fault_injection_stats.json"
+                    )
                     self.weight_fault_statistics.save_to_file(stats_path)
                     print(f"Weight fault injection statistics saved to: {stats_path}")
 
@@ -724,7 +769,9 @@ class Trainer:
         if self.has_validation and self.rank == 0:
             print("\nRunning final evaluation on test set...")
             final_test_loss, final_test_acc = self.test()
-            self.logger.log_final_test(final_test_loss, final_test_acc, self.total_epochs)
+            self.logger.log_final_test(
+                final_test_loss, final_test_acc, self.total_epochs
+            )
 
         # Print fault injection statistics
         if self.rank == 0:
@@ -737,9 +784,13 @@ class Trainer:
                 # Save statistics to experiment directory
                 experiment_dir = self.experiment.get_experiment_dir()
                 if experiment_dir is not None:
-                    stats_path = os.path.join(experiment_dir, "activation_fault_injection_stats.json")
+                    stats_path = os.path.join(
+                        experiment_dir, "activation_fault_injection_stats.json"
+                    )
                     self.act_fault_statistics.save_to_file(stats_path)
-                    print(f"Activation fault injection statistics saved to: {stats_path}")
+                    print(
+                        f"Activation fault injection statistics saved to: {stats_path}"
+                    )
 
             if self.weight_fault_statistics is not None:
                 print("\n" + "=" * 60)
@@ -750,7 +801,9 @@ class Trainer:
                 # Save statistics to experiment directory
                 experiment_dir = self.experiment.get_experiment_dir()
                 if experiment_dir is not None:
-                    stats_path = os.path.join(experiment_dir, "weight_fault_injection_stats.json")
+                    stats_path = os.path.join(
+                        experiment_dir, "weight_fault_injection_stats.json"
+                    )
                     self.weight_fault_statistics.save_to_file(stats_path)
                     print(f"Weight fault injection statistics saved to: {stats_path}")
 
@@ -779,7 +832,9 @@ class Trainer:
             phase = self.phase_manager.get_phase_by_index(idx)
             if phase is not None:
                 print(f"Phase {idx + 1}: {phase.name}")
-                print(f"  Epochs: {phase.epochs} (range: [{phase.start_epoch}, {phase.end_epoch}))")
+                print(
+                    f"  Epochs: {phase.epochs} (range: [{phase.start_epoch}, {phase.end_epoch}))"
+                )
 
                 if phase.optimizer is not None:
                     print(f"  Optimizer: Custom config")
@@ -808,8 +863,10 @@ class Trainer:
         assert isinstance(phase, PhaseConfig)
 
         print("\n" + "=" * 80)
-        print(f"PHASE TRANSITION: Starting Phase {phase.phase_idx + 1}/"
-              f"{self.phase_manager.get_num_phases()}")
+        print(
+            f"PHASE TRANSITION: Starting Phase {phase.phase_idx + 1}/"
+            f"{self.phase_manager.get_num_phases()}"
+        )
         print(f"Phase Name: {phase.name}")
         print(f"Epoch Range: [{phase.start_epoch}, {phase.end_epoch})")
         print(f"Duration: {phase.epochs} epochs")
@@ -913,10 +970,14 @@ class Trainer:
                 if fi_config.track_statistics:
                     num_layers = self.act_fault_injector.get_num_layers(self.model)
                     self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
-                    self.act_fault_injector.set_statistics(self.model, self.act_fault_statistics)
+                    self.act_fault_injector.set_statistics(
+                        self.model, self.act_fault_statistics
+                    )
 
-                print(f"  Activation fault injection enabled: "
-                      f"prob={fi_config.probability}%, type={fi_config.injection_type}")
+                print(
+                    f"  Activation fault injection enabled: "
+                    f"prob={fi_config.probability}%, type={fi_config.injection_type}"
+                )
             else:
                 self.act_fault_injector = None
                 self.act_fault_config = None
@@ -934,11 +995,17 @@ class Trainer:
 
                 if fi_config.track_statistics:
                     num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                    self.weight_fault_statistics = FaultStatistics(num_layers=num_layers)
-                    self.weight_fault_injector.set_statistics(self.model, self.weight_fault_statistics)
+                    self.weight_fault_statistics = FaultStatistics(
+                        num_layers=num_layers
+                    )
+                    self.weight_fault_injector.set_statistics(
+                        self.model, self.weight_fault_statistics
+                    )
 
-                print(f"  Weight fault injection enabled: "
-                      f"prob={fi_config.probability}%, type={fi_config.injection_type}")
+                print(
+                    f"  Weight fault injection enabled: "
+                    f"prob={fi_config.probability}%, type={fi_config.injection_type}"
+                )
             else:
                 self.weight_fault_injector = None
                 self.weight_fault_config = None

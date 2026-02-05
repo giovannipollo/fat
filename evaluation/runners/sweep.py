@@ -77,7 +77,9 @@ class SweepRunner(BaseRunner):
                 num_runs=self.config.runner.num_runs
             )
 
-            baseline_mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = (
+                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            )
             fault_mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
             degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
 
@@ -87,7 +89,9 @@ class SweepRunner(BaseRunner):
                 "degradation": degradation.to_dict(),
             }
 
-            if any(inj.track_statistics for inj in self.config.get_enabled_injections()):
+            if any(
+                inj.track_statistics for inj in self.config.get_enabled_injections()
+            ):
                 stats_dict = {}
                 for name, stats in self.evaluator.get_statistics().items():
                     stats_dict[name] = stats.to_dict()
@@ -108,7 +112,9 @@ class SweepRunner(BaseRunner):
         results["sweep_results"] = sweep_results
 
         if self.config.output.verbose:
-            baseline_mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = (
+                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            )
             self._print_sweep_summary(baseline_mean, sweep_results)
 
         return results

@@ -194,7 +194,7 @@ class PhaseManager:
         if not self.is_multi_phase():
             return {
                 "mode": "single_phase",
-                "total_epochs": self.base_config.get("training", {}).get("epochs", 0)
+                "total_epochs": self.base_config.get("training", {}).get("epochs", 0),
             }
 
         current_phase = self.get_current_phase(epoch)
@@ -227,9 +227,7 @@ class PhaseManager:
             ValueError: If phases_config is invalid.
         """
         if not isinstance(phases_config, list):
-            raise ValueError(
-                f"'phases' must be a list, got: {type(phases_config)}"
-            )
+            raise ValueError(f"'phases' must be a list, got: {type(phases_config)}")
 
         if len(phases_config) == 0:
             raise ValueError(
@@ -238,9 +236,7 @@ class PhaseManager:
 
         for idx, phase_dict in enumerate(phases_config):
             if not isinstance(phase_dict, dict):
-                raise ValueError(
-                    f"Phase {idx} must be a dict, got: {type(phase_dict)}"
-                )
+                raise ValueError(f"Phase {idx} must be a dict, got: {type(phase_dict)}")
 
             # Create PhaseConfig (validation happens in __post_init__)
             phase = PhaseConfig.from_dict(phase_dict)
@@ -373,13 +369,12 @@ class PhaseManager:
         if phase.activation_fault_injection is not None:
             merged["activation_fault_injection"] = self._deep_merge_dicts(
                 merged.get("activation_fault_injection", {}),
-                phase.activation_fault_injection
+                phase.activation_fault_injection,
             )
 
         if phase.weight_fault_injection is not None:
             merged["weight_fault_injection"] = self._deep_merge_dicts(
-                merged.get("weight_fault_injection", {}),
-                phase.weight_fault_injection
+                merged.get("weight_fault_injection", {}), phase.weight_fault_injection
             )
 
         # Override total epochs to reflect phase duration
@@ -409,7 +404,11 @@ class PhaseManager:
         result = copy.deepcopy(base)
 
         for key, value in override.items():
-            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            if (
+                key in result
+                and isinstance(result[key], dict)
+                and isinstance(value, dict)
+            ):
                 # Both are dicts - recurse
                 result[key] = self._deep_merge_dicts(result[key], value)
             else:

@@ -63,7 +63,9 @@ class ComparisonRunner(BaseRunner):
                 injection_configs=[injection], num_runs=self.config.runner.num_runs
             )
 
-            baseline_mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = (
+                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            )
             fault_mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
             degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
 
@@ -94,7 +96,9 @@ class ComparisonRunner(BaseRunner):
         results["comparisons"] = comparisons
 
         if self.config.output.verbose:
-            baseline_mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = (
+                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            )
             self._print_comparison_table(baseline_mean, comparisons)
 
         return results

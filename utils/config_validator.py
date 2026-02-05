@@ -81,7 +81,9 @@ class ConfigValidator:
 
         # Empty check
         if len(phases) == 0:
-            self.errors.append("'phases' list is empty - remove 'phases' key or add at least one phase")
+            self.errors.append(
+                "'phases' list is empty - remove 'phases' key or add at least one phase"
+            )
             return
 
         # Validate each phase
@@ -114,7 +116,9 @@ class ConfigValidator:
         if "epochs" not in phase:
             self.errors.append(f"{prefix}: missing required field 'epochs'")
         elif not isinstance(phase["epochs"], int) or phase["epochs"] <= 0:
-            self.errors.append(f"{prefix}: 'epochs' must be a positive integer, got {phase.get('epochs')}")
+            self.errors.append(
+                f"{prefix}: 'epochs' must be a positive integer, got {phase.get('epochs')}"
+            )
 
         # Optional field validation
         if "training" in phase:
@@ -163,7 +167,9 @@ class ConfigValidator:
         if "batch_size" in training:
             bs = training["batch_size"]
             if not isinstance(bs, int) or bs <= 0:
-                self.errors.append(f"{prefix}: training.batch_size must be positive integer")
+                self.errors.append(
+                    f"{prefix}: training.batch_size must be positive integer"
+                )
 
     def _validate_phase_optimizer(self, prefix: str, optimizer: Any) -> None:
         """Validate phase optimizer config.
@@ -189,7 +195,9 @@ class ConfigValidator:
         if "learning_rate" in optimizer:
             lr = optimizer["learning_rate"]
             if not isinstance(lr, (int, float)) or lr <= 0:
-                self.errors.append(f"{prefix}: optimizer.learning_rate must be positive number")
+                self.errors.append(
+                    f"{prefix}: optimizer.learning_rate must be positive number"
+                )
 
     def _validate_phase_scheduler(self, prefix: str, scheduler: Any) -> None:
         """Validate phase scheduler config.
@@ -222,7 +230,9 @@ class ConfigValidator:
             target_type: Either "activation" or "weight".
         """
         if not isinstance(fi_config, dict):
-            self.errors.append(f"{prefix}: '{target_type}_fault_injection' must be a dict")
+            self.errors.append(
+                f"{prefix}: '{target_type}_fault_injection' must be a dict"
+            )
             return
 
         # Check probability range

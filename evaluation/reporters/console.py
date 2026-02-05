@@ -90,7 +90,9 @@ class ConsoleReporter(BaseReporter):
             print(
                 f"  Absolute degradation: {self._format_percentage(abs_deg, show_sign=True)}"
             )
-            print(f"  Relative degradation: {self._format_percentage(rel_deg, decimals=1)}%")
+            print(
+                f"  Relative degradation: {self._format_percentage(rel_deg, decimals=1)}%"
+            )
 
         if "statistics" in results:
             self._print_statistics(results["statistics"])

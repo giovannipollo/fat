@@ -15,10 +15,10 @@ from .losses import SqrHingeLoss
 
 class LossFactory:
     """Factory class for creating loss functions from configuration.
-    
+
     Supports common classification loss functions with their
     respective hyperparameters extracted from config dictionaries.
-    
+
     Supported Loss Functions:
         - cross_entropy: CrossEntropyLoss (default)
         - nll: Negative Log Likelihood Loss
@@ -29,10 +29,10 @@ class LossFactory:
         - bce_with_logits: Binary Cross Entropy with Logits Loss
         - kl_div: Kullback-Leibler Divergence Loss
         - sqr_hinge: Squared Hinge Loss (for SVM-style training)
-    
+
     Attributes:
         LOSSES: Registry of available loss function classes.
-    
+
     Example:
         ```yaml
         loss:
@@ -40,7 +40,7 @@ class LossFactory:
           label_smoothing: 0.1
         ```
     """
-    
+
     LOSSES: Dict[str, Type[nn.Module]] = {
         "cross_entropy": nn.CrossEntropyLoss,
         "nll": nn.NLLLoss,
@@ -53,21 +53,21 @@ class LossFactory:
         "sqr_hinge": SqrHingeLoss,
     }
     """Registry of available loss function classes."""
-    
+
     @classmethod
     def create(cls, config: Dict[str, Any]) -> nn.Module:
         """Create a loss function based on configuration.
-        
+
         Args:
             config: Configuration dictionary with optional loss settings
                 under config["loss"].
-        
+
         Returns:
             Configured loss function instance.
-            
+
         Raises:
             ValueError: If the loss name is unknown.
-        
+
         Example:
             ```python
             config = {"loss": {"name": "cross_entropy", "label_smoothing": 0.1}}
@@ -76,55 +76,60 @@ class LossFactory:
         """
         loss_config: Dict[str, Any] = config.get("loss", {})
         loss_name: str = loss_config.get("name", "cross_entropy").lower()
-        
+
         if loss_name not in cls.LOSSES:
             available: List[str] = list(cls.LOSSES.keys())
-            raise ValueError(f"Unknown loss function: {loss_name}. Available: {available}")
-        
+            raise ValueError(
+                f"Unknown loss function: {loss_name}. Available: {available}"
+            )
+
         # Build parameters based on loss type
         params: Dict[str, Any] = {}
-        
+
         # CrossEntropyLoss parameters
         if loss_name == "cross_entropy":
             if "label_smoothing" in loss_config:
                 params["label_smoothing"] = float(loss_config["label_smoothing"])
             if "weight" in loss_config:
                 import torch
+
                 params["weight"] = torch.tensor(loss_config["weight"])
             if "ignore_index" in loss_config:
                 params["ignore_index"] = int(loss_config["ignore_index"])
-        
+
         # NLLLoss parameters
         elif loss_name == "nll":
             if "weight" in loss_config:
                 import torch
+
                 params["weight"] = torch.tensor(loss_config["weight"])
             if "ignore_index" in loss_config:
                 params["ignore_index"] = int(loss_config["ignore_index"])
-        
+
         # SmoothL1Loss parameters
         elif loss_name == "smooth_l1":
             if "beta" in loss_config:
                 params["beta"] = float(loss_config["beta"])
-        
+
         # KLDivLoss parameters
         elif loss_name == "kl_div":
             params["reduction"] = loss_config.get("reduction", "batchmean")
             if "log_target" in loss_config:
                 params["log_target"] = bool(loss_config["log_target"])
-        
+
         # BCEWithLogitsLoss parameters
         elif loss_name == "bce_with_logits":
             if "pos_weight" in loss_config:
                 import torch
+
                 params["pos_weight"] = torch.tensor(loss_config["pos_weight"])
-        
+
         return cls.LOSSES[loss_name](**params)
-    
+
     @classmethod
     def available_losses(cls) -> List[str]:
         """Get list of available loss function names.
-        
+
         Returns:
             List of supported loss function name strings.
         """

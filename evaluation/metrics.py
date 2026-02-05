@@ -99,9 +99,7 @@ class DegradationMetrics:
     relative_degradation: float
 
     @classmethod
-    def calculate(
-        cls, baseline: float, fault: float
-    ) -> "DegradationMetrics":
+    def calculate(cls, baseline: float, fault: float) -> "DegradationMetrics":
         """Calculate degradation metrics from baseline and fault accuracy.
 
         Args:
@@ -172,9 +170,7 @@ def aggregate_accuracies(
     return mean, std
 
 
-def calculate_degradation(
-    baseline: float, fault: float
-) -> Tuple[float, float]:
+def calculate_degradation(baseline: float, fault: float) -> Tuple[float, float]:
     """Calculate absolute and relative degradation.
 
     Args:

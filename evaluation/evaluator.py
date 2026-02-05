@@ -77,9 +77,7 @@ class Evaluator:
             elif injection.target_type == "weight":
                 injector = WeightFaultInjector()
             else:
-                raise ValueError(
-                    f"Unknown target type: {injection.target_type}"
-                )
+                raise ValueError(f"Unknown target type: {injection.target_type}")
 
             self.injectors[injection.name] = injector
             self.model = injector.inject(self.model, fault_config)

@@ -61,7 +61,13 @@ class FaultInjectionConfig:
         repr=False,
     )
     _VALID_ACTIVATION_LAYERS: List[str] = field(
-        default_factory=lambda: ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d", "QuantLinear"],
+        default_factory=lambda: [
+            "QuantIdentity",
+            "QuantReLU",
+            "QuantHardTanh",
+            "QuantConv2d",
+            "QuantLinear",
+        ],
         repr=False,
     )
     _VALID_WEIGHT_LAYERS: List[str] = field(
@@ -73,10 +79,15 @@ class FaultInjectionConfig:
         """Validate configuration and set defaults."""
         if not self.target_layers:
             if self.target_type == "activation":
-                self.target_layers = ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+                self.target_layers = [
+                    "QuantIdentity",
+                    "QuantReLU",
+                    "QuantHardTanh",
+                    "QuantConv2d",
+                ]
             elif self.target_type == "weight":
                 self.target_layers = ["QuantConv2d", "QuantLinear"]
-        
+
         self.validate()
 
     @classmethod
@@ -102,15 +113,20 @@ class FaultInjectionConfig:
             ```
         """
         target_type = config.get("target_type", "activation")
-        
+
         if "target_layers" not in config:
             if target_type == "activation":
-                default_layers = ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+                default_layers = [
+                    "QuantIdentity",
+                    "QuantReLU",
+                    "QuantHardTanh",
+                    "QuantConv2d",
+                ]
             else:
                 default_layers = ["QuantConv2d", "QuantLinear"]
         else:
             default_layers = None
-        
+
         return cls(
             enabled=config.get("enabled", False),
             target_type=target_type,
@@ -152,7 +168,8 @@ class FaultInjectionConfig:
             )
 
         valid_layers = (
-            self._VALID_ACTIVATION_LAYERS if self.target_type == "activation"
+            self._VALID_ACTIVATION_LAYERS
+            if self.target_type == "activation"
             else self._VALID_WEIGHT_LAYERS
         )
         for layer in self.target_layers:

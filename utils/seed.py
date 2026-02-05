@@ -30,6 +30,7 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
 
     try:
         import numpy as np
+
         np.random.seed(seed)
     except ImportError:
         pass

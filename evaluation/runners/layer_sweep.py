@@ -95,7 +95,9 @@ class LayerSweepRunner(BaseRunner):
                 baseline_mean = (
                     baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
                 )
-                fault_mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
+                fault_mean = (
+                    fault_metrics.mean if fault_metrics.mean is not None else 0.0
+                )
                 degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
 
                 layer_result = {
@@ -104,7 +106,9 @@ class LayerSweepRunner(BaseRunner):
                     "degradation": degradation.to_dict(),
                 }
 
-                if any(inj.track_statistics for inj in self.config.get_enabled_injections()):
+                if any(
+                    inj.track_statistics for inj in self.config.get_enabled_injections()
+                ):
                     stats_dict = {}
                     for name, stats in self.evaluator.get_statistics().items():
                         stats_dict[name] = stats.to_dict()
@@ -115,12 +119,8 @@ class LayerSweepRunner(BaseRunner):
                 if self.config.output.verbose:
                     from ..metrics import format_accuracy, format_degradation
 
-                    mean = (
-                        fault_metrics.mean if fault_metrics.mean is not None else 0.0
-                    )
-                    std = (
-                        fault_metrics.std if fault_metrics.std is not None else 0.0
-                    )
+                    mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
+                    std = fault_metrics.std if fault_metrics.std is not None else 0.0
                     print(f"  Accuracy: {format_accuracy(mean, std)}")
                     print(
                         f"  Degradation: {format_degradation(degradation.absolute_degradation)}"
@@ -129,7 +129,9 @@ class LayerSweepRunner(BaseRunner):
             layer_results[injection.name] = sweep_results
 
         if self.config.output.verbose:
-            baseline_mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = (
+                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            )
             self._print_layer_sweep_summary(baseline_mean, sweep_results)
 
         results["layer_results"] = layer_results
@@ -142,9 +144,7 @@ class LayerSweepRunner(BaseRunner):
         """Print formatted layer sweep summary table."""
         print("\n" + "=" * 80)
         print("Layer-by-Layer Sweep Summary:")
-        print(
-            f"{'Layer':>8} | {'Accuracy':>12} | {'Degradation':>12}"
-        )
+        print(f"{'Layer':>8} | {'Accuracy':>12} | {'Degradation':>12}")
         print("-" * 38)
 
         for result in sweep_results:
@@ -157,15 +157,21 @@ class LayerSweepRunner(BaseRunner):
 
         if sweep_results:
             most_resilient = min(
-                sweep_results, key=lambda x: abs(x["degradation"]["absolute_degradation"])
+                sweep_results,
+                key=lambda x: abs(x["degradation"]["absolute_degradation"]),
             )
             least_resilient = max(
-                sweep_results, key=lambda x: abs(x["degradation"]["absolute_degradation"])
+                sweep_results,
+                key=lambda x: abs(x["degradation"]["absolute_degradation"]),
             )
 
             baseline_mean = baseline_acc if baseline_acc is not None else 0.0
             print("\nMost resilient layer:")
-            print(f"  Layer {most_resilient['layer_index']}: {most_resilient['degradation']['absolute_degradation']:+.2f}%")
+            print(
+                f"  Layer {most_resilient['layer_index']}: {most_resilient['degradation']['absolute_degradation']:+.2f}%"
+            )
 
             print("\nLeast resilient layer:")
-            print(f"  Layer {least_resilient['layer_index']}: {least_resilient['degradation']['absolute_degradation']:+.2f}%")
+            print(
+                f"  Layer {least_resilient['layer_index']}: {least_resilient['degradation']['absolute_degradation']:+.2f}%"
+            )

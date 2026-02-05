@@ -45,7 +45,9 @@ class SingleRunner(BaseRunner):
             if self.config.output.verbose:
                 from ..metrics import format_accuracy
 
-                mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+                mean = (
+                    baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+                )
                 std = baseline_metrics.std if baseline_metrics.std is not None else 0.0
                 print(f"Baseline accuracy: {format_accuracy(mean, std)}")
 

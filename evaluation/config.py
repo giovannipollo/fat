@@ -137,9 +137,7 @@ class RunnerConfig:
 
         for prob in self.probabilities:
             if prob < 0.0 or prob > 100.0:
-                raise ValueError(
-                    f"Probability must be between 0 and 100, got {prob}"
-                )
+                raise ValueError(f"Probability must be between 0 and 100, got {prob}")
 
         if self.num_runs < 1:
             raise ValueError(f"num_runs must be >= 1, got {self.num_runs}")
@@ -293,7 +291,9 @@ class EvaluationConfig:
             raise ValueError("Evaluation config must specify a checkpoint path")
 
         if not self.injections and not self.baseline.enabled:
-            raise ValueError("At least one injection configuration or baseline required")
+            raise ValueError(
+                "At least one injection configuration or baseline required"
+            )
 
         for idx, injection in enumerate(self.injections):
             if not injection.name:

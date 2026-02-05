@@ -22,9 +22,7 @@ class BaseRunner(ABC):
         evaluator: Evaluator instance.
     """
 
-    def __init__(
-        self, config: EvaluationConfig, evaluator: Evaluator
-    ):
+    def __init__(self, config: EvaluationConfig, evaluator: Evaluator):
         """Initialize runner.
 
         Args:
@@ -53,9 +51,7 @@ class BaseRunner(ABC):
             "experiment_name": self.config.name,
             "description": self.config.description,
             "runner_type": self.config.runner.type,
-            "injections": [
-                inj.name for inj in self.config.get_enabled_injections()
-            ],
+            "injections": [inj.name for inj in self.config.get_enabled_injections()],
             "seed": self.config.seed,
         }
 

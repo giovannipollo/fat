@@ -107,7 +107,9 @@ class ExperimentManager:
                 return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
         else:
             if activation_or_weight == "":
-                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+                return (
+                    f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+                )
             else:
                 return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
 
@@ -149,11 +151,15 @@ class ExperimentManager:
         activation_fault_injection: Dict[str, Any] = self.config.get(
             "activation_fault_injection", {}
         )
-        activation_fault_injection_probability = activation_fault_injection.get("probability", 0)
+        activation_fault_injection_probability = activation_fault_injection.get(
+            "probability", 0
+        )
         weight_fault_injection: Dict[str, Any] = self.config.get(
             "weight_fault_injection", {}
         )
-        weight_fault_injection_probability = weight_fault_injection.get("probability", 0)
+        weight_fault_injection_probability = weight_fault_injection.get(
+            "probability", 0
+        )
         if activation_fault_injection.get(
             "enabled", False
         ) and weight_fault_injection.get("enabled", False):
@@ -201,7 +207,12 @@ class ExperimentManager:
         experiment_name: str = self._generate_experiment_name(custom_name)
 
         self.experiment_dir = (
-            base_path / sat_or_fat / dataset_name / model_name / precision_folder / experiment_name
+            base_path
+            / sat_or_fat
+            / dataset_name
+            / model_name
+            / precision_folder
+            / experiment_name
         )
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.tensorboard_dir = self.experiment_dir / "tensorboard"
@@ -279,10 +290,10 @@ class ExperimentManager:
         # Remove fault injection wrappers/hooks before saving
         needs_act_reinject = act_fault_injector is not None
         needs_weight_reinject = weight_fault_injector is not None
-        
+
         if needs_act_reinject:
             model = act_fault_injector.remove(model)
-        
+
         if needs_weight_reinject:
             model = weight_fault_injector.remove(model)
 
@@ -308,7 +319,9 @@ class ExperimentManager:
         # Include phase name in filename for multi-phase training
         if phase_info is not None and phase_info.get("mode") == "multi_phase":
             phase_name = phase_info.get("phase_name", "unknown")
-            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}_{phase_name}.pt"
+            checkpoint_path: Path = (
+                self.checkpoint_dir / f"epoch_{epoch:04d}_{phase_name}.pt"
+            )
         else:
             checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
@@ -334,7 +347,7 @@ class ExperimentManager:
         # Re-inject fault injection wrappers/hooks after saving
         if needs_act_reinject and act_fault_config is not None:
             model = act_fault_injector.inject(model, act_fault_config)
-        
+
         if needs_weight_reinject and weight_fault_config is not None:
             model = weight_fault_injector.inject(model, weight_fault_config)
 
