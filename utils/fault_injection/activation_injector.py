@@ -263,6 +263,21 @@ class ActivationFaultInjector(BaseFaultInjector):
         for layer in self._get_injection_layers(model):
             layer.set_enabled(enabled)
 
+    def set_layer_enabled(
+        self, model: nn.Module, layer_id: int, enabled: bool
+    ) -> None:
+        """Enable or disable injection for a specific layer.
+
+        Args:
+            model: Model with injection layers.
+            layer_id: Layer ID to enable/disable.
+            enabled: Whether to enable injection.
+        """
+        for layer in self._get_injection_layers(model):
+            if layer.layer_id == layer_id:
+                layer.set_enabled(enabled)
+                break
+
     def set_statistics(self, model: nn.Module, statistics: FaultStatistics) -> None:
         """Set statistics tracker for all injection layers.
 

@@ -217,13 +217,28 @@ class WeightFaultInjector(BaseFaultInjector):
     
     def set_enabled(self, model: nn.Module, enabled: bool) -> None:
         """Enable or disable injection for all hooks.
-        
+
         Args:
             model: Model with injection hooks.
             enabled: Whether to enable injection.
         """
         for hook in self._injection_hooks:
             hook.set_enabled(enabled)
+
+    def set_layer_enabled(
+        self, model: nn.Module, layer_id: int, enabled: bool
+    ) -> None:
+        """Enable or disable injection for a specific layer.
+
+        Args:
+            model: Model with injection hooks.
+            layer_id: Layer ID to enable/disable.
+            enabled: Whether to enable injection.
+        """
+        for hook in self._injection_hooks:
+            if hook.layer_id == layer_id:
+                hook.set_enabled(enabled)
+                break
     
     def set_statistics(self, model: nn.Module, statistics: FaultStatistics) -> None:
         """Set statistics tracker for all injection hooks.
