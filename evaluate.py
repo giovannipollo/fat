@@ -1,220 +1,71 @@
 """Fault injection evaluation script.
 
 This script evaluates the fault resilience of trained models by running
-inference with fault injection enabled and tracking the accuracy degradation.
+inference with fault injection enabled and tracking accuracy degradation.
 
 Usage:
-    python evaluate.py --config configs/<config>.yaml --checkpoint path/to/checkpoint.pth
+    # YAML-based evaluation (recommended)
+    python evaluate.py --config configs/train_config.yaml \\
+                       --eval-config configs/evaluation/sweep.yaml \\
+                       --checkpoint path/to/checkpoint.pth
+    
+    # Legacy CLI mode (backward compatible)
+    python evaluate.py --config configs/train_config.yaml \\
+                       --checkpoint checkpoints/best.pth \\
+                       --probability 5.0 \\
+                       --injection-type random
 
-Example:
-    # Evaluate with default fault injection settings from config
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth
-
-    # Override fault injection probability
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --probability 10.0
-
-    # Run multiple times with different seeds to average results
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --num-runs 10
-
-    # Sweep across multiple probabilities
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml --checkpoint checkpoints/best.pth --sweep 0,1,5,10,20,50
+Examples:
+    # Probability sweep
+    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
+                       --eval-config configs/evaluation/sweep.yaml \\
+                       --checkpoint checkpoints/best.pth
+    
+    # Compare injection strategies
+    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
+                       --eval-config configs/evaluation/comparison.yaml \\
+                       --checkpoint checkpoints/best.pth
+    
+    # Combined weight + activation injection
+    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
+                       --eval-config configs/evaluation/combined.yaml \\
+                       --checkpoint checkpoints/best.pth
 """
 
 from __future__ import annotations
 
 import argparse
-import os
-import json
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict
 
 import torch
-import torch.nn as nn
-from torch.utils.data import DataLoader
-from tqdm import tqdm
 
 from datasets import get_dataset
 from models import get_model
 from utils import get_device, load_config, set_seed
-from utils.fault_injection import (
-    FaultInjectionConfig,
-    FaultInjector,
-    FaultStatistics,
-)
+
+from evaluation import EvaluationConfig, Evaluator
+from evaluation.runners import get_runner
+from evaluation.reporters import get_reporters
 
 
-def evaluate_with_faults(
-    model: nn.Module,
-    loader: DataLoader[Any],
-    device: torch.device,
-    injector: FaultInjector,
-    statistics: Optional[FaultStatistics] = None,
-    show_progress: bool = True,
-) -> Tuple[float, int, int]:
-    """Evaluate model with fault injection enabled.
-    
-    Args:
-        model: Model to evaluate (with fault injection layers).
-        loader: DataLoader for evaluation.
-        device: Compute device.
-        injector: Fault injector instance.
-        statistics: Optional statistics tracker.
-        show_progress: Whether to show progress bar.
+def parse_args() -> argparse.Namespace:
+    """Parse command line arguments.
     
     Returns:
-        Tuple of (accuracy, correct_count, total_count).
+        Parsed arguments
     """
-    model.eval()
-    correct = 0
-    total = 0
-    
-    # Enable injection for evaluation
-    injector.set_enabled(model, True)
-
-    
-    if statistics is not None:
-        injector.set_statistics(model, statistics)
-    
-    # Create progress bar
-    if show_progress:
-        pbar = tqdm(loader, desc="Evaluating", leave=False, dynamic_ncols=True)
-    else:
-        pbar = loader
-    
-    with torch.no_grad():
-        for inputs, labels in pbar:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-    
-    accuracy = 100.0 * correct / total
-    return accuracy, correct, total
-
-
-def evaluate_baseline(
-    model: nn.Module,
-    loader: DataLoader[Any],
-    device: torch.device,
-    injector: Optional[FaultInjector] = None,
-    show_progress: bool = True,
-) -> Tuple[float, int, int]:
-    """Evaluate model without fault injection (baseline).
-    
-    Args:
-        model: Model to evaluate.
-        loader: DataLoader for evaluation.
-        device: Compute device.
-        injector: Optional fault injector to disable.
-        show_progress: Whether to show progress bar.
-    
-    Returns:
-        Tuple of (accuracy, correct_count, total_count).
-    """
-    model.eval()
-    correct = 0
-    total = 0
-    
-    # Disable injection for baseline
-    if injector is not None:
-        injector.set_enabled(model, False)
-    
-    # Create progress bar
-    if show_progress:
-        pbar = tqdm(loader, desc="Baseline", leave=False, dynamic_ncols=True)
-    else:
-        pbar = loader
-    
-    with torch.no_grad():
-        for inputs, labels in pbar:
-            inputs, labels = inputs.to(device), labels.to(device)
-            outputs = model(inputs)
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-    
-    accuracy = 100.0 * correct / total
-    return accuracy, correct, total
-
-
-def run_probability_sweep(
-    model: nn.Module,
-    loader: DataLoader[Any],
-    device: torch.device,
-    injector: FaultInjector,
-    probabilities: List[float],
-    num_layers: int,
-    num_runs: int = 1,
-    show_progress: bool = True,
-) -> Dict[str, Any]:
-    """Run evaluation sweep across multiple fault probabilities.
-    
-    Args:
-        model: Model to evaluate (with fault injection layers).
-        loader: DataLoader for evaluation.
-        device: Compute device.
-        injector: Fault injector instance.
-        probabilities: List of probabilities to sweep.
-        num_layers: Number of fault injection layers.
-        num_runs: Number of runs per probability (for averaging).
-        show_progress: Whether to show progress bar.
-    
-    Returns:
-        Dictionary with sweep results.
-    """
-    results: Dict[str, Any] = {
-        "probabilities": probabilities,
-        "num_runs": num_runs,
-        "results": [],
-    }
-    
-    for prob in probabilities:
-        print(f"\nEvaluating with probability {prob}%...")
-        injector.update_probability(model, prob)
-        
-        run_accuracies = []
-        for run in range(num_runs):
-            if num_runs > 1:
-                print(f"  Run {run + 1}/{num_runs}...")
-            
-            stats = FaultStatistics(num_layers=num_layers)
-            accuracy, _, _ = evaluate_with_faults(
-                model, loader, device, injector, stats, show_progress
-            )
-            run_accuracies.append(accuracy)
-        
-        avg_accuracy = sum(run_accuracies) / len(run_accuracies)
-        std_accuracy = (
-            (sum((a - avg_accuracy) ** 2 for a in run_accuracies) / len(run_accuracies))
-            ** 0.5
-            if num_runs > 1
-            else 0.0
-        )
-        
-        results["results"].append({
-            "probability": prob,
-            "accuracies": run_accuracies,
-            "mean_accuracy": avg_accuracy,
-            "std_accuracy": std_accuracy,
-        })
-        
-        print(f"  Accuracy: {avg_accuracy:.2f}% (std: {std_accuracy:.2f}%)")
-    
-    return results
-
-
-def main() -> None:
-    """Main entry point for fault injection evaluation."""
     parser = argparse.ArgumentParser(
         description="Evaluate model fault resilience",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
+    
+    # Required arguments
     parser.add_argument(
         "--config",
         type=str,
         required=True,
-        help="Path to configuration file",
+        help="Path to training configuration file (for model/dataset)",
     )
     parser.add_argument(
         "--checkpoint",
@@ -222,75 +73,157 @@ def main() -> None:
         required=True,
         help="Path to model checkpoint",
     )
+    
+    # Evaluation configuration
+    parser.add_argument(
+        "--eval-config",
+        type=str,
+        default=None,
+        help="Path to evaluation configuration YAML (recommended)",
+    )
+    
+    # Legacy CLI options (backward compatibility)
     parser.add_argument(
         "--probability",
         type=float,
-        default=None,
-        help="Override fault injection probability (0-100)",
+        default=5.0,
+        help="Fault injection probability (0-100) [legacy mode]",
     )
     parser.add_argument(
         "--injection-type",
         type=str,
         choices=["random", "lsb_flip", "msb_flip", "full_flip"],
-        default=None,
-        help="Override injection type",
+        default="random",
+        help="Injection type [legacy mode]",
+    )
+    parser.add_argument(
+        "--target-type",
+        type=str,
+        choices=["activation", "weight"],
+        default="activation",
+        help="Injection target [legacy mode]",
     )
     parser.add_argument(
         "--sweep",
         type=str,
         default=None,
-        help="Comma-separated list of probabilities to sweep (e.g., '0,1,5,10,20')",
+        help="Comma-separated probabilities for sweep (e.g., '0,1,5,10') [legacy mode]",
     )
     parser.add_argument(
         "--num-runs",
         type=int,
         default=1,
-        help="Number of runs per configuration (for averaging results)",
+        help="Number of runs per configuration",
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Output file for results (JSON)",
+        help="Output file path for results",
     )
     parser.add_argument(
         "--no-progress",
         action="store_true",
         help="Disable progress bars",
     )
-    args = parser.parse_args()
-
-    # Load configuration
-    config: Dict[str, Any] = load_config(args.config)
-
-    # Set seed for reproducibility
-    seed_config: Dict[str, Any] = config.get("seed", {})
-    base_seed: int = seed_config.get("value", 42) if seed_config.get("enabled", False) else 42
-    if seed_config.get("enabled", False):
-        set_seed(base_seed, deterministic=True)
-        print(f"Random seed: {base_seed}")
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Random seed for reproducibility",
+    )
     
-    # Setup device
-    device = get_device()
-    print(f"Using device: {device}")
+    return parser.parse_args()
+
+
+def create_legacy_config(args: argparse.Namespace) -> EvaluationConfig:
+    """Create evaluation config from legacy CLI arguments.
     
+    Args:
+        args: Parsed command line arguments
+        
+    Returns:
+        EvaluationConfig instance
+    """
+    from evaluation.config import InjectionConfig, RunnerConfig, OutputConfig
+    
+    # Create injection config
+    injection = InjectionConfig(
+        name=args.target_type,
+        enabled=True,
+        target_type=args.target_type,
+        probability=args.probability,
+        injection_type=args.injection_type,
+        track_statistics=True,
+    )
+    
+    # Determine runner type
+    if args.sweep:
+        runner_type = "sweep"
+        probabilities = [float(p.strip()) for p in args.sweep.split(",")]
+    else:
+        runner_type = "single"
+        probabilities = []
+    
+    # Create runner config
+    runner = RunnerConfig(
+        type=runner_type,
+        probabilities=probabilities,
+        num_runs=args.num_runs,
+    )
+    
+    # Create output config
+    output = OutputConfig(
+        formats=["console", "json"],
+        save_path=args.output,
+        verbose=True,
+        show_progress=not args.no_progress,
+    )
+    
+    # Create evaluation config
+    return EvaluationConfig(
+        name=f"legacy_{args.target_type}_{args.injection_type}",
+        description=f"Legacy CLI evaluation: {args.injection_type} on {args.target_type}",
+        injections=[injection],
+        runner=runner,
+        output=output,
+        seed=args.seed,
+    )
+
+
+def load_model_and_dataset(
+    train_config: Dict[str, Any],
+    checkpoint_path: str,
+    device: torch.device,
+):
+    """Load model and dataset from training config.
+    
+    Args:
+        train_config: Training configuration dict
+        checkpoint_path: Path to model checkpoint
+        device: Compute device
+        
+    Returns:
+        Tuple of (model, test_loader)
+    """
     # Load dataset
-    dataset = get_dataset(config)
+    dataset = get_dataset(train_config)
     _, _, test_loader = dataset.get_loaders()
     print(f"Dataset: {dataset.name} ({len(test_loader)} test batches)")
     
     # Create model
-    if "num_classes" not in config["model"]:
-        config["model"]["num_classes"] = dataset.num_classes
-    if "in_channels" not in config["model"]:
-        config["model"]["in_channels"] = dataset.in_channels
+    if "num_classes" not in train_config["model"]:
+        train_config["model"]["num_classes"] = dataset.num_classes
+    if "in_channels" not in train_config["model"]:
+        train_config["model"]["in_channels"] = dataset.in_channels
     
-    model = get_model(config)
-    print(f"Model: {config['model']['name']}")
+    model = get_model(train_config)
+    print(f"Model: {train_config['model']['name']}")
     
     # Load checkpoint
-    print(f"Loading checkpoint: {args.checkpoint}")
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    print(f"Loading checkpoint: {checkpoint_path}")
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
+    
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
         if "best_acc" in checkpoint:
@@ -301,146 +234,104 @@ def main() -> None:
     
     model = model.to(device)
     
-    # Setup fault injection configuration
-    fi_config = config.get("fault_injection", {})
-    fi_config["enabled"] = True
-    fi_config["apply_during"] = "eval"
+    return model, test_loader
+
+
+def main() -> None:
+    """Main entry point for fault injection evaluation."""
+    args = parse_args()
     
-    # Apply command-line overrides
-    if args.probability is not None:
-        fi_config["probability"] = args.probability
-    if args.injection_type is not None:
-        fi_config["injection_type"] = args.injection_type
-    if args.mode is not None:
-        fi_config["mode"] = args.mode
+    # Setup device
+    device = get_device()
+    print(f"Using device: {device}")
     
-    # Set defaults if not specified
-    fi_config.setdefault("probability", 5.0)
-    fi_config.setdefault("injection_type", "random")
-    fi_config.setdefault("track_statistics", True)
+    # Load training configuration (for model/dataset)
+    train_config: Dict[str, Any] = load_config(args.config)
     
-    fault_config = FaultInjectionConfig.from_dict(fi_config)
-    
-    # Inject fault layers
-    injector = FaultInjector()
-    model = injector.inject(model, fault_config)
-    num_layers = injector.get_num_layers(model)
-    
-    print(f"\nFault Injection Configuration:")
-    print(f"Injection layers: {num_layers}")
-    print(f"Apply During: {fault_config.apply_during}")
-    print(f"Injection type: {fault_config.injection_type}")
-    if args.sweep:
-        print(f"  Probability sweep: {args.sweep}")
+    # Load or create evaluation configuration
+    if args.eval_config:
+        # YAML-based evaluation
+        print(f"Loading evaluation config: {args.eval_config}")
+        eval_config = EvaluationConfig.from_yaml(args.eval_config)
+        
+        # Apply CLI overrides
+        if args.num_runs > 1:
+            eval_config.runner.num_runs = args.num_runs
+        if args.output:
+            eval_config.output.save_path = args.output
+        if args.no_progress:
+            eval_config.output.show_progress = False
+        if args.seed is not None:
+            eval_config.seed = args.seed
     else:
-        print(f"  Probability: {fault_config.probability}%")
+        # Legacy CLI mode
+        print("Using legacy CLI mode (consider using --eval-config)")
+        eval_config = create_legacy_config(args)
     
-    # Evaluate baseline (no faults)
-    print("\n" + "=" * 60)
-    print("Evaluating baseline (no faults)...")
-    baseline_acc, _, _ = evaluate_baseline(
-        model, test_loader, device, injector, not args.no_progress
+    # Validate evaluation config
+    eval_config.validate()
+    
+    # Set seed for reproducibility
+    if eval_config.seed is not None:
+        set_seed(eval_config.seed, deterministic=True)
+        print(f"Random seed: {eval_config.seed}")
+    
+    # Load model and dataset
+    model, test_loader = load_model_and_dataset(
+        train_config,
+        args.checkpoint,
+        device
     )
-    print(f"Baseline accuracy: {baseline_acc:.2f}%")
     
-    # Results dictionary
-    results: Dict[str, Any] = {
-        "config_file": args.config,
-        "checkpoint": args.checkpoint,
-        "model": config["model"]["name"],
-        "dataset": dataset.name,
-        "num_injection_layers": num_layers,
-        "fault_config": {
-            "apply_during": fault_config.apply_during,
-            "injection_type": fault_config.injection_type,
-        },
-        "baseline_accuracy": baseline_acc,
-    }
+    # Create evaluator
+    evaluator = Evaluator(
+        config=eval_config,
+        model=model,
+        test_loader=test_loader,
+        device=device,
+    )
+    
+    # Check if baseline-only evaluation
+    enabled_injections = eval_config.get_enabled_injections()
+    if len(enabled_injections) == 0:
+        print("\n" + "=" * 80)
+        print("BASELINE-ONLY EVALUATION (No Fault Injection)")
+        print("=" * 80)
+    else:
+        # Setup fault injectors
+        print("\nFault Injection Configuration:")
+        for injection in enabled_injections:
+            print(f"  {injection.name}:")
+            print(f"    Target: {injection.target_type}")
+            print(f"    Type: {injection.injection_type}")
+            print(f"    Probability: {injection.probability}%")
+            print(f"    Layers: {injection.target_layers}")
+    
+    # Get runner
+    runner = get_runner(eval_config, evaluator)
     
     # Run evaluation
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 80)
+    print(f"Starting evaluation: {eval_config.name}")
+    print("=" * 80)
     
-    if args.sweep:
-        # Probability sweep
-        probabilities = [float(p.strip()) for p in args.sweep.split(",")]
-        sweep_results = run_probability_sweep(
-            model, test_loader, device, injector,
-            probabilities, num_layers, args.num_runs, not args.no_progress
-        )
-        results["sweep_results"] = sweep_results
-        
-        # Print summary
-        print("\n" + "=" * 60)
-        print("Sweep Summary:")
-        print(f"{'Probability':>12} | {'Accuracy':>10} | {'Degradation':>12}")
-        print("-" * 40)
-        for r in sweep_results["results"]:
-            degradation = baseline_acc - r["mean_accuracy"]
-            print(f"{r['probability']:>11.1f}% | {r['mean_accuracy']:>9.2f}% | {degradation:>+11.2f}%")
-    else:
-        # Single probability evaluation
-        print(f"Evaluating with {fault_config.probability}% fault probability...")
-        if args.num_runs > 1:
-            print(f"Running {args.num_runs} times with different seeds...")
-
-        run_accuracies = []
-        run_statistics = []
-
-        for run in range(args.num_runs):
-            if args.num_runs > 1:
-                # Set different seed for each run
-                run_seed = base_seed + run
-                set_seed(run_seed, deterministic=True)
-                print(f"  Run {run + 1}/{args.num_runs} (seed: {run_seed})...")
-
-            statistics = FaultStatistics(num_layers=num_layers)
-            fault_acc, _, _ = evaluate_with_faults(
-                model, test_loader, device, injector, statistics, not args.no_progress
-            )
-            run_accuracies.append(fault_acc)
-            run_statistics.append(statistics)
-
-        avg_fault_acc = sum(run_accuracies) / len(run_accuracies)
-        std_fault_acc = (
-            (sum((a - avg_fault_acc) ** 2 for a in run_accuracies) / len(run_accuracies))
-            ** 0.5
-            if args.num_runs > 1
-            else 0.0
-        )
-
-        results["fault_probability"] = fault_config.probability
-        results["fault_accuracies"] = run_accuracies
-        results["fault_accuracy"] = avg_fault_acc
-        results["fault_accuracy_std"] = std_fault_acc
-        results["accuracy_degradation"] = baseline_acc - avg_fault_acc
-        results["num_runs"] = args.num_runs
-
-        print(f"\nResults:")
-        print(f"  Baseline accuracy:   {baseline_acc:.2f}%")
-        print(f"  Fault accuracy:      {avg_fault_acc:.2f}% (std: {std_fault_acc:.2f}%)")
-        print(f"  Accuracy degradation: {baseline_acc - avg_fault_acc:+.2f}%")
-
-        # Print statistics (from the last run, or could aggregate)
-        if fault_config.track_statistics:
-            print("\n" + "-" * 60)
-            # For multiple runs, show statistics from the last run
-            # Could be enhanced to aggregate statistics across runs
-            run_statistics[-1].print_report()
+    results = runner.run()
     
-    # Save results
-    if args.output:
-        output_path = args.output
-    else:
-        # Default output path
-        checkpoint_dir = os.path.dirname(args.checkpoint)
-        output_path = os.path.join(
-            checkpoint_dir or ".",
-            f"fault_eval_{fault_config.injection_type}.json"
-        )
+    # Report results
+    reporters = get_reporters(
+        formats=eval_config.output.formats,
+        save_path=eval_config.output.save_path,
+        verbose=eval_config.output.verbose,
+        show_progress=eval_config.output.show_progress,
+    )
     
-    with open(output_path, "w") as f:
-        json.dump(results, f, indent=2)
-    print(f"\nResults saved to: {output_path}")
+    for reporter in reporters:
+        reporter.report(results)
+    
+    # Cleanup
+    evaluator.cleanup()
+    
+    print("\nEvaluation complete!")
 
 
 if __name__ == "__main__":
