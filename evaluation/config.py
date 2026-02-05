@@ -222,6 +222,8 @@ class EvaluationConfig:
     Attributes:
         name: Experiment name.
         description: Experiment description.
+        checkpoint: Path to model checkpoint file.
+        train_config: Path to training configuration YAML (optional, inferred from checkpoint if not provided).
         injections: List of injection configurations.
         baseline: Baseline evaluation configuration.
         runner: Runner configuration.
@@ -231,6 +233,8 @@ class EvaluationConfig:
 
     name: str = "evaluation"
     description: str = ""
+    checkpoint: Optional[str] = None
+    train_config: Optional[str] = None
     injections: List[InjectionConfig] = field(default_factory=list)
     baseline: BaselineConfig = field(default_factory=BaselineConfig)
     runner: RunnerConfig = field(default_factory=RunnerConfig)
@@ -265,6 +269,8 @@ class EvaluationConfig:
         return cls(
             name=config.get("name", "evaluation"),
             description=config.get("description", ""),
+            checkpoint=config.get("checkpoint"),
+            train_config=config.get("train_config"),
             injections=[
                 InjectionConfig.from_dict(inj) for inj in config.get("injections", [])
             ],
@@ -282,6 +288,9 @@ class EvaluationConfig:
         """
         if not self.name:
             raise ValueError("Evaluation name cannot be empty")
+
+        if not self.checkpoint:
+            raise ValueError("Evaluation config must specify a checkpoint path")
 
         if not self.injections and not self.baseline.enabled:
             raise ValueError("At least one injection configuration or baseline required")
@@ -309,6 +318,8 @@ class EvaluationConfig:
         return {
             "name": self.name,
             "description": self.description,
+            "checkpoint": self.checkpoint,
+            "train_config": self.train_config,
             "injections": [
                 {
                     "name": inj.name,

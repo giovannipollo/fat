@@ -4,37 +4,23 @@ This script evaluates the fault resilience of trained models by running
 inference with fault injection enabled and tracking accuracy degradation.
 
 Usage:
-    # YAML-based evaluation (recommended)
-    python evaluate.py --config configs/train_config.yaml \\
-                       --eval-config configs/evaluation/sweep.yaml \\
-                       --checkpoint path/to/checkpoint.pth
-    
-    # Legacy CLI mode (backward compatible)
-    python evaluate.py --config configs/train_config.yaml \\
-                       --checkpoint checkpoints/best.pth \\
-                       --probability 5.0 \\
-                       --injection-type random
+    python evaluate.py --eval-config configs/evaluation/sweep.yaml
 
 Examples:
     # Probability sweep
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
-                       --eval-config configs/evaluation/sweep.yaml \\
-                       --checkpoint checkpoints/best.pth
+    python evaluate.py --eval-config configs/evaluation/sweep.yaml
     
     # Compare injection strategies
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
-                       --eval-config configs/evaluation/comparison.yaml \\
-                       --checkpoint checkpoints/best.pth
+    python evaluate.py --eval-config configs/evaluation/comparison.yaml
     
     # Combined weight + activation injection
-    python evaluate.py --config configs/quant_cnv_w2a2_cifar10.yaml \\
-                       --eval-config configs/evaluation/combined.yaml \\
-                       --checkpoint checkpoints/best.pth
+    python evaluate.py --eval-config configs/evaluation/combined.yaml
 """
 
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
 from typing import Any, Dict
 
 import torch
@@ -60,66 +46,26 @@ def parse_args() -> argparse.Namespace:
         epilog=__doc__,
     )
     
-    # Required arguments
-    parser.add_argument(
-        "--config",
-        type=str,
-        required=True,
-        help="Path to training configuration file (for model/dataset)",
-    )
-    parser.add_argument(
-        "--checkpoint",
-        type=str,
-        required=True,
-        help="Path to model checkpoint",
-    )
-    
-    # Evaluation configuration
+    # Required argument
     parser.add_argument(
         "--eval-config",
         type=str,
-        default=None,
-        help="Path to evaluation configuration YAML (recommended)",
+        required=True,
+        help="Path to evaluation configuration YAML",
     )
     
-    # Legacy CLI options (backward compatibility)
-    parser.add_argument(
-        "--probability",
-        type=float,
-        default=5.0,
-        help="Fault injection probability (0-100) [legacy mode]",
-    )
-    parser.add_argument(
-        "--injection-type",
-        type=str,
-        choices=["random", "lsb_flip", "msb_flip", "full_flip"],
-        default="random",
-        help="Injection type [legacy mode]",
-    )
-    parser.add_argument(
-        "--target-type",
-        type=str,
-        choices=["activation", "weight"],
-        default="activation",
-        help="Injection target [legacy mode]",
-    )
-    parser.add_argument(
-        "--sweep",
-        type=str,
-        default=None,
-        help="Comma-separated probabilities for sweep (e.g., '0,1,5,10') [legacy mode]",
-    )
+    # Optional overrides
     parser.add_argument(
         "--num-runs",
         type=int,
-        default=1,
-        help="Number of runs per configuration",
+        default=None,
+        help="Override number of runs per configuration",
     )
     parser.add_argument(
         "--output",
         type=str,
         default=None,
-        help="Output file path for results",
+        help="Override output file path for results",
     )
     parser.add_argument(
         "--no-progress",
@@ -130,65 +76,10 @@ def parse_args() -> argparse.Namespace:
         "--seed",
         type=int,
         default=None,
-        help="Random seed for reproducibility",
+        help="Override random seed for reproducibility",
     )
     
     return parser.parse_args()
-
-
-def create_legacy_config(args: argparse.Namespace) -> EvaluationConfig:
-    """Create evaluation config from legacy CLI arguments.
-    
-    Args:
-        args: Parsed command line arguments
-        
-    Returns:
-        EvaluationConfig instance
-    """
-    from evaluation.config import InjectionConfig, RunnerConfig, OutputConfig
-    
-    # Create injection config
-    injection = InjectionConfig(
-        name=args.target_type,
-        enabled=True,
-        target_type=args.target_type,
-        probability=args.probability,
-        injection_type=args.injection_type,
-        track_statistics=True,
-    )
-    
-    # Determine runner type
-    if args.sweep:
-        runner_type = "sweep"
-        probabilities = [float(p.strip()) for p in args.sweep.split(",")]
-    else:
-        runner_type = "single"
-        probabilities = []
-    
-    # Create runner config
-    runner = RunnerConfig(
-        type=runner_type,
-        probabilities=probabilities,
-        num_runs=args.num_runs,
-    )
-    
-    # Create output config
-    output = OutputConfig(
-        formats=["console", "json"],
-        save_path=args.output,
-        verbose=True,
-        show_progress=not args.no_progress,
-    )
-    
-    # Create evaluation config
-    return EvaluationConfig(
-        name=f"legacy_{args.target_type}_{args.injection_type}",
-        description=f"Legacy CLI evaluation: {args.injection_type} on {args.target_type}",
-        injections=[injection],
-        runner=runner,
-        output=output,
-        seed=args.seed,
-    )
 
 
 def load_model_and_dataset(
@@ -245,31 +136,40 @@ def main() -> None:
     device = get_device()
     print(f"Using device: {device}")
     
-    # Load training configuration (for model/dataset)
-    train_config: Dict[str, Any] = load_config(args.config)
+    # Load evaluation configuration
+    print(f"Loading evaluation config: {args.eval_config}")
+    eval_config = EvaluationConfig.from_yaml(args.eval_config)
     
-    # Load or create evaluation configuration
-    if args.eval_config:
-        # YAML-based evaluation
-        print(f"Loading evaluation config: {args.eval_config}")
-        eval_config = EvaluationConfig.from_yaml(args.eval_config)
-        
-        # Apply CLI overrides
-        if args.num_runs > 1:
-            eval_config.runner.num_runs = args.num_runs
-        if args.output:
-            eval_config.output.save_path = args.output
-        if args.no_progress:
-            eval_config.output.show_progress = False
-        if args.seed is not None:
-            eval_config.seed = args.seed
-    else:
-        # Legacy CLI mode
-        print("Using legacy CLI mode (consider using --eval-config)")
-        eval_config = create_legacy_config(args)
+    # Apply CLI overrides
+    if args.num_runs is not None:
+        eval_config.runner.num_runs = args.num_runs
+    if args.output:
+        eval_config.output.save_path = args.output
+    if args.no_progress:
+        eval_config.output.show_progress = False
+    if args.seed is not None:
+        eval_config.seed = args.seed
     
     # Validate evaluation config
     eval_config.validate()
+    
+    # Get checkpoint path
+    checkpoint_path = eval_config.checkpoint
+    if not checkpoint_path:
+        raise ValueError("Evaluation config must specify 'checkpoint' field")
+    print(f"Checkpoint: {checkpoint_path}")
+    
+    # Determine training config path
+    if eval_config.train_config:
+        train_config_path = eval_config.train_config
+    else:
+        # Infer train_config from checkpoint directory
+        checkpoint_dir = Path(checkpoint_path).parent.parent
+        train_config_path = str(checkpoint_dir / "config.yaml")
+        print(f"Training config inferred from checkpoint directory: {train_config_path}")
+    
+    # Load training configuration (for model/dataset)
+    train_config: Dict[str, Any] = load_config(train_config_path)
     
     # Set seed for reproducibility
     if eval_config.seed is not None:
@@ -279,7 +179,7 @@ def main() -> None:
     # Load model and dataset
     model, test_loader = load_model_and_dataset(
         train_config,
-        args.checkpoint,
+        checkpoint_path,
         device
     )
     
