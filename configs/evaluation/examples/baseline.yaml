@@ -1,6 +1,7 @@
 name: "baseline_evaluation"
 description: "Load and check the accuracy is the same"
+checkpoint: "path/to/your/checkpoint"
 
 baseline:
   enabled: true
-  num_runs: 1
+  num_runs: 5
