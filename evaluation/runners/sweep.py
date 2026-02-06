@@ -7,15 +7,14 @@ from typing import Any, Dict, List
 from tqdm import tqdm
 
 from .base import BaseRunner
-from ..metrics import DegradationMetrics
-from ..metrics.formatting import format_accuracy, format_degradation
+from ..metrics.formatting import format_accuracy
 
 
 class SweepRunner(BaseRunner):
     """Runner for probability sweep evaluation.
 
     Sweeps fault injection probability across a range and measures
-    accuracy degradation at each point.
+    accuracy at each point.
 
     Supports sweeping:
         - Single injection probability
@@ -100,13 +99,9 @@ class SweepRunner(BaseRunner):
             if fault_mean is None:
                 fault_mean = 0.0
                 
-            degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
-            # Calculate accuracy degradation compared to baseline performance
-
             prob_result = {
                 "probability": prob,
                 "fault_metrics": fault_metrics.to_dict(),
-                "degradation": degradation.to_dict(),
             }
             # Create a dictionary with results for this probability point
 
@@ -138,34 +133,26 @@ class SweepRunner(BaseRunner):
                     fault_std = 0.0
                     
                 print(f"  Accuracy: {format_accuracy(fault_mean, fault_std)}")
-                print(
-                    f"  Degradation: {format_degradation(degradation.absolute_degradation)}"
-                )
 
         results["sweep_results"] = sweep_results
         # Store the complete list of sweep results in the output dictionary
 
         if self.config.output.verbose:
-            baseline_mean = baseline_metrics.mean
-            if baseline_mean is None:
-                baseline_mean = 0.0
-                
-            self._print_sweep_summary(baseline_mean, sweep_results)
+            self._print_sweep_summary(sweep_results)
             # Print a formatted summary table of all sweep results
 
         return results
 
     def _print_sweep_summary(
-        self, baseline_acc: float, sweep_results: List[Dict[str, Any]]
+        self, sweep_results: List[Dict[str, Any]]
     ) -> None:
         """Print formatted sweep summary table."""
         print("\n" + "=" * 60)
         print("Sweep Summary:")
-        print(f"{'Probability':>12} | {'Accuracy':>12} | {'Degradation':>12}")
-        print("-" * 42)
+        print(f"{'Probability':>12} | {'Accuracy':>12}")
+        print("-" * 27)
 
         for result in sweep_results:
             prob = result["probability"]
             acc = result["fault_metrics"]["mean"]
-            deg = result["degradation"]["absolute_degradation"]
-            print(f"{prob:>11.1f}% | {acc:>11.2f}% | {deg:>+11.2f}%")
+            print(f"{prob:>11.1f}% | {acc:>11.2f}%")
