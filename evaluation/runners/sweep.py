@@ -35,21 +35,27 @@ class SweepRunner(BaseRunner):
             }
         """
         results = self._create_result_dict()
+        # Initialize results dictionary with base structure
 
         if not self.config.runner.probabilities:
             raise ValueError("Sweep runner requires probabilities list in config")
 
         probabilities = self.config.runner.probabilities
+        # Extract the list of probabilities to sweep over
         results["sweep_probabilities"] = probabilities
+        # Store the sweep probabilities in results
 
         if self.config.output.verbose:
             print("\n" + "=" * 60)
             print("Running baseline evaluation...")
 
         baseline_metrics = self.evaluator.evaluate_baseline()
+        # Evaluate model performance without any faults
         results["baseline"] = baseline_metrics.to_dict()
+        # Store baseline evaluation results
 
         if self.config.output.verbose:
+            # Extract and handle baseline accuracy for display
             baseline_mean = baseline_metrics.mean
             if baseline_mean is None:
                 baseline_mean = 0.0
@@ -61,12 +67,14 @@ class SweepRunner(BaseRunner):
             print(f"Baseline accuracy: {format_accuracy(baseline_mean, baseline_std)}")
 
         sweep_results: List[Dict[str, Any]] = []
+        # Initialize list to store evaluation results for each probability point
 
         if self.config.output.verbose:
             print("\n" + "=" * 60)
             print(f"Running probability sweep: {probabilities}")
             print(f"Runs per probability: {self.config.runner.num_runs}")
 
+        # Sweep through each probability value in the configured list
         for prob in tqdm(
             probabilities,
             desc="Probability sweep",
@@ -75,12 +83,14 @@ class SweepRunner(BaseRunner):
             if self.config.output.verbose:
                 print(f"\nEvaluating probability: {prob}%")
 
+            # Update all enabled injections to use the current sweep probability
             for injection in self.config.get_enabled_injections():
                 self.evaluator.update_injection_probability(injection.name, prob)
 
             fault_metrics = self.evaluator.evaluate_with_faults(
                 num_runs=self.config.runner.num_runs
             )
+            # Run evaluation with faults applied at the current probability
 
             baseline_mean = baseline_metrics.mean
             if baseline_mean is None:
@@ -91,12 +101,14 @@ class SweepRunner(BaseRunner):
                 fault_mean = 0.0
                 
             degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
+            # Calculate accuracy degradation compared to baseline performance
 
             prob_result = {
                 "probability": prob,
                 "fault_metrics": fault_metrics.to_dict(),
                 "degradation": degradation.to_dict(),
             }
+            # Create a dictionary with results for this probability point
 
             # Check if any injection has statistics tracking enabled
             has_statistics_tracking = False
@@ -106,14 +118,17 @@ class SweepRunner(BaseRunner):
                     break
 
             if has_statistics_tracking:
+                # Collect detailed statistics for injections with tracking enabled
                 stats_dict = {}
                 for name, stats in self.evaluator.get_statistics().items():
                     stats_dict[name] = stats.to_dict()
                 prob_result["statistics"] = stats_dict
 
             sweep_results.append(prob_result)
+            # Add the result for this probability to the sweep results list
 
             if self.config.output.verbose:
+                # Display accuracy and degradation results for this probability
                 fault_mean = fault_metrics.mean
                 if fault_mean is None:
                     fault_mean = 0.0
@@ -128,6 +143,7 @@ class SweepRunner(BaseRunner):
                 )
 
         results["sweep_results"] = sweep_results
+        # Store the complete list of sweep results in the output dictionary
 
         if self.config.output.verbose:
             baseline_mean = baseline_metrics.mean
@@ -135,6 +151,7 @@ class SweepRunner(BaseRunner):
                 baseline_mean = 0.0
                 
             self._print_sweep_summary(baseline_mean, sweep_results)
+            # Print a formatted summary table of all sweep results
 
         return results
 

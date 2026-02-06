@@ -32,20 +32,24 @@ class SingleRunner(BaseRunner):
             }
         """
         results = self._create_result_dict()
+        # Initialize results dictionary with base structure
         results["num_runs"] = self.config.runner.num_runs
 
         baseline_metrics = None
+        # Optionally run baseline evaluation (no faults)
         if self.config.baseline.enabled:
             if self.config.output.verbose:
                 print("\n" + "=" * 60)
                 print("Running baseline evaluation (no faults)...")
 
             baseline_metrics = self.evaluator.evaluate_baseline()
+            # Evaluate model performance without any faults
             results["baseline"] = baseline_metrics.to_dict()
+            # Store baseline evaluation results in the results dictionary
 
         if baseline_metrics is not None:
             if self.config.output.verbose:
-
+                # Extract and handle baseline accuracy metrics for display
                 baseline_mean = baseline_metrics.mean
                 if baseline_mean is None:
                     baseline_mean = 0.0
@@ -55,11 +59,12 @@ class SingleRunner(BaseRunner):
                     baseline_std = 0.0
 
                 formatted_accuracy = format_accuracy(
-                    accuracy=baseline_mean, baseline_std=baseline_std
+                    accuracy=baseline_mean, std=baseline_std
                 )
                 print(f"Baseline accuracy: {formatted_accuracy}")
 
         enabled_injections = self.config.get_enabled_injections()
+        # Retrieve the list of fault injections that are enabled in the configuration
 
         if len(enabled_injections) == 0:
             if self.config.output.verbose:
@@ -70,6 +75,7 @@ class SingleRunner(BaseRunner):
         if self.config.output.verbose:
             print("\n" + "=" * 60)
             print("Running fault injection evaluation...")
+            # Display details of each enabled injection
             for injection in enabled_injections:
                 print(
                     f"  {injection.name}: {injection.injection_type} @ {injection.probability}% on {injection.target_type}"
@@ -78,10 +84,12 @@ class SingleRunner(BaseRunner):
         fault_metrics = self.evaluator.evaluate_with_faults(
             num_runs=self.config.runner.num_runs
         )
+        # Run the evaluation with fault injections applied over multiple runs
         results["fault"] = fault_metrics.to_dict()
+        # Store fault evaluation results
 
         if self.config.output.verbose:
-
+            # Extract and handle fault accuracy metrics for display
             fault_mean = fault_metrics.mean
             if fault_mean is None:
                 fault_mean = 0.0
@@ -94,6 +102,7 @@ class SingleRunner(BaseRunner):
             print(f"Fault accuracy: {formatted_accuracy}")
 
         if baseline_metrics is not None:
+            # Calculate degradation metrics comparing baseline and fault performance
             baseline_mean = baseline_metrics.mean
             if baseline_mean is None:
                 baseline_mean = 0.0
@@ -122,6 +131,7 @@ class SingleRunner(BaseRunner):
                 break
 
         if has_statistics_tracking:
+            # Collect detailed statistics for each injection that has tracking enabled
             stats_dict = {}
             for name, stats in self.evaluator.get_statistics().items():
                 stats_dict[name] = stats.to_dict()
