@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import torch
 import torch.nn as nn
@@ -13,6 +13,7 @@ from .config import EvaluationConfig, InjectionConfig
 from .metrics import AccuracyMetrics
 from utils.fault_injection import (
     ActivationFaultInjector,
+    BaseFaultInjector,
     WeightFaultInjector,
     FaultStatistics,
 )
@@ -57,7 +58,9 @@ class Evaluator:
         self.device = device
         self.test_loader = test_loader
 
-        self.injectors: Dict[str, Any] = {}
+        self.injectors: Dict[
+            str, Union[ActivationFaultInjector, WeightFaultInjector]
+        ] = {}
         self.statistics: Dict[str, FaultStatistics] = {}
 
         self.show_progress = config.output.show_progress
@@ -101,7 +104,7 @@ class Evaluator:
 
         for i in range(num_runs):
             correct, total = self._single_evaluation(
-                enable_faults=False, desc=f"Baseline run {i + 1}/{num_runs}"
+                desc=f"Baseline run {i + 1}/{num_runs}"
             )
             runs.append((correct, total))
 
@@ -124,9 +127,11 @@ class Evaluator:
             AccuracyMetrics with fault evaluation results.
         """
         if injection_configs is not None:
-            for inj in injection_configs:
-                if inj.name in self.injectors:
-                    self.update_injection_probability(inj.name, inj.probability)
+            for injection in injection_configs:
+                if injection.name in self.injectors:
+                    self.update_injection_probability(
+                        injection_name=injection.name, probability=injection.probability
+                    )
 
         self.enable_injectors(enabled=True)
 
@@ -136,20 +141,16 @@ class Evaluator:
         runs = []
         for i in range(num_runs):
             correct, total = self._single_evaluation(
-                enable_faults=True,
                 desc=f"{desc} run {i + 1}/{num_runs}",
             )
             runs.append((correct, total))
 
         return AccuracyMetrics.from_runs(runs)
 
-    def _single_evaluation(
-        self, enable_faults: bool = True, desc: str = "Evaluating"
-    ) -> Tuple[int, int]:
+    def _single_evaluation(self, desc: str = "Evaluating") -> Tuple[int, int]:
         """Run single forward pass through test set.
 
         Args:
-            enable_faults: Whether to enable fault injection.
             desc: Description for progress bar.
 
         Returns:
@@ -251,7 +252,9 @@ class Evaluator:
                 f"Available: {list(self.injectors.keys())}"
             )
 
-        injector = self.injectors[injection_name]
+        injector: Union[ActivationFaultInjector, WeightFaultInjector] = self.injectors[
+            injection_name
+        ]
         injector.update_probability(self.model, probability)
 
     def get_statistics(self) -> Dict[str, FaultStatistics]:
