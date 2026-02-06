@@ -31,8 +31,6 @@ class ConsoleReporter(BaseReporter):
             self._report_single(results)
         elif runner_type == "sweep":
             self._report_sweep(results)
-        elif runner_type == "layer_sweep":
-            self._report_layer_sweep(results)
         else:
             self._report_generic(results)
 
@@ -129,59 +127,6 @@ class ConsoleReporter(BaseReporter):
             f"  Worst degradation: {self._format_percentage(worst_point['degradation']['absolute_degradation'], show_sign=True)} "
             f"at {worst_point['probability']:.1f}%"
         )
-
-    def _report_layer_sweep(self, results: Dict[str, Any]) -> None:
-        """Report layer-by-layer sweep results.
-
-        Args:
-            results: Results dictionary.
-        """
-        print("\nLayer-by-Layer Sweep Results:")
-
-        layer_results = results.get("layer_results", {})
-        total_layers = results.get("total_layers", 0)
-
-        if total_layers:
-            print(f"Total layers evaluated: {total_layers}")
-
-        for injection_name, sweep_results in layer_results.items():
-            print(f"\n{injection_name}:")
-
-            print(f"\n{'Layer':>8} | {'Accuracy':>14} | {'Degradation':>14}")
-            print("-" * 42)
-
-            for result in sweep_results:
-                layer_idx = result["layer_index"]
-                acc_mean = result["fault_metrics"]["mean"]
-                acc_std = result["fault_metrics"].get("std", 0)
-                deg = result["degradation"]["absolute_degradation"]
-
-                acc_str = self._format_metric(
-                    acc_mean, acc_std if acc_std > 0 else None
-                )
-                deg_str = self._format_percentage(deg, show_sign=True)
-
-                print(f"{layer_idx:>7} | {acc_str:>14} | {deg_str:>14}")
-
-            if sweep_results:
-                most_resilient = min(
-                    sweep_results,
-                    key=lambda x: abs(x["degradation"]["absolute_degradation"]),
-                )
-                least_resilient = max(
-                    sweep_results,
-                    key=lambda x: abs(x["degradation"]["absolute_degradation"]),
-                )
-
-                print("\nLayer Resilience Summary:")
-                print(
-                    f"  Most resilient: Layer {most_resilient['layer_index']} "
-                    f"(degradation: {self._format_percentage(most_resilient['degradation']['absolute_degradation'], show_sign=True)})"
-                )
-                print(
-                    f"  Least resilient: Layer {least_resilient['layer_index']} "
-                    f"(degradation: {self._format_percentage(least_resilient['degradation']['absolute_degradation'], show_sign=True)})"
-                )
 
     def _report_generic(self, results: Dict[str, Any]) -> None:
         """Generic fallback reporter.

@@ -70,12 +70,10 @@ def get_runner(config: EvaluationConfig, evaluator: Evaluator) -> BaseRunner:
     """
     from .single import SingleRunner
     from .sweep import SweepRunner
-    from .layer_sweep import LayerSweepRunner
 
     runners: Dict[str, type[BaseRunner]] = {
         "single": SingleRunner,
         "sweep": SweepRunner,
-        "layer_sweep": LayerSweepRunner,
     }
 
     runner_type = config.runner.type
