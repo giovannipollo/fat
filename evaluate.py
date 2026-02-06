@@ -10,9 +10,6 @@ Examples:
     # Probability sweep
     python evaluate.py --eval-config configs/evaluation/sweep.yaml
 
-    # Compare injection strategies
-    python evaluate.py --eval-config configs/evaluation/comparison.yaml
-
     # Combined weight + activation injection
     python evaluate.py --eval-config configs/evaluation/combined.yaml
 """

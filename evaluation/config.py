@@ -109,7 +109,7 @@ class RunnerConfig:
     """Configuration for evaluation runner.
 
     Attributes:
-        type: Runner type - "single", "sweep", "comparison".
+        type: Runner type - "single", "sweep".
         probabilities: List of probabilities for sweep.
         num_runs: Number of runs per configuration.
         seeds: Optional list of seeds for reproducibility.
@@ -126,7 +126,7 @@ class RunnerConfig:
         Raises:
             ValueError: If configuration is invalid.
         """
-        valid_types = ["single", "sweep", "comparison"]
+        valid_types = ["single", "sweep"]
         if self.type not in valid_types:
             raise ValueError(
                 f"Runner type must be one of {valid_types}, got '{self.type}'"

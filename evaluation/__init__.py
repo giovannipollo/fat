@@ -5,14 +5,14 @@ of neural network models. It supports:
 
 - YAML-based evaluation configuration
 - Multiple injection strategies (activation, weight, or combined)
-- Different evaluation patterns (single, sweep, comparison)
+- Different evaluation patterns (single, sweep)
 - Flexible output formats (console, JSON, CSV)
 
 Main Components:
     - EvaluationConfig: Configuration dataclass with YAML support
     - Evaluator: Main evaluation orchestrator
     - AccuracyMetrics/DegradationMetrics: Metric calculation utilities
-    - Runners: Single, Sweep, Comparison evaluation patterns
+    - Runners: Single, Sweep evaluation patterns
     - Reporters: Console, JSON output formatting
 
 Example:

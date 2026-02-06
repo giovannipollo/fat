@@ -11,7 +11,7 @@ class ConsoleReporter(BaseReporter):
     """Reporter for formatted console output.
 
     Formats results as tables and text summaries for terminal display.
-    Handles different runner types (single, sweep, comparison).
+    Handles different runner types (single, sweep).
     """
 
     def report(self, results: Dict[str, Any]) -> None:
@@ -31,8 +31,6 @@ class ConsoleReporter(BaseReporter):
             self._report_single(results)
         elif runner_type == "sweep":
             self._report_sweep(results)
-        elif runner_type == "comparison":
-            self._report_comparison(results)
         elif runner_type == "layer_sweep":
             self._report_layer_sweep(results)
         else:
@@ -130,56 +128,6 @@ class ConsoleReporter(BaseReporter):
         print(
             f"  Worst degradation: {self._format_percentage(worst_point['degradation']['absolute_degradation'], show_sign=True)} "
             f"at {worst_point['probability']:.1f}%"
-        )
-
-    def _report_comparison(self, results: Dict[str, Any]) -> None:
-        """Report comparison results as table.
-
-        Args:
-            results: Results dictionary.
-        """
-        print("\nInjection Strategy Comparison:")
-
-        comparisons = results["comparisons"]
-
-        print(
-            f"\n{'Name':>20} | {'Type':>12} | {'Target':>10} | {'Prob':>6} | {'Accuracy':>14} | {'Degradation':>14}"
-        )
-        print("-" * 95)
-
-        for comp in comparisons:
-            name = comp["injection_name"][:20]
-            config = comp["injection_config"]
-            inj_type = config["injection_type"][:12]
-            target = config["target_type"][:10]
-            prob = config["probability"]
-
-            acc_mean = comp["fault_metrics"]["mean"]
-            acc_std = comp["fault_metrics"].get("std", 0)
-            deg = comp["degradation"]["absolute_degradation"]
-
-            prob_str = f"{prob:.1f}%"
-            acc_str = self._format_metric(acc_mean, acc_std if acc_std > 0 else None)
-            deg_str = self._format_percentage(deg, show_sign=True)
-
-            print(
-                f"{name:>20} | {inj_type:>12} | {target:>10} | {prob_str:>6} | {acc_str:>14} | {deg_str:>14}"
-            )
-
-        print("\nComparison Summary:")
-        worst_comp = max(
-            comparisons, key=lambda x: abs(x["degradation"]["absolute_degradation"])
-        )
-        best_comp = min(
-            comparisons, key=lambda x: abs(x["degradation"]["absolute_degradation"])
-        )
-        print(
-            f"  Most resilient: {best_comp['injection_name']} "
-            f"(degradation: {self._format_percentage(best_comp['degradation']['absolute_degradation'], show_sign=True)})"
-        )
-        print(
-            f"  Least resilient: {worst_comp['injection_name']} "
-            f"(degradation: {self._format_percentage(worst_comp['degradation']['absolute_degradation'], show_sign=True)})"
         )
 
     def _report_layer_sweep(self, results: Dict[str, Any]) -> None:

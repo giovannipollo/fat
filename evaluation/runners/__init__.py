@@ -5,7 +5,6 @@ from __future__ import annotations
 from .base import BaseRunner, get_runner
 from .single import SingleRunner
 from .sweep import SweepRunner
-from .comparison import ComparisonRunner
 from .layer_sweep import LayerSweepRunner
 
 __all__ = [
@@ -13,6 +12,5 @@ __all__ = [
     "get_runner",
     "SingleRunner",
     "SweepRunner",
-    "ComparisonRunner",
     "LayerSweepRunner",
 ]

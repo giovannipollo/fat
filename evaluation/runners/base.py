@@ -15,7 +15,6 @@ class BaseRunner(ABC):
     Runners orchestrate different types of evaluations:
         - Single: One evaluation with fixed config
         - Sweep: Multiple evaluations across parameter ranges
-        - Comparison: Compare different injection strategies
 
     Attributes:
         config: Evaluation configuration.
@@ -71,13 +70,11 @@ def get_runner(config: EvaluationConfig, evaluator: Evaluator) -> BaseRunner:
     """
     from .single import SingleRunner
     from .sweep import SweepRunner
-    from .comparison import ComparisonRunner
     from .layer_sweep import LayerSweepRunner
 
-    runners: Dict[str, BaseRunner] = {
+    runners: Dict[str, type[BaseRunner]] = {
         "single": SingleRunner,
         "sweep": SweepRunner,
-        "comparison": ComparisonRunner,
         "layer_sweep": LayerSweepRunner,
     }
 
