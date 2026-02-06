@@ -74,7 +74,7 @@ def get_runner(config: EvaluationConfig, evaluator: Evaluator) -> BaseRunner:
     from .comparison import ComparisonRunner
     from .layer_sweep import LayerSweepRunner
 
-    runners = {
+    runners: Dict[str, BaseRunner] = {
         "single": SingleRunner,
         "sweep": SweepRunner,
         "comparison": ComparisonRunner,
@@ -88,4 +88,4 @@ def get_runner(config: EvaluationConfig, evaluator: Evaluator) -> BaseRunner:
             f"Must be one of {list(runners.keys())}"
         )
 
-    return runners[runner_type](config, evaluator)
+    return runners[runner_type](config=config, evaluator=evaluator)

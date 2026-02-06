@@ -171,7 +171,7 @@ def main() -> None:
             print(f"    Layers: {injection.target_layers}")
 
     # Get runner
-    runner = get_runner(eval_config, evaluator)
+    runner = get_runner(config=eval_config, evaluator=evaluator)
 
     # Run evaluation
     print("\n" + "=" * 80)
