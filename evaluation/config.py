@@ -307,7 +307,11 @@ class EvaluationConfig:
         Returns:
             List of enabled InjectionConfig instances.
         """
-        return [inj for inj in self.injections if inj.enabled]
+        enabled_injections = []
+        for injection in self.injections:
+            if injection.enabled:
+                enabled_injections.append(injection)
+        return enabled_injections
 
     def to_dict(self) -> Dict[str, Any]:
         """Export configuration as dictionary.
@@ -315,23 +319,26 @@ class EvaluationConfig:
         Returns:
             Dictionary representation of configuration.
         """
-        return {
+        injections_list = []
+        for injection in self.injections:
+            injections_list.append(
+                {
+                    "name": injection.name,
+                    "enabled": injection.enabled,
+                    "target_type": injection.target_type,
+                    "probability": injection.probability,
+                    "injection_type": injection.injection_type,
+                    "target_layers": injection.target_layers,
+                    "track_statistics": injection.track_statistics,
+                }
+            )
+
+        config_dict = {
             "name": self.name,
             "description": self.description,
             "checkpoint": self.checkpoint,
             "train_config": self.train_config,
-            "injections": [
-                {
-                    "name": inj.name,
-                    "enabled": inj.enabled,
-                    "target_type": inj.target_type,
-                    "probability": inj.probability,
-                    "injection_type": inj.injection_type,
-                    "target_layers": inj.target_layers,
-                    "track_statistics": inj.track_statistics,
-                }
-                for inj in self.injections
-            ],
+            "injections": injections_list,
             "baseline": {
                 "enabled": self.baseline.enabled,
                 "num_runs": self.baseline.num_runs,
@@ -350,3 +357,4 @@ class EvaluationConfig:
             },
             "seed": self.seed,
         }
+        return config_dict

@@ -54,31 +54,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to evaluation configuration YAML",
     )
 
-    # Optional overrides
-    parser.add_argument(
-        "--num-runs",
-        type=int,
-        default=None,
-        help="Override number of runs per configuration",
-    )
-    parser.add_argument(
-        "--output",
-        type=str,
-        default=None,
-        help="Override output file path for results",
-    )
-    parser.add_argument(
-        "--no-progress",
-        action="store_true",
-        help="Disable progress bars",
-    )
-    parser.add_argument(
-        "--seed",
-        type=int,
-        default=None,
-        help="Override random seed for reproducibility",
-    )
-
     return parser.parse_args()
 
 
@@ -139,16 +114,6 @@ def main() -> None:
     # Load evaluation configuration
     print(f"Loading evaluation config: {args.eval_config}")
     eval_config = EvaluationConfig.from_yaml(args.eval_config)
-
-    # Apply CLI overrides
-    if args.num_runs is not None:
-        eval_config.runner.num_runs = args.num_runs
-    if args.output:
-        eval_config.output.save_path = args.output
-    if args.no_progress:
-        eval_config.output.show_progress = False
-    if args.seed is not None:
-        eval_config.seed = args.seed
 
     # Validate evaluation config
     eval_config.validate()
