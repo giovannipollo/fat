@@ -104,29 +104,18 @@ class ConsoleReporter(BaseReporter):
         sweep_results = results["sweep_results"]
         baseline_acc = results["baseline"]["mean"]
 
-        print(f"\n{'Probability':>12} | {'Accuracy':>14} | {'Degradation':>14}")
-        print("-" * 45)
+        print(f"\n{'Probability':>12} | {'Accuracy':>14}")
+        print("-" * 30)
 
         for point in sweep_results:
             prob = point["probability"]
             acc_mean = point["fault_metrics"]["mean"]
             acc_std = point["fault_metrics"].get("std", 0)
-            deg = point["degradation"]["absolute_degradation"]
 
             prob_str = f"{prob:.1f}%"
             acc_str = self._format_metric(acc_mean, acc_std if acc_std > 0 else None)
-            deg_str = self._format_percentage(deg, show_sign=True)
 
-            print(f"{prob_str:>12} | {acc_str:>14} | {deg_str:>14}")
-
-        print("\nSweep Summary:")
-        worst_point = max(
-            sweep_results, key=lambda x: abs(x["degradation"]["absolute_degradation"])
-        )
-        print(
-            f"  Worst degradation: {self._format_percentage(worst_point['degradation']['absolute_degradation'], show_sign=True)} "
-            f"at {worst_point['probability']:.1f}%"
-        )
+            print(f"{prob_str:>12} | {acc_str:>14}")
 
     def _report_generic(self, results: Dict[str, Any]) -> None:
         """Generic fallback reporter.
