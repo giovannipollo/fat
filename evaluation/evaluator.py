@@ -99,16 +99,7 @@ class Evaluator:
         runs = []
         num_runs = self.config.baseline.num_runs
 
-        if self.verbose and num_runs > 1:
-            pbar = tqdm(
-                range(num_runs),
-                desc="Baseline runs",
-                disable=not self.show_progress,
-            )
-        else:
-            pbar = range(num_runs)
-
-        for i in pbar:
+        for i in range(num_runs):
             correct, total = self._single_evaluation(
                 enable_faults=False, desc=f"Baseline run {i + 1}/{num_runs}"
             )
@@ -143,16 +134,7 @@ class Evaluator:
             stats.reset()
 
         runs = []
-        if self.verbose and num_runs > 1:
-            pbar = tqdm(
-                range(num_runs),
-                desc=f"{desc} runs",
-                disable=not self.show_progress,
-            )
-        else:
-            pbar = range(num_runs)
-
-        for i in pbar:
+        for i in range(num_runs):
             correct, total = self._single_evaluation(
                 enable_faults=True,
                 desc=f"{desc} run {i + 1}/{num_runs}",

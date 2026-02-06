@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from tqdm import tqdm
-
 from .base import BaseRunner
 from ..metrics.formatting import format_accuracy
 
@@ -74,11 +72,7 @@ class SweepRunner(BaseRunner):
             print(f"Runs per probability: {self.config.runner.num_runs}")
 
         # Sweep through each probability value in the configured list
-        for prob in tqdm(
-            probabilities,
-            desc="Probability sweep",
-            disable=not self.config.output.show_progress,
-        ):
+        for prob in probabilities:
             if self.config.output.verbose:
                 print(f"\nEvaluating probability: {prob}%")
 
