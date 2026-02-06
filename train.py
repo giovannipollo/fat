@@ -26,6 +26,8 @@ from utils.config_validator import validate_config, ConfigValidationError
 
 # Suppress Brevitas pkg_resources deprecation warning
 warnings.filterwarnings("ignore", category=UserWarning, module="brevitas")
+warnings.filterwarnings("ignore", message="To copy construct from a tensor.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 
 
 def main() -> None:

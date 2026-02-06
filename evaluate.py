@@ -17,6 +17,7 @@ Examples:
 from __future__ import annotations
 
 import argparse
+import warnings
 from pathlib import Path
 from typing import Any, Dict
 
@@ -29,6 +30,11 @@ from utils import get_device, load_config, set_seed
 from evaluation import EvaluationConfig, Evaluator
 from evaluation.runners import get_runner
 from evaluation.reporters import get_reporters
+
+# Suppress common warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="brevitas")
+warnings.filterwarnings("ignore", message="To copy construct from a tensor.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 
 
 def parse_args() -> argparse.Namespace:
