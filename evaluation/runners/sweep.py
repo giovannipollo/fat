@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from .base import BaseRunner
 from ..metrics import DegradationMetrics
+from ..metrics.formatting import format_accuracy, format_degradation
 
 
 class SweepRunner(BaseRunner):
@@ -49,11 +50,15 @@ class SweepRunner(BaseRunner):
         results["baseline"] = baseline_metrics.to_dict()
 
         if self.config.output.verbose:
-            from ..metrics import format_accuracy
-
-            mean = baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
-            std = baseline_metrics.std if baseline_metrics.std is not None else 0.0
-            print(f"Baseline accuracy: {format_accuracy(mean, std)}")
+            baseline_mean = baseline_metrics.mean
+            if baseline_mean is None:
+                baseline_mean = 0.0
+                
+            baseline_std = baseline_metrics.std
+            if baseline_std is None:
+                baseline_std = 0.0
+                
+            print(f"Baseline accuracy: {format_accuracy(baseline_mean, baseline_std)}")
 
         sweep_results: List[Dict[str, Any]] = []
 
@@ -77,10 +82,14 @@ class SweepRunner(BaseRunner):
                 num_runs=self.config.runner.num_runs
             )
 
-            baseline_mean = (
-                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
-            )
-            fault_mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
+            baseline_mean = baseline_metrics.mean
+            if baseline_mean is None:
+                baseline_mean = 0.0
+                
+            fault_mean = fault_metrics.mean
+            if fault_mean is None:
+                fault_mean = 0.0
+                
             degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
 
             prob_result = {
@@ -89,9 +98,14 @@ class SweepRunner(BaseRunner):
                 "degradation": degradation.to_dict(),
             }
 
-            if any(
-                inj.track_statistics for inj in self.config.get_enabled_injections()
-            ):
+            # Check if any injection has statistics tracking enabled
+            has_statistics_tracking = False
+            for inj in self.config.get_enabled_injections():
+                if inj.track_statistics:
+                    has_statistics_tracking = True
+                    break
+
+            if has_statistics_tracking:
                 stats_dict = {}
                 for name, stats in self.evaluator.get_statistics().items():
                     stats_dict[name] = stats.to_dict()
@@ -100,11 +114,15 @@ class SweepRunner(BaseRunner):
             sweep_results.append(prob_result)
 
             if self.config.output.verbose:
-                from ..metrics import format_accuracy, format_degradation
-
-                mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
-                std = fault_metrics.std if fault_metrics.std is not None else 0.0
-                print(f"  Accuracy: {format_accuracy(mean, std)}")
+                fault_mean = fault_metrics.mean
+                if fault_mean is None:
+                    fault_mean = 0.0
+                    
+                fault_std = fault_metrics.std
+                if fault_std is None:
+                    fault_std = 0.0
+                    
+                print(f"  Accuracy: {format_accuracy(fault_mean, fault_std)}")
                 print(
                     f"  Degradation: {format_degradation(degradation.absolute_degradation)}"
                 )
@@ -112,9 +130,10 @@ class SweepRunner(BaseRunner):
         results["sweep_results"] = sweep_results
 
         if self.config.output.verbose:
-            baseline_mean = (
-                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
-            )
+            baseline_mean = baseline_metrics.mean
+            if baseline_mean is None:
+                baseline_mean = 0.0
+                
             self._print_sweep_summary(baseline_mean, sweep_results)
 
         return results

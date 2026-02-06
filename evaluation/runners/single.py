@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from .base import BaseRunner
 from ..metrics import DegradationMetrics
+from ..metrics.formatting import format_accuracy, format_degradation
 
 
 class SingleRunner(BaseRunner):
@@ -42,14 +43,21 @@ class SingleRunner(BaseRunner):
             baseline_metrics = self.evaluator.evaluate_baseline()
             results["baseline"] = baseline_metrics.to_dict()
 
+        if baseline_metrics is not None:
             if self.config.output.verbose:
-                from ..metrics import format_accuracy
 
-                mean = (
-                    baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+                baseline_mean = baseline_metrics.mean
+                if baseline_mean is None:
+                    baseline_mean = 0.0
+
+                baseline_std = baseline_metrics.std
+                if baseline_std is None:
+                    baseline_std = 0.0
+
+                formatted_accuracy = format_accuracy(
+                    accuracy=baseline_mean, baseline_std=baseline_std
                 )
-                std = baseline_metrics.std if baseline_metrics.std is not None else 0.0
-                print(f"Baseline accuracy: {format_accuracy(mean, std)}")
+                print(f"Baseline accuracy: {formatted_accuracy}")
 
         enabled_injections = self.config.get_enabled_injections()
 
@@ -62,9 +70,9 @@ class SingleRunner(BaseRunner):
         if self.config.output.verbose:
             print("\n" + "=" * 60)
             print("Running fault injection evaluation...")
-            for inj in enabled_injections:
+            for injection in enabled_injections:
                 print(
-                    f"  {inj.name}: {inj.injection_type} @ {inj.probability}% on {inj.target_type}"
+                    f"  {injection.name}: {injection.injection_type} @ {injection.probability}% on {injection.target_type}"
                 )
 
         fault_metrics = self.evaluator.evaluate_with_faults(
@@ -73,28 +81,47 @@ class SingleRunner(BaseRunner):
         results["fault"] = fault_metrics.to_dict()
 
         if self.config.output.verbose:
-            from ..metrics import format_accuracy
 
-            mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
-            std = fault_metrics.std if fault_metrics.std is not None else 0.0
-            print(f"Fault accuracy: {format_accuracy(mean, std)}")
+            fault_mean = fault_metrics.mean
+            if fault_mean is None:
+                fault_mean = 0.0
+
+            fault_std = fault_metrics.std
+            if fault_std is None:
+                fault_std = 0.0
+
+            formatted_accuracy = format_accuracy(fault_mean, fault_std)
+            print(f"Fault accuracy: {formatted_accuracy}")
 
         if baseline_metrics is not None:
-            baseline_mean = (
-                baseline_metrics.mean if baseline_metrics.mean is not None else 0.0
+            baseline_mean = baseline_metrics.mean
+            if baseline_mean is None:
+                baseline_mean = 0.0
+
+            fault_mean = fault_metrics.mean
+            if fault_mean is None:
+                fault_mean = 0.0
+
+            degradation = DegradationMetrics.calculate(
+                baseline=baseline_mean, fault=fault_mean
             )
-            fault_mean = fault_metrics.mean if fault_metrics.mean is not None else 0.0
-            degradation = DegradationMetrics.calculate(baseline_mean, fault_mean)
             results["degradation"] = degradation.to_dict()
 
             if self.config.output.verbose:
-                from ..metrics import format_degradation
 
-                print(
-                    f"Degradation: {format_degradation(degradation.absolute_degradation)}"
+                formatted_degradation = format_degradation(
+                    degradation=degradation.absolute_degradation
                 )
+                print(f"Degradation: {formatted_degradation}")
 
-        if any(inj.track_statistics for inj in enabled_injections):
+        # Check if any injection has statistics tracking enabled
+        has_statistics_tracking = False
+        for injection in enabled_injections:
+            if injection.track_statistics:
+                has_statistics_tracking = True
+                break
+
+        if has_statistics_tracking:
             stats_dict = {}
             for name, stats in self.evaluator.get_statistics().items():
                 stats_dict[name] = stats.to_dict()
