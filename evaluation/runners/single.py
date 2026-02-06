@@ -5,8 +5,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from .base import BaseRunner
-from ..metrics import DegradationMetrics
-from ..metrics.formatting import format_accuracy, format_degradation
+from ..metrics.formatting import format_accuracy
 
 
 class SingleRunner(BaseRunner):
@@ -15,7 +14,6 @@ class SingleRunner(BaseRunner):
     Executes:
         1. Baseline evaluation (if enabled)
         2. Fault evaluation with configured injections
-        3. Calculate degradation metrics
     """
 
     def run(self) -> Dict[str, Any]:
@@ -27,7 +25,6 @@ class SingleRunner(BaseRunner):
                 "experiment_name": str,
                 "baseline": AccuracyMetrics dict (if enabled),
                 "fault": AccuracyMetrics dict,
-                "degradation": DegradationMetrics dict (if baseline enabled),
                 "statistics": Dict[injection_name, stats] (if enabled),
             }
         """
@@ -103,28 +100,6 @@ class SingleRunner(BaseRunner):
 
             formatted_accuracy = format_accuracy(fault_mean, fault_std)
             print(f"Fault accuracy: {formatted_accuracy}")
-
-        # Calculate degradation metrics comparing baseline and fault performance
-        if baseline_metrics is not None:
-            baseline_mean = baseline_metrics.mean
-            if baseline_mean is None:
-                baseline_mean = 0.0
-
-            fault_mean = fault_metrics.mean
-            if fault_mean is None:
-                fault_mean = 0.0
-
-            degradation = DegradationMetrics.calculate(
-                baseline=baseline_mean, fault=fault_mean
-            )
-            results["degradation"] = degradation.to_dict()
-
-            if self.config.output.verbose:
-
-                formatted_degradation = format_degradation(
-                    degradation=degradation.absolute_degradation
-                )
-                print(f"Degradation: {formatted_degradation}")
 
         # Check if any injection has statistics tracking enabled
         has_statistics_tracking = False
