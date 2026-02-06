@@ -16,6 +16,13 @@ import os
 import warnings
 from typing import Any, Dict
 
+# Suppress pkg_resources deprecation warning from brevitas
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning
+)
+
 import torch
 import torch.distributed as dist
 

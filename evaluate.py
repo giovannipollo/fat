@@ -21,6 +21,13 @@ import warnings
 from pathlib import Path
 from typing import Any, Dict
 
+# Suppress pkg_resources deprecation warning from brevitas
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning
+)
+
 import torch
 
 from datasets import get_dataset
