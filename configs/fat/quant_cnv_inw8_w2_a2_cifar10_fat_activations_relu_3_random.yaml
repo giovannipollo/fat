@@ -26,8 +26,8 @@ model:
 
 quantization:
   in_weight_bit_width: 8
-  weight_bit_width: 4
-  act_bit_width: 4
+  weight_bit_width: 2
+  act_bit_width: 2
 
 loss:
   name: "sqr_hinge"
