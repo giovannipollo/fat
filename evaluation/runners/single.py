@@ -81,9 +81,7 @@ class SingleRunner(BaseRunner):
                 )
 
         # Run the evaluation with fault injections applied over multiple runs
-        fault_metrics = self.evaluator.evaluate_with_faults(
-            num_runs=self.config.runner.num_runs
-        )
+        fault_metrics = self.evaluator.evaluate_with_faults()
 
         # Store fault evaluation results
         results["fault"] = fault_metrics.to_dict()

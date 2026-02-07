@@ -112,13 +112,11 @@ class Evaluator:
 
     def evaluate_with_faults(
         self,
-        num_runs: int = 1,
         desc: str = "Fault evaluation",
     ) -> AccuracyMetrics:
         """Evaluate model with fault injection.
 
         Args:
-            num_runs: Number of evaluation runs for averaging.
             desc: Description for progress bar.
 
         Returns:
@@ -130,6 +128,7 @@ class Evaluator:
         for stats in self.statistics.values():
             stats.reset()
 
+        num_runs = self.config.runner.num_runs
         runs = []
         for i in range(num_runs):
             correct, total = self._single_evaluation(

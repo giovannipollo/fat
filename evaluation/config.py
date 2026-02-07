@@ -72,6 +72,7 @@ class InjectionConfig:
             probability=config.get("probability", 5.0),
             injection_type=config.get("injection_type", "random"),
             target_layers=config.get("target_layers", []),
+            target_layer_indices=config.get("target_layer_indices", None),
             track_statistics=config.get("track_statistics", True),
         )
 
