@@ -35,6 +35,7 @@ from utils.config_validator import validate_config, ConfigValidationError
 warnings.filterwarnings("ignore", category=UserWarning, module="brevitas")
 warnings.filterwarnings("ignore", message="To copy construct from a tensor.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
+warnings.filterwarnings("ignore", message="Named tensors and all their associated APIs are an experimental feature*")
 
 
 def main() -> None:
