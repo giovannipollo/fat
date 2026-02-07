@@ -83,7 +83,7 @@ class Evaluator:
                 raise ValueError(f"Unknown target type: {injection.target_type}")
 
             self.injectors[injection.name] = injector
-            self.model = injector.inject(self.model, fault_config)
+            self.model = injector.inject(model=self.model, config=fault_config)
 
             if injection.track_statistics:
                 num_layers = injector.get_num_layers(self.model)
@@ -112,26 +112,18 @@ class Evaluator:
 
     def evaluate_with_faults(
         self,
-        injection_configs: Optional[List[InjectionConfig]] = None,
         num_runs: int = 1,
         desc: str = "Fault evaluation",
     ) -> AccuracyMetrics:
         """Evaluate model with fault injection.
 
         Args:
-            injection_configs: Optional override of injection configs.
             num_runs: Number of evaluation runs for averaging.
             desc: Description for progress bar.
 
         Returns:
             AccuracyMetrics with fault evaluation results.
         """
-        if injection_configs is not None:
-            for injection in injection_configs:
-                if injection.name in self.injectors:
-                    self.update_injection_probability(
-                        injection_name=injection.name, probability=injection.probability
-                    )
 
         self.enable_injectors(enabled=True)
 
