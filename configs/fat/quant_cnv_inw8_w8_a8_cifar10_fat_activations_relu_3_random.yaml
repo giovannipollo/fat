@@ -96,39 +96,3 @@ activation_fault_injection:
 
   # Verbose output for debugging
   verbose: false
-
-# # Weight Fault Injection Configuration
-# weight_fault_injection:
-#   # Enable/disable weight fault injection
-#   enabled: false
-
-#   # Target type (must be "weight" for this section)
-#   target_type: weight
-
-#   # Fault probability (0-100%)
-#   # Percentage of weight elements that will be modified when injection is active
-#   probability: 2
-
-#   # Injection type (fault model):
-#   # - "random": Add random values within quantization range
-#   # - "lsb_flip": Flip least significant bit
-#   # - "msb_flip": Flip most significant bit
-#   # - "full_flip": Flip all bits
-#   injection_type: "lsb_flip"
-
-#   # When to apply fault injection:
-#   # - "train": Only during training forward pass
-#   # - "eval": Only during evaluation
-#   # - "both": During both training and evaluation
-#   apply_during: "both"
-
-#   # Target layers to inject faults into:
-#   # Available: "QuantConv2d", "QuantLinear"
-#   # Default (if not specified): ["QuantConv2d", "QuantLinear"]
-#   target_layers: ["QuantConv2d"]
-
-#   # Track injection statistics (RMSE, cosine similarity, etc.)
-#   track_statistics: true
-
-#   # Verbose output for debugging
-#   verbose: false
