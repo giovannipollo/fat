@@ -91,13 +91,19 @@ class Evaluator:
                 injector.set_statistics(self.model, stats)
                 self.statistics[injection.name] = stats
 
-    def evaluate_baseline(self) -> AccuracyMetrics:
+    def evaluate_baseline(
+        self, injection_configs: List[InjectionConfig]
+    ) -> AccuracyMetrics:
         """Evaluate model without fault injection.
+
+        Args:
+            injection_configs: List of injection configurations to disable for baseline.
 
         Returns:
             AccuracyMetrics with baseline results.
         """
-        self.enable_injectors(enabled=False)
+        for injection_config in injection_configs:
+            self.enable_injection(injection_name=injection_config.name, enabled=False)
 
         runs = []
         num_runs = self.config.baseline.num_runs
@@ -112,18 +118,29 @@ class Evaluator:
 
     def evaluate_with_faults(
         self,
+        injection_configs: List[InjectionConfig] = None,
         desc: str = "Fault evaluation",
     ) -> AccuracyMetrics:
         """Evaluate model with fault injection.
 
         Args:
-            desc: Description for progress bar.
+            injection_config: Optional configuration for the injection.
+            desc: Description for progress display.
 
         Returns:
             AccuracyMetrics with fault evaluation results.
         """
-
-        self.enable_injectors(enabled=True)
+        for injection_config in injection_configs:
+            if injection_config.target_layer_indices is not None:
+                self.enable_injection_layers(
+                    injection_name=injection_config.name,
+                    layer_indices=injection_config.target_layer_indices,
+                    enabled=True,
+                )
+            else:
+                self.enable_injection(
+                    injection_name=injection_config.name, enabled=True
+                )
 
         for stats in self.statistics.values():
             stats.reset()
@@ -167,22 +184,27 @@ class Evaluator:
 
         return correct, total
 
-    def enable_injectors(self, enabled: bool = True) -> None:
+    def enable_injection(self, injection_name: str, enabled: bool = True) -> None:
         """Enable/disable all injectors.
 
         Args:
+            injection_name: Name of injection to enable/disable.
             enabled: Whether to enable injection.
         """
-        for injector in self.injectors.values():
-            injector.set_enabled(self.model, enabled)
+        injector = self.injectors[injection_name]
+        injector.set_enabled(self.model, enabled)
 
     def enable_injection_layers(
-        self, injection_name: str, layer_indices: Optional[List[int]] = None
+        self,
+        injection_name: str,
+        enabled: bool = True,
+        layer_indices: Optional[List[int]] = None,
     ) -> None:
         """Enable/disable specific injection layers by index.
 
         Args:
             injection_name: Name of injection to configure.
+            enabled: Whether to enable injection for specified layers.
             layer_indices: List of layer indices to enable (0-based). None = all layers.
 
         Raises:
@@ -197,12 +219,14 @@ class Evaluator:
         injector = self.injectors[injection_name]
 
         if layer_indices is None:
-            injector.set_enabled(self.model, True)
+            injector.set_enabled(self.model, enabled)
         else:
             injector.set_enabled(self.model, False)
             for layer_id in layer_indices:
                 if hasattr(injector, "set_layer_enabled"):
-                    injector.set_layer_enabled(self.model, layer_id, True)
+                    injector.set_layer_enabled(
+                        model=self.model, layer_id=layer_id, enabled=enabled
+                    )
 
     def get_num_injection_layers(self, injection_name: str) -> int:
         """Get number of injection layers for a specific injection.

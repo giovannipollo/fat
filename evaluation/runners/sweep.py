@@ -48,7 +48,7 @@ class SweepRunner(BaseRunner):
             print("Running baseline evaluation...")
 
         # Evaluate model performance without any faults
-        baseline_metrics = self.evaluator.evaluate_baseline()
+        baseline_metrics = self.evaluator.evaluate_baseline(injection_configs=self.config.injections)
         
         # Store baseline evaluation results
         results["baseline"] = baseline_metrics.to_dict()

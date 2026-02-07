@@ -41,7 +41,7 @@ class SingleRunner(BaseRunner):
                 print("Running baseline evaluation (no faults)...")
 
             # Evaluate model performance without any faults
-            baseline_metrics = self.evaluator.evaluate_baseline()
+            baseline_metrics = self.evaluator.evaluate_baseline(injection_configs=self.config.injections)
 
             # Store baseline evaluation results in the results dictionary
             results["baseline"] = baseline_metrics.to_dict()
@@ -81,7 +81,7 @@ class SingleRunner(BaseRunner):
                 )
 
         # Run the evaluation with fault injections applied over multiple runs
-        fault_metrics = self.evaluator.evaluate_with_faults()
+        fault_metrics = self.evaluator.evaluate_with_faults(injection_configs=enabled_injections)
 
         # Store fault evaluation results
         results["fault"] = fault_metrics.to_dict()
