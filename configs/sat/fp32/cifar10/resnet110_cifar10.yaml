@@ -1,34 +1,31 @@
-# ResNet-20 on MNIST
-# Overkill for MNIST but useful for testing
-# Expected accuracy: ~99%+ after just a few epochs
-
 seed:
   enabled: true
   value: 42
   deterministic: false
 
 dataset:
-  name: "mnist"
+  name: "cifar10"
   root: "./data"
   download: true
   num_workers: 4
 
 model:
-  name: "resnet20"
+  name: "resnet110"
 
 training:
   batch_size: 128
-  epochs: 20
+  epochs: 200
 
 optimizer:
-  name: "adam"
-  learning_rate: 0.001
-  weight_decay: 0.0001
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0005
 
 scheduler:
   name: "cosine"
-  T_max: 20
-  warmup_epochs: 1
+  T_max: 200
+  warmup_epochs: 5
 
 amp:
   enabled: false
@@ -42,5 +39,5 @@ progress:
 checkpoint:
   enabled: true
   dir: "./experiments"
-  save_frequency: 10
+  save_frequency: 50
   save_best: true

@@ -1,20 +1,16 @@
-# ResNet-50 on CIFAR-100 - Deeper model for more classes
-# Expected accuracy: ~75-78% after 200 epochs
-
 seed:
   enabled: true
   value: 42
   deterministic: false
 
 dataset:
-  name: "cifar100"
+  name: "cifar10"
   root: "./data"
   download: true
-  num_workers: 8
-  val_split: 0.1
+  num_workers: 4
 
 model:
-  name: "resnet50"
+  name: "resnet20"
 
 training:
   batch_size: 128
@@ -32,7 +28,7 @@ scheduler:
   warmup_epochs: 5
 
 amp:
-  enabled: true  # Recommended for ResNet-50
+  enabled: false
 
 tensorboard:
   enabled: true
@@ -43,5 +39,5 @@ progress:
 checkpoint:
   enabled: true
   dir: "./experiments"
-  save_frequency: 20
+  save_frequency: 50
   save_best: true

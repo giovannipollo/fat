@@ -1,7 +1,3 @@
-# ResNet-56 on CIFAR-10
-# Medium-sized CIFAR model (~0.85M params)
-# Expected accuracy: ~93-94% after 200 epochs
-
 seed:
   enabled: true
   value: 42
@@ -12,10 +8,9 @@ dataset:
   root: "./data"
   download: true
   num_workers: 4
-  # val_split: 0.1
 
 model:
-  name: "resnet56"
+  name: "resnet110"
 
 training:
   batch_size: 128

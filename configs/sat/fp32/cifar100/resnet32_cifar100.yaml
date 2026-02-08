@@ -1,21 +1,16 @@
-# ResNet-20 on CIFAR-10
-# A lightweight model (~0.27M params) that trains quickly
-# Expected accuracy: ~91-92% after 200 epochs
-
 seed:
   enabled: true
   value: 42
   deterministic: false
 
 dataset:
-  name: "cifar10"
+  name: "cifar100"
   root: "./data"
   download: true
   num_workers: 4
-  val_split: 0.1
 
 model:
-  name: "resnet20"
+  name: "resnet32"
 
 training:
   batch_size: 128

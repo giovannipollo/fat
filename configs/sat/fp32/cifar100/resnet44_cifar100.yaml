@@ -1,7 +1,3 @@
-# ResNet-20 on CIFAR-100
-# Lightweight model for the harder 100-class problem
-# Expected accuracy: ~68-70% after 200 epochs
-
 seed:
   enabled: true
   value: 42
@@ -12,10 +8,9 @@ dataset:
   root: "./data"
   download: true
   num_workers: 4
-  # val_split: 0.1
 
 model:
-  name: "resnet20"
+  name: "resnet44"
 
 training:
   batch_size: 128

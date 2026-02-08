@@ -1,20 +1,16 @@
-# ResNet-18 on CIFAR-10 - Standard configuration
-# Expected accuracy: ~93-95% after 200 epochs
-
 seed:
   enabled: true
   value: 42
   deterministic: false
 
 dataset:
-  name: "cifar10"
+  name: "cifar100"
   root: "./data"
   download: true
-  num_workers: 8
-  val_split: 0.1
+  num_workers: 4
 
 model:
-  name: "resnet18"
+  name: "resnet20"
 
 training:
   batch_size: 128
@@ -43,5 +39,5 @@ progress:
 checkpoint:
   enabled: true
   dir: "./experiments"
-  save_frequency: 20
+  save_frequency: 50
   save_best: true
