@@ -1,0 +1,86 @@
+seed:
+  enabled: true
+  value: 2
+  deterministic: false
+
+dataset:
+  name: "cifar100"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_cnv"
+
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 2
+  act_bit_width: 2
+
+loss:
+  name: "sqr_hinge"
+
+training:
+  batch_size: 256
+  epochs: 300
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.01
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 300
+  warmup_epochs: 0
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
+
+# Activation Fault Injection Configuration
+activation_fault_injection:
+  # Enable/disable activation fault injection
+  enabled: true
+
+  # Target type (must be "activation" for this section)
+  target_type: activation
+
+  # Fault probability (0-100%)
+  # Percentage of activations that will be modified when injection is active
+  probability: 1
+
+  # Injection type (fault model):
+  # - "random": Add random values within quantization range
+  # - "lsb_flip": Flip least significant bit
+  # - "msb_flip": Flip most significant bit
+  # - "full_flip": Flip all bits
+  injection_type: "random"
+
+  # When to apply fault injection:
+  # - "train": Only during training forward pass
+  # - "eval": Only during evaluation
+  # - "both": During both training and evaluation
+  apply_during: "train"
+
+  # Target layers to inject faults after:
+  # Available: "QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d", "QuantLinear"
+  # Default (if not specified): ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
+  target_layers: ["QuantReLU"]
+
+  # Track injection statistics (RMSE, cosine similarity, etc.)
+  track_statistics: true
+
+  # Verbose output for debugging
+  verbose: false
