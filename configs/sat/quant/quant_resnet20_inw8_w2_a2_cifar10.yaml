@@ -23,7 +23,7 @@ loss:
   name: "sqr_hinge"
 
 training:
-  batch_size: 64
+  batch_size: 256
   epochs: 300
 
 optimizer:
