@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .mobilenet import MobileNetV1 as MobileNetV1ImageNet
+from .mobilenet import MobileNetV1ImageNet
 from .resnet import (
     BasicBlock,
     Bottleneck,

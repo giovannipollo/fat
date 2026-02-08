@@ -72,7 +72,7 @@ class DepthwiseSeparableBlock(nn.Module):
         return out
 
 
-class MobileNetV1(nn.Module):
+class MobileNetV1ImageNet(nn.Module):
     """MobileNetV1 for ImageNet-1K.
 
     Original MobileNetV1 architecture designed for ImageNet (224x224) inputs.
