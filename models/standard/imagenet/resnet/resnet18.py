@@ -1,13 +1,15 @@
-"""ResNet-18 model adapted for small images."""
+"""ResNet-18 model for ImageNet classification."""
 
 from .base import ResNetBase, BasicBlock
 
 
 class ResNet18(ResNetBase):
-    """ResNet-18 model adapted for CIFAR-10/100 and MNIST.
+    """ResNet-18 model following the original architecture.
 
     Uses BasicBlock with [2, 2, 2, 2] blocks per stage.
-    Approximately 11.2M parameters.
+    Approximately 11.7M parameters for ImageNet-1K (1000 classes).
+    
+    Architecture designed for 224x224 RGB inputs.
     """
 
     #: Block type (BasicBlock)

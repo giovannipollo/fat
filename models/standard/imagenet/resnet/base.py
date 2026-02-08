@@ -1,7 +1,7 @@
-"""ResNet base classes and building blocks for ImageNet-style architectures.
+"""ResNet base classes and building blocks for classical ImageNet architectures.
 
 Provides BasicBlock, Bottleneck, and ResNetBase classes for building
-ResNet-18 through ResNet-152 models adapted for small image inputs.
+ResNet-18 through ResNet-152 models following the original paper architecture.
 
 See: https://arxiv.org/abs/1512.03385 "Deep Residual Learning for Image Recognition"
 """
@@ -152,17 +152,25 @@ class Bottleneck(nn.Module):
 
 
 class ResNetBase(nn.Module, ABC):
-    """Base ResNet model adapted for small images (CIFAR, MNIST).
+    """Classical ImageNet ResNet base model.
 
-    Modified from the original ImageNet architecture:
-    - Initial conv: 3x3, stride=1, padding=1 (vs 7x7, stride=2)
-    - No max pooling after initial conv (preserves resolution)
-    - Supports both RGB and grayscale inputs
+    Follows the original ResNet architecture from He et al., 2015:
+    - Initial 7x7 conv with stride=2, padding=3
+    - 3x3 max pooling with stride=2, padding=1
+    - Four residual stages: [64, 128, 256, 512] base channels
+    - Global average pooling + fully connected classifier
+    - Designed for 224x224 RGB inputs
 
     Architecture:
-        - Initial 3x3 conv -> 64 channels
-        - 4 stages: [64, 128, 256, 512] base channels
-        - Global average pooling + FC classifier
+        - Input: (N, 3, 224, 224)
+        - Conv1: 7x7, 64 channels, stride=2 -> (N, 64, 112, 112)
+        - MaxPool: 3x3, stride=2 -> (N, 64, 56, 56)
+        - Layer1: 64 channels -> (N, 64*expansion, 56, 56)
+        - Layer2: 128 channels, stride=2 -> (N, 128*expansion, 28, 28)
+        - Layer3: 256 channels, stride=2 -> (N, 256*expansion, 14, 14)
+        - Layer4: 512 channels, stride=2 -> (N, 512*expansion, 7, 7)
+        - AvgPool: (7, 7) -> (1, 1) -> (N, 512*expansion, 1, 1)
+        - FC: num_classes -> (N, num_classes)
 
     Subclasses must define:
         - block: The block type (BasicBlock or Bottleneck)
@@ -177,27 +185,28 @@ class ResNetBase(nn.Module, ABC):
 
     def __init__(
         self,
-        num_classes: int = 10,
+        num_classes: int = 1000,
         in_channels: int = 3,
     ):
-        """Initialize ResNet base model.
+        """Initialize classical ImageNet ResNet model.
 
         Args:
-            num_classes: Number of output classes.
+            num_classes: Number of output classes (default: 1000 for ImageNet).
             in_channels: Number of input channels (3=RGB, 1=grayscale).
         """
         super().__init__()
         self.in_planes: int = 64
         self.in_channels: int = in_channels
 
-        # Initial convolution layer
-        # NOTE: Smaller kernel and no stride/pooling for 32x32 inputs
+        # Initial convolution layer (7x7 conv with stride=2)
         self.conv1 = nn.Conv2d(
-            in_channels, 64, kernel_size=3, stride=1, padding=1, bias=False
+            in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False
         )
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
-        # No max pooling for CIFAR (small images)
+        
+        # Max pooling layer (3x3 with stride=2)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         # Residual layers
         self.layer1 = self._make_layer(64, self.layers[0], stride=1)
@@ -263,6 +272,7 @@ class ResNetBase(nn.Module, ABC):
 
         Args:
             x: Input tensor of shape (N, C, H, W).
+               Typically (N, 3, 224, 224) for ImageNet.
 
         Returns:
             Output logits of shape (N, num_classes).
@@ -270,6 +280,7 @@ class ResNetBase(nn.Module, ABC):
         out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
+        out = self.maxpool(out)
 
         out = self.layer1(out)
         out = self.layer2(out)
