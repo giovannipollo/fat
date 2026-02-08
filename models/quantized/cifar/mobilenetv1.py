@@ -14,7 +14,6 @@ import torch
 import torch.nn as nn
 import brevitas.nn as qnn
 
-from brevitas.quant import IntBias
 from utils.weight_quant import CommonIntWeightPerChannelQuant
 from utils.weight_quant import CommonIntWeightPerTensorQuant
 from utils.weight_quant import CommonUintActQuant
@@ -56,8 +55,9 @@ class QuantDepthwiseSeparableBlock(nn.Module):
             bias=False,
             weight_quant=weight_quant,
             weight_bit_width=weight_bit_width,
+            return_quant_tensor=True,
         )
-        self.bn1 = nn.BatchNorm2d(in_planes)
+        self.bn1 = nn.BatchNorm2d(num_features=in_planes)
 
         # Pointwise convolution
         self.conv2 = qnn.QuantConv2d(
@@ -69,9 +69,14 @@ class QuantDepthwiseSeparableBlock(nn.Module):
             bias=False,
             weight_quant=weight_quant,
             weight_bit_width=weight_bit_width,
+            return_quant_tensor=True,
         )
-        self.bn2 = nn.BatchNorm2d(out_planes)
-        self.relu = qnn.QuantReLU(act_quant=CommonUintActQuant, bit_width=act_bit_width)
+        self.bn2 = nn.BatchNorm2d(num_features=out_planes)
+        self.relu = qnn.QuantReLU(
+            act_quant=CommonUintActQuant,
+            bit_width=act_bit_width,
+            return_quant_tensor=True,
+        )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass through depthwise separable block.
@@ -82,7 +87,7 @@ class QuantDepthwiseSeparableBlock(nn.Module):
         Returns:
             Output tensor of shape (N, C_out, H', W').
         """
-        out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
         out = self.relu(self.bn2(self.conv2(out)))
         return out
 
@@ -140,7 +145,6 @@ class QuantMobileNetV1(nn.Module):
         self.in_channels: int = in_channels
 
         # Initial Conv Layer
-        # NOTE: Stride is 1 here (vs 2 in ImageNet) to preserve resolution for 32x32 inputs
         self.conv1 = qnn.QuantConv2d(
             in_channels=in_channels,
             out_channels=32,
@@ -150,9 +154,14 @@ class QuantMobileNetV1(nn.Module):
             bias=False,
             weight_quant=weight_quant,
             weight_bit_width=in_weight_bit_width,
+            return_quant_tensor=True,
         )
-        self.bn1 = nn.BatchNorm2d(32)
-        self.relu = qnn.QuantReLU(act_quant=CommonUintActQuant, bit_width=act_bit_width)
+        self.bn1 = nn.BatchNorm2d(num_features=32)
+        self.relu = qnn.QuantReLU(
+            act_quant=CommonUintActQuant,
+            bit_width=act_bit_width,
+            return_quant_tensor=True,
+        )
 
         # MobileNet Body
         self.layers = self._make_layers(
@@ -168,7 +177,7 @@ class QuantMobileNetV1(nn.Module):
             out_features=num_classes,
             bias=False,
             weight_quant=CommonIntWeightPerTensorQuant,
-            weight_bit_width=last_layer_bit_width,
+            weight_bit_width=last_layer_bit_width
         )
 
     def _make_layers(
@@ -206,7 +215,7 @@ class QuantMobileNetV1(nn.Module):
         Returns:
             Output logits of shape (N, num_classes).
         """
-        out: torch.Tensor = self.relu(self.bn1(self.conv1(x)))
+        out = self.relu(self.bn1(self.conv1(x)))
         out = self.layers(out)
         out = torch.nn.functional.avg_pool2d(out, 2)
         out = out.view(out.size(0), -1)

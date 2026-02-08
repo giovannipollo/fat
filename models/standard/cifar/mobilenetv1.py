@@ -33,21 +33,26 @@ class DepthwiseSeparableBlock(nn.Module):
         super().__init__()
         # Depthwise convolution
         self.conv1 = nn.Conv2d(
-            in_planes,
-            in_planes,
+            in_channels=in_planes,
+            out_channels=in_planes,
             kernel_size=3,
             stride=stride,
             padding=1,
             groups=in_planes,
             bias=False,
         )
-        self.bn1 = nn.BatchNorm2d(in_planes)
+        self.bn1 = nn.BatchNorm2d(num_features=in_planes)
 
         # Pointwise convolution
         self.conv2 = nn.Conv2d(
-            in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False
+            in_channels=in_planes,
+            out_channels=out_planes,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            bias=False,
         )
-        self.bn2 = nn.BatchNorm2d(out_planes)
+        self.bn2 = nn.BatchNorm2d(num_features=out_planes)
         self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -108,18 +113,22 @@ class MobileNetV1(nn.Module):
         self.in_channels: int = in_channels
 
         # Initial Conv Layer
-        # NOTE: Stride is 1 here (vs 2 in ImageNet) to preserve resolution for 32x32 inputs
         self.conv1 = nn.Conv2d(
-            in_channels, 32, kernel_size=3, stride=1, padding=1, bias=False
+            in_channels=in_channels,
+            out_channels=32,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
-        self.bn1 = nn.BatchNorm2d(32)
+        self.bn1 = nn.BatchNorm2d(num_features=32)
         self.relu = nn.ReLU(inplace=True)
 
         # MobileNet Body
         self.layers = self._make_layers(in_planes=32)
 
         # Classifier
-        self.linear = nn.Linear(1024, num_classes)
+        self.linear = nn.Linear(in_features=1024, out_features=num_classes)
 
     def _make_layers(self, in_planes: int) -> nn.Sequential:
         """Build the sequence of depthwise separable blocks.
@@ -132,7 +141,11 @@ class MobileNetV1(nn.Module):
         """
         layers: List[nn.Module] = []
         for out_planes, stride in self.CFG:
-            layers.append(DepthwiseSeparableBlock(in_planes, out_planes, stride))
+            layers.append(
+                DepthwiseSeparableBlock(
+                    in_planes=in_planes, out_planes=out_planes, stride=stride
+                )
+            )
             in_planes = out_planes
         return nn.Sequential(*layers)
 
