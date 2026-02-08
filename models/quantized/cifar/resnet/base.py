@@ -1,4 +1,4 @@
-"""ResNet base classes for CIFAR-specific architectures.
+"""Quantized ResNet base classes for CIFAR-specific architectures.
 
 Implements the CIFAR-specific ResNet architecture from the original paper
 (Section 4.2), which differs from the ImageNet version in structure and size.
@@ -12,13 +12,17 @@ from typing import ClassVar, List, Optional
 
 import torch
 import torch.nn as nn
+import brevitas.nn as qnn
+
+from utils.weight_quant import CommonIntWeightPerChannelQuant
+from utils.weight_quant import CommonIntWeightPerTensorQuant
 
 
-class BasicBlock(nn.Module):
-    """Basic residual block for CIFAR ResNets.
+class QuantBasicBlock(nn.Module):
+    """Quantized basic residual block for CIFAR ResNets.
 
-    Two 3x3 convolutions with batch normalization and skip connection.
-    No channel expansion (expansion = 1).
+    Two 3x3 convolutions with batch normalization,
+    quantized ReLU activations, and skip connection.
     """
 
     #: Output channel expansion factor (1 for basic block)
@@ -30,36 +34,48 @@ class BasicBlock(nn.Module):
         planes: int,
         stride: int = 1,
         downsample: Optional[nn.Module] = None,
+        weight_bit_width: int = 8,
+        act_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ):
-        """Initialize basic residual block.
+        """Initialize quantized basic residual block.
 
         Args:
             in_planes: Number of input channels.
             planes: Number of output channels.
-            stride: Stride for first convolution (for downsampling).
+            stride: Stride for first convolution.
             downsample: Optional downsampling layer for skip connection.
+            weight_bit_width: Bit width for weight quantization.
+            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
-        self.conv1 = nn.Conv2d(
+        self.conv1 = qnn.QuantConv2d(
             in_channels=in_planes,
             out_channels=planes,
             kernel_size=3,
             stride=stride,
             padding=1,
             bias=False,
+            weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
+            return_quant_tensor=True,
         )
         self.bn1 = nn.BatchNorm2d(num_features=planes)
-        self.relu = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(
+        self.relu1 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
+
+        self.conv2 = qnn.QuantConv2d(
             in_channels=planes,
             out_channels=planes,
             kernel_size=3,
             stride=1,
             padding=1,
             bias=False,
+            weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
+            return_quant_tensor=True,
         )
         self.bn2 = nn.BatchNorm2d(num_features=planes)
-        self.relu2 = nn.ReLU(inplace=True)
+        self.relu2 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.downsample = downsample
 
@@ -76,7 +92,7 @@ class BasicBlock(nn.Module):
 
         out: torch.Tensor = self.conv1(x)
         out = self.bn1(out)
-        out = self.relu(out)
+        out = self.relu1(out)
 
         out = self.conv2(out)
         out = self.bn2(out)
@@ -90,8 +106,8 @@ class BasicBlock(nn.Module):
         return out
 
 
-class ResNetCIFAR(nn.Module):
-    """CIFAR-specific ResNet architecture.
+class QuantResNetCIFAR(nn.Module):
+    """Quantized CIFAR-specific ResNet architecture.
 
     Follows the original paper's CIFAR-10 architecture:
     - Initial conv: 3x3, 16 filters, no pooling
@@ -110,43 +126,72 @@ class ResNetCIFAR(nn.Module):
         num_blocks: int,
         num_classes: int = 10,
         in_channels: int = 3,
+        in_weight_bit_width: int = 8,
+        weight_bit_width: int = 8,
+        act_bit_width: int = 8,
+        first_layer_weight_quant=CommonIntWeightPerChannelQuant,
+        weight_quant=CommonIntWeightPerChannelQuant,
+        last_layer_weight_quant=CommonIntWeightPerTensorQuant,
     ):
-        """Initialize CIFAR ResNet.
+        """Initialize quantized CIFAR ResNet.
 
         Args:
             num_blocks: Number of blocks per stage (n in the paper).
             num_classes: Number of output classes.
             in_channels: Number of input channels (3=RGB, 1=grayscale).
+            in_weight_bit_width: Bit width for input weight quantization.
+            weight_bit_width: Bit width for weight quantization.
+            act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
         self.in_planes: int = 16
+        self.in_weight_bit_width = in_weight_bit_width
+        self.weight_bit_width = weight_bit_width
+        self.act_bit_width = act_bit_width
 
-        # Initial convolution
-        self.conv1 = nn.Conv2d(
+        self.quant_inp = qnn.QuantIdentity(bit_width=act_bit_width)
+
+        self.conv1 = qnn.QuantConv2d(
             in_channels=in_channels,
             out_channels=16,
             kernel_size=3,
             stride=1,
             padding=1,
             bias=False,
+            weight_bit_width=in_weight_bit_width,
+            weight_quant=first_layer_weight_quant,
+            return_quant_tensor=True,
         )
         self.bn1 = nn.BatchNorm2d(num_features=16)
-        self.relu = nn.ReLU(inplace=True)
+        self.relu = qnn.QuantReLU(
+            bit_width=self.act_bit_width, return_quant_tensor=True
+        )
 
-        # Three stages with increasing filter counts
-        self.layer1 = self._make_layer(planes=16, num_blocks=num_blocks, stride=1)
-        self.layer2 = self._make_layer(planes=32, num_blocks=num_blocks, stride=2)
-        self.layer3 = self._make_layer(planes=64, num_blocks=num_blocks, stride=2)
+        self.layer1 = self._make_layer(
+            planes=16, num_blocks=num_blocks, stride=1, weight_quant=weight_quant
+        )
+        self.layer2 = self._make_layer(
+            planes=32, num_blocks=num_blocks, stride=2, weight_quant=weight_quant
+        )
+        self.layer3 = self._make_layer(
+            planes=64, num_blocks=num_blocks, stride=2, weight_quant=weight_quant
+        )
 
-        # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(in_features=64, out_features=num_classes)
+        self.fc = qnn.QuantLinear(
+            in_features=64,
+            out_features=num_classes,
+            bias=True,
+            weight_bit_width=weight_bit_width,
+            weight_quant=last_layer_weight_quant,
+        )
 
-        # Weight initialization
         self._initialize_weights()
 
-    def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
-        """Build a stage of residual blocks.
+    def _make_layer(
+        self, planes: int, num_blocks: int, stride: int, weight_quant
+    ) -> nn.Sequential:
+        """Build a stage of quantized residual blocks.
 
         Args:
             planes: Number of output channels.
@@ -159,42 +204,56 @@ class ResNetCIFAR(nn.Module):
         downsample: Optional[nn.Module] = None
         if stride != 1 or self.in_planes != planes:
             downsample = nn.Sequential(
-                nn.Conv2d(
+                qnn.QuantConv2d(
                     in_channels=self.in_planes,
                     out_channels=planes,
                     kernel_size=1,
                     stride=stride,
                     bias=False,
+                    weight_bit_width=self.weight_bit_width,
+                    weight_quant=weight_quant,
+                    return_quant_tensor=True,
                 ),
-                nn.BatchNorm2d(num_features=planes),
+                nn.BatchNorm2d(planes),
             )
 
         layers: List[nn.Module] = []
         layers.append(
-            BasicBlock(
+            QuantBasicBlock(
                 in_planes=self.in_planes,
                 planes=planes,
                 stride=stride,
                 downsample=downsample,
+                weight_bit_width=self.weight_bit_width,
+                act_bit_width=self.act_bit_width,
+                weight_quant=weight_quant,
             )
         )
         self.in_planes = planes
         for _ in range(1, num_blocks):
-            layers.append(BasicBlock(in_planes=self.in_planes, planes=planes))
+            layers.append(
+                QuantBasicBlock(
+                    in_planes=self.in_planes,
+                    planes=planes,
+                    weight_bit_width=self.weight_bit_width,
+                    act_bit_width=self.act_bit_width,
+                    weight_quant=weight_quant,
+                )
+            )
 
         return nn.Sequential(*layers)
 
     def _initialize_weights(self) -> None:
         """Initialize weights using Kaiming initialization."""
         for m in self.modules():
-            if isinstance(m, nn.Conv2d):
+            if isinstance(m, qnn.QuantConv2d):
                 nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Forward pass through ResNet.
+        """Forward pass through quantized ResNet.
 
         Args:
             x: Input tensor of shape (N, C, H, W).
@@ -202,7 +261,8 @@ class ResNetCIFAR(nn.Module):
         Returns:
             Output logits of shape (N, num_classes).
         """
-        out: torch.Tensor = self.conv1(x)
+        out: torch.Tensor = self.quant_inp(x)
+        out = self.conv1(out)
         out = self.bn1(out)
         out = self.relu(out)
 
