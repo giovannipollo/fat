@@ -26,6 +26,7 @@ from .cifar.resnet import (
     ResNet56,
     ResNet110,
 )
+from .imagenet.mobilenet import MobileNetV1 as MobileNetV1ImageNet
 from .imagenet.resnet import (
     BasicBlock,
     Bottleneck,
@@ -43,6 +44,7 @@ __all__ = [
     # MobileNet
     "MobileNetV1",
     "MobileNetV1Finn",
+    "MobileNetV1ImageNet",
     # ResNet CIFAR
     "CIFARBasicBlock",
     "ResNetCIFAR",

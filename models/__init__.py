@@ -22,6 +22,7 @@ from .standard import (
     CNV,
     MobileNetV1,
     MobileNetV1Finn,
+    MobileNetV1ImageNet,
     ResNet20,
     ResNet32,
     ResNet44,
@@ -56,9 +57,6 @@ ModelType = Union[Type[nn.Module], Callable[..., nn.Module]]
 MODELS: Dict[str, ModelType] = {
     # CNV
     "cnv": CNV,
-    # MobileNet
-    "mobilenetv1": MobileNetV1,
-    "mobilenetv1_finn": MobileNetV1Finn,
     # ResNet (CIFAR-specific)
     "resnet20": ResNet20,
     "resnet32": ResNet32,
@@ -93,6 +91,15 @@ QUANT_MODELS: Dict[str, ModelType] = {
 """Registry mapping quantized model names to their implementation classes."""
 
 DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
+    "mobilenetv1": {
+        "cifar10": "MobileNetV1",
+        "cifar100": "MobileNetV1",
+        "imagenet": "MobileNetV1ImageNet",
+    },
+    "mobilenetv1_finn": {
+        "cifar10": "MobileNetV1Finn",
+        "cifar100": "MobileNetV1Finn",
+    },
     "quant_mobilenetv1_finn": {
         "cifar10": "QuantMobileNetV1FinnCIFAR",
         "cifar100": "QuantMobileNetV1FinnCIFAR",
@@ -106,6 +113,9 @@ DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
 """Mapping of model variants by dataset. Used to resolve base model names to implementation classes based on dataset."""
 
 INTERNAL_REGISTRY: Dict[str, ModelType] = {
+    "MobileNetV1": MobileNetV1,
+    "MobileNetV1ImageNet": MobileNetV1ImageNet,
+    "MobileNetV1Finn": MobileNetV1Finn,
     "QuantMobileNetV1FinnCIFAR": QuantMobileNetV1FinnCIFAR,
     "QuantMobileNetV1FinnImageNet": QuantMobileNetV1FinnImageNet,
     "QuantMobileNetV1CIFAR": QuantMobileNetV1CIFAR,

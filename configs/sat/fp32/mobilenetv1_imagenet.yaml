@@ -1,0 +1,49 @@
+# MobileNetV1 on ImageNet-1K (FP32)
+# Standard ImageNet MobileNetV1 with proper stride=2 architecture
+# Expected accuracy: ~70-72% top-1 after 90 epochs
+# Parameters: ~4.2M
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "imagenet"
+  root: "/space/pollo/imagenet/2012"
+  download: false
+  num_workers: 8
+
+model:
+  name: "mobilenetv1"
+  num_classes: 1000
+
+training:
+  batch_size: 512
+  epochs: 90
+
+optimizer:
+  name: "sgd"
+  learning_rate: 0.1
+  momentum: 0.9
+  weight_decay: 0.0001
+
+scheduler:
+  name: "step"
+  step_size: 30
+  gamma: 0.1
+
+amp:
+  enabled: true
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true
