@@ -8,9 +8,10 @@ See: https://arxiv.org/abs/1704.04861
 
 from __future__ import annotations
 
-from .mobilenetv1 import DepthwiseSeparableBlock, MobileNetV1
+from .mobilenetv1 import MobileNetV1 as MobileNetV1ImageNet
+from .mobilenetv1 import DepthwiseSeparableBlock
 
 __all__ = [
     "DepthwiseSeparableBlock",
-    "MobileNetV1",
+    "MobileNetV1ImageNet",
 ]

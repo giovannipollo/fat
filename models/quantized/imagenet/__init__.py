@@ -6,7 +6,7 @@ designs with configurable bit-width quantization using Brevitas.
 
 from __future__ import annotations
 
-from .mobilenetv1_finn import QuantMobileNetV1Finn
+from .mobilenet import QuantMobileNetV1ImageNet, QuantMobileNetV1FinnImageNet
 from .resnet import (
     QuantBasicBlock,
     QuantBottleneck,
@@ -19,7 +19,8 @@ from .resnet import (
 )
 
 __all__ = [
-    "QuantMobileNetV1Finn",
+    "QuantMobileNetV1ImageNet",
+    "QuantMobileNetV1FinnImageNet",
     "QuantBasicBlock",
     "QuantBottleneck",
     "QuantResNetBase",

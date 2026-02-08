@@ -25,7 +25,7 @@ from .imagenet.resnet import (
 )
 from .cifar import QuantMobileNetV1Finn as QuantMobileNetV1FinnCIFAR, QuantCNV
 from .cifar import QuantMobileNetV1 as QuantMobileNetV1CIFAR
-from .imagenet import QuantMobileNetV1Finn as QuantMobileNetV1FinnImageNet
+from .imagenet import QuantMobileNetV1ImageNet, QuantMobileNetV1FinnImageNet
 
 __all__ = [
     # ResNet CIFAR
@@ -41,9 +41,10 @@ __all__ = [
     "QuantResNet101",
     "QuantResNet152",
     # MobileNet
-    "QuantMobileNetV1FinnCIFAR",
-    "QuantMobileNetV1FinnImageNet",
     "QuantMobileNetV1CIFAR",
+    "QuantMobileNetV1FinnCIFAR",
+    "QuantMobileNetV1ImageNet",
+    "QuantMobileNetV1FinnImageNet",
     # CNV
     "QuantCNV",
 ]
