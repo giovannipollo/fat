@@ -1,12 +1,16 @@
-"""Quantized ImageNet-style models.
+"""Quantized classical ImageNet models.
 
-Quantized versions of ImageNet architectures adapted for small images.
+Quantized versions of ImageNet architectures following the original
+designs with configurable bit-width quantization using Brevitas.
 """
 
 from __future__ import annotations
 
 from .mobilenetv1_finn import QuantMobileNetV1Finn
 from .resnet import (
+    QuantBasicBlock,
+    QuantBottleneck,
+    QuantResNetBase,
     QuantResNet18,
     QuantResNet34,
     QuantResNet50,
@@ -16,6 +20,9 @@ from .resnet import (
 
 __all__ = [
     "QuantMobileNetV1Finn",
+    "QuantBasicBlock",
+    "QuantBottleneck",
+    "QuantResNetBase",
     "QuantResNet18",
     "QuantResNet34",
     "QuantResNet50",
