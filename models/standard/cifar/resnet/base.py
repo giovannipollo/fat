@@ -41,14 +41,24 @@ class BasicBlock(nn.Module):
         """
         super().__init__()
         self.conv1 = nn.Conv2d(
-            in_planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
+            in_channels=in_planes,
+            out_channels=planes,
+            kernel_size=3,
+            stride=stride,
+            padding=1,
+            bias=False,
         )
-        self.bn1 = nn.BatchNorm2d(planes)
+        self.bn1 = nn.BatchNorm2d(num_features=planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = nn.Conv2d(
-            planes, planes, kernel_size=3, stride=1, padding=1, bias=False
+            in_channels=planes,
+            out_channels=planes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.BatchNorm2d(num_features=planes)
         self.downsample = downsample
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -111,9 +121,14 @@ class ResNetCIFAR(nn.Module):
 
         # Initial convolution
         self.conv1 = nn.Conv2d(
-            in_channels, 16, kernel_size=3, stride=1, padding=1, bias=False
+            in_channels=in_channels,
+            out_channels=16,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False,
         )
-        self.bn1 = nn.BatchNorm2d(16)
+        self.bn1 = nn.BatchNorm2d(num_features=16)
         self.relu = nn.ReLU(inplace=True)
 
         # Three stages with increasing filter counts
@@ -123,7 +138,7 @@ class ResNetCIFAR(nn.Module):
 
         # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc = nn.Linear(64, num_classes)
+        self.fc = nn.Linear(in_features=64, out_features=num_classes)
 
         # Weight initialization
         self._initialize_weights()
@@ -143,16 +158,27 @@ class ResNetCIFAR(nn.Module):
         if stride != 1 or self.in_planes != planes:
             downsample = nn.Sequential(
                 nn.Conv2d(
-                    self.in_planes, planes, kernel_size=1, stride=stride, bias=False
+                    in_channels=self.in_planes,
+                    out_channels=planes,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
                 ),
-                nn.BatchNorm2d(planes),
+                nn.BatchNorm2d(num_features=planes),
             )
 
         layers: List[nn.Module] = []
-        layers.append(BasicBlock(self.in_planes, planes, stride, downsample))
+        layers.append(
+            BasicBlock(
+                in_planes=self.in_planes,
+                out_planes=planes,
+                stride=stride,
+                downsample=downsample,
+            )
+        )
         self.in_planes = planes
         for _ in range(1, num_blocks):
-            layers.append(BasicBlock(self.in_planes, planes))
+            layers.append(BasicBlock(in_planes=self.in_planes, out_planes=planes))
 
         return nn.Sequential(*layers)
 

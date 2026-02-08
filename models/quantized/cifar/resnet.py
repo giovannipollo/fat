@@ -196,14 +196,23 @@ class QuantResNetCIFAR(nn.Module):
         self.relu = self._make_quant_relu(bit_width=self.act_bit_width)
 
         # Three stages with increasing filter counts
-        self.layer1 = self._make_layer(planes=16, num_blocks=num_blocks, stride=1, weight_quant=weight_quant)
-        self.layer2 = self._make_layer(planes=32, num_blocks=num_blocks, stride=2, weight_quant=weight_quant)
-        self.layer3 = self._make_layer(planes=64, num_blocks=num_blocks, stride=2, weight_quant=weight_quant)
+        self.layer1 = self._make_layer(
+            planes=16, num_blocks=num_blocks, stride=1, weight_quant=weight_quant
+        )
+        self.layer2 = self._make_layer(
+            planes=32, num_blocks=num_blocks, stride=2, weight_quant=weight_quant
+        )
+        self.layer3 = self._make_layer(
+            planes=64, num_blocks=num_blocks, stride=2, weight_quant=weight_quant
+        )
 
         # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = self._make_quant_linear(
-            in_features=64, out_features=num_classes, weight_bit_width=weight_bit_width, weight_quant=last_layer_weight_quant
+            in_features=64,
+            out_features=num_classes,
+            weight_bit_width=weight_bit_width,
+            weight_quant=last_layer_weight_quant,
         )
 
         # Weight initialization
@@ -267,7 +276,11 @@ class QuantResNetCIFAR(nn.Module):
         return qnn.QuantReLU(bit_width=bit_width, return_quant_tensor=True)
 
     def _make_quant_linear(
-        self, in_features: int, out_features: int, weight_bit_width: int = 8, weight_quant=CommonIntWeightPerTensorQuant
+        self,
+        in_features: int,
+        out_features: int,
+        weight_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerTensorQuant,
     ) -> qnn.QuantLinear:
         """Create quantized linear layer.
 
@@ -280,10 +293,16 @@ class QuantResNetCIFAR(nn.Module):
             Quantized linear layer.
         """
         return qnn.QuantLinear(
-            in_features=in_features, out_features=out_features, bias=True, weight_bit_width=weight_bit_width, weight_quant=weight_quant
+            in_features=in_features,
+            out_features=out_features,
+            bias=True,
+            weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
         )
 
-    def _make_layer(self, planes: int, num_blocks: int, stride: int, weight_quant) -> nn.Sequential:
+    def _make_layer(
+        self, planes: int, num_blocks: int, stride: int, weight_quant
+    ) -> nn.Sequential:
         """Build a stage of quantized residual blocks.
 
         Args:
@@ -390,7 +409,12 @@ def QuantResNet20(
         Quantized ResNet-20 model.
     """
     return QuantResNetCIFAR(
-        num_blocks=3, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
+        num_blocks=3,
+        num_classes=num_classes,
+        in_channels=in_channels,
+        in_weight_bit_width=in_weight_bit_width,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -404,7 +428,12 @@ def QuantResNet32(
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-32 for CIFAR."""
     return QuantResNetCIFAR(
-        num_blocks=5, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
+        num_blocks=5,
+        num_classes=num_classes,
+        in_channels=in_channels,
+        in_weight_bit_width=in_weight_bit_width,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -418,7 +447,12 @@ def QuantResNet44(
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-44 for CIFAR."""
     return QuantResNetCIFAR(
-        num_blocks=7, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
+        num_blocks=7,
+        num_classes=num_classes,
+        in_channels=in_channels,
+        in_weight_bit_width=in_weight_bit_width,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -432,7 +466,12 @@ def QuantResNet56(
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-56 for CIFAR."""
     return QuantResNetCIFAR(
-        num_blocks=9, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
+        num_blocks=9,
+        num_classes=num_classes,
+        in_channels=in_channels,
+        in_weight_bit_width=in_weight_bit_width,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
 
 
@@ -446,5 +485,10 @@ def QuantResNet110(
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-110 for CIFAR."""
     return QuantResNetCIFAR(
-        num_blocks=18, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
+        num_blocks=18,
+        num_classes=num_classes,
+        in_channels=in_channels,
+        in_weight_bit_width=in_weight_bit_width,
+        weight_bit_width=weight_bit_width,
+        act_bit_width=act_bit_width,
     )
