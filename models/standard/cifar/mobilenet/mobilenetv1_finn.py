@@ -152,7 +152,7 @@ class QuantDwsConvBlock(nn.Module):
         return x
 
 
-class MobileNetV1Finn(nn.Module):
+class MobileNetV1FinnCIFAR(nn.Module):
     """Quantized MobileNetV1 optimized for hardware deployment.
 
     Uses per-channel weight quantization (CommonIntWeightPerChannelQuant)

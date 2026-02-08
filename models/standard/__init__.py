@@ -15,8 +15,8 @@ Organized by dataset type:
 from __future__ import annotations
 
 from .cifar.cnv import CNV
-from .cifar.mobilenet import MobileNetV1
-from .cifar.mobilenet import MobileNetV1Finn
+from .cifar.mobilenet import MobileNetV1CIFAR
+from .cifar.mobilenet import MobileNetV1FinnCIFAR
 from .cifar.resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,
@@ -42,8 +42,8 @@ __all__ = [
     # CNV
     "CNV",
     # MobileNet
-    "MobileNetV1",
-    "MobileNetV1Finn",
+    "MobileNetV1CIFAR",
+    "MobileNetV1FinnCIFAR",
     "MobileNetV1ImageNet",
     # ResNet CIFAR
     "CIFARBasicBlock",

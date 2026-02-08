@@ -20,8 +20,8 @@ import torch.nn as nn
 
 from .standard import (
     CNV,
-    MobileNetV1,
-    MobileNetV1Finn,
+    MobileNetV1CIFAR,
+    MobileNetV1FinnCIFAR,
     MobileNetV1ImageNet,
     ResNet20,
     ResNet32,
@@ -93,31 +93,31 @@ QUANT_MODELS: Dict[str, ModelType] = {
 
 DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
     "mobilenetv1": {
-        "cifar10": "MobileNetV1",
-        "cifar100": "MobileNetV1",
+        "cifar10": "MobileNetV1CIFAR",
+        "cifar100": "MobileNetV1CIFAR",
         "imagenet": "MobileNetV1ImageNet",
     },
     "mobilenetv1_finn": {
-        "cifar10": "MobileNetV1Finn",
-        "cifar100": "MobileNetV1Finn",
-    },
-    "quant_mobilenetv1_finn": {
-        "cifar10": "QuantMobileNetV1FinnCIFAR",
-        "cifar100": "QuantMobileNetV1FinnCIFAR",
-        "imagenet": "QuantMobileNetV1FinnImageNet",
+        "cifar10": "MobileNetV1FinnCIFAR",
+        "cifar100": "MobileNetV1FinnCIFAR",
     },
     "quant_mobilenetv1": {
         "cifar10": "QuantMobileNetV1CIFAR",
         "cifar100": "QuantMobileNetV1CIFAR",
         "imagenet": "QuantMobileNetV1ImageNet",
     },
+    "quant_mobilenetv1_finn": {
+        "cifar10": "QuantMobileNetV1FinnCIFAR",
+        "cifar100": "QuantMobileNetV1FinnCIFAR",
+        "imagenet": "QuantMobileNetV1FinnImageNet",
+    }
 }
 """Mapping of model variants by dataset. Used to resolve base model names to implementation classes based on dataset."""
 
 INTERNAL_REGISTRY: Dict[str, ModelType] = {
-    "MobileNetV1": MobileNetV1,
+    "MobileNetV1CIFAR": MobileNetV1CIFAR,
+    "MobileNetV1FinnCIFAR": MobileNetV1FinnCIFAR,
     "MobileNetV1ImageNet": MobileNetV1ImageNet,
-    "MobileNetV1Finn": MobileNetV1Finn,
     "QuantMobileNetV1CIFAR": QuantMobileNetV1CIFAR,
     "QuantMobileNetV1FinnCIFAR": QuantMobileNetV1FinnCIFAR,
     "QuantMobileNetV1ImageNet": QuantMobileNetV1ImageNet,

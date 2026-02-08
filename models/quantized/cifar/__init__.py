@@ -14,8 +14,8 @@ from .resnet import (
     QuantResNet56,
     QuantResNet110,
 )
-from .mobilenetv1_finn import QuantMobileNetV1Finn
-from .mobilenetv1 import QuantMobileNetV1
+from .mobilenet.mobilenetv1_finn import QuantMobileNetV1Finn
+from .mobilenet.mobilenetv1 import QuantMobileNetV1
 from .cnv import QuantCNV
 
 __all__ = [

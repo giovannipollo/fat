@@ -69,7 +69,7 @@ class DepthwiseSeparableBlock(nn.Module):
         return out
 
 
-class MobileNetV1(nn.Module):
+class MobileNetV1CIFAR(nn.Module):
     """MobileNetV1 adapted for small images.
 
     Modified from the original ImageNet architecture:
