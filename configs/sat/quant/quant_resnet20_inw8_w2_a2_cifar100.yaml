@@ -1,10 +1,11 @@
+
 seed:
   enabled: true
   value: 42
   deterministic: false
 
 dataset:
-  name: "cifar10"
+  name: "cifar100"
   root: "./data"
   download: true
   num_workers: 4
@@ -15,8 +16,8 @@ model:
 # Quantization settings (Brevitas)
 quantization:
   in_weight_bit_width: 8  # Bit width for input quantization
-  weight_bit_width: 4   # Bit width for weight quantization
-  act_bit_width: 4      # Bit width for activation quantization
+  weight_bit_width: 2   # Bit width for weight quantization
+  act_bit_width: 2      # Bit width for activation quantization
 
 loss:
   name: "sqr_hinge"

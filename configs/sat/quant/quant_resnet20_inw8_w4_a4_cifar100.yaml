@@ -4,7 +4,7 @@ seed:
   deterministic: false
 
 dataset:
-  name: "cifar10"
+  name: "cifar100"
   root: "./data"
   download: true
   num_workers: 4

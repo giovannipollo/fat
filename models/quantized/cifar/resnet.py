@@ -12,6 +12,9 @@ import torch
 import torch.nn as nn
 import brevitas.nn as qnn
 
+from utils.weight_quant import CommonIntWeightPerChannelQuant
+from utils.weight_quant import CommonIntWeightPerTensorQuant
+
 
 class QuantBasicBlock(nn.Module):
     """Quantized basic residual block for CIFAR ResNets.
@@ -30,6 +33,7 @@ class QuantBasicBlock(nn.Module):
         downsample: Optional[nn.Module] = None,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ):
         """Initialize quantized basic residual block.
 
@@ -43,26 +47,28 @@ class QuantBasicBlock(nn.Module):
         """
         super().__init__()
         self.conv1 = self._make_quant_conv2d(
-            in_planes,
-            planes,
+            in_channels=in_planes,
+            out_channels=planes,
             kernel_size=3,
             stride=stride,
             padding=1,
             weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
         )
-        self.bn1 = nn.BatchNorm2d(planes)
-        self.relu1 = self._make_quant_relu(act_bit_width)
+        self.bn1 = nn.BatchNorm2d(num_features=planes)
+        self.relu1 = self._make_quant_relu(bit_width=act_bit_width)
 
         self.conv2 = self._make_quant_conv2d(
-            planes,
-            planes,
+            in_channels=planes,
+            out_channels=planes,
             kernel_size=3,
             stride=1,
             padding=1,
             weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
         )
-        self.bn2 = nn.BatchNorm2d(planes)
-        self.relu2 = self._make_quant_relu(act_bit_width)
+        self.bn2 = nn.BatchNorm2d(num_features=planes)
+        self.relu2 = self._make_quant_relu(bit_width=act_bit_width)
 
         self.downsample = downsample
 
@@ -74,6 +80,7 @@ class QuantBasicBlock(nn.Module):
         stride: int = 1,
         padding: int = 0,
         weight_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ) -> qnn.QuantConv2d:
         """Create quantized convolution layer.
 
@@ -96,6 +103,8 @@ class QuantBasicBlock(nn.Module):
             padding=padding,
             bias=False,
             weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
+            return_quant_tensor=True,
         )
 
     def _make_quant_relu(self, bit_width: int = 8) -> qnn.QuantReLU:
@@ -107,7 +116,7 @@ class QuantBasicBlock(nn.Module):
         Returns:
             Quantized ReLU layer.
         """
-        return qnn.QuantReLU(bit_width=bit_width)
+        return qnn.QuantReLU(bit_width=bit_width, return_quant_tensor=True)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with residual connection.
@@ -148,8 +157,12 @@ class QuantResNetCIFAR(nn.Module):
         num_blocks: int,
         num_classes: int = 10,
         in_channels: int = 3,
+        in_weight_bit_width: int = 8,
         weight_bit_width: int = 8,
         act_bit_width: int = 8,
+        first_layer_weight_quant=CommonIntWeightPerChannelQuant,
+        weight_quant=CommonIntWeightPerChannelQuant,
+        last_layer_weight_quant=CommonIntWeightPerTensorQuant,
     ):
         """Initialize quantized CIFAR ResNet.
 
@@ -157,38 +170,38 @@ class QuantResNetCIFAR(nn.Module):
             num_blocks: Number of blocks per stage.
             num_classes: Number of output classes.
             in_channels: Number of input channels.
+            in_weight_bit_width: Bit width for input weight quantization.
             weight_bit_width: Bit width for weight quantization.
             act_bit_width: Bit width for activation quantization.
         """
         super().__init__()
         self.in_planes: int = 16
+        self.in_weight_bit_width = in_weight_bit_width
         self.weight_bit_width = weight_bit_width
         self.act_bit_width = act_bit_width
 
-        # Input quantization
-        self.quant_inp = self._make_quant_identity(act_bit_width)
-
         # Initial convolution
         self.conv1 = self._make_quant_conv2d(
-            in_channels,
-            16,
+            in_channels=in_channels,
+            out_channels=16,
             kernel_size=3,
             stride=1,
             padding=1,
-            weight_bit_width=weight_bit_width,
+            weight_bit_width=in_weight_bit_width,
+            weight_quant=first_layer_weight_quant,
         )
-        self.bn1 = nn.BatchNorm2d(16)
-        self.relu = self._make_quant_relu(act_bit_width)
+        self.bn1 = nn.BatchNorm2d(num_features=16)
+        self.relu = self._make_quant_relu(bit_width=self.act_bit_width)
 
         # Three stages with increasing filter counts
-        self.layer1 = self._make_layer(16, num_blocks, stride=1)
-        self.layer2 = self._make_layer(32, num_blocks, stride=2)
-        self.layer3 = self._make_layer(64, num_blocks, stride=2)
+        self.layer1 = self._make_layer(planes=16, num_blocks=num_blocks, stride=1, weight_quant=weight_quant)
+        self.layer2 = self._make_layer(planes=32, num_blocks=num_blocks, stride=2, weight_quant=weight_quant)
+        self.layer3 = self._make_layer(planes=64, num_blocks=num_blocks, stride=2, weight_quant=weight_quant)
 
         # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = self._make_quant_linear(
-            64, num_classes, weight_bit_width=weight_bit_width
+            in_features=64, out_features=num_classes, weight_bit_width=weight_bit_width, weight_quant=last_layer_weight_quant
         )
 
         # Weight initialization
@@ -213,6 +226,7 @@ class QuantResNetCIFAR(nn.Module):
         stride: int = 1,
         padding: int = 0,
         weight_bit_width: int = 8,
+        weight_quant=CommonIntWeightPerChannelQuant,
     ) -> qnn.QuantConv2d:
         """Create quantized convolution layer.
 
@@ -228,13 +242,15 @@ class QuantResNetCIFAR(nn.Module):
             Quantized convolution layer.
         """
         return qnn.QuantConv2d(
-            in_channels,
-            out_channels,
-            kernel_size,
+            in_channels=in_channels,
+            out_channels=out_channels,
+            kernel_size=kernel_size,
             stride=stride,
             padding=padding,
             bias=False,
             weight_bit_width=weight_bit_width,
+            weight_quant=weight_quant,
+            return_quant_tensor=True,
         )
 
     def _make_quant_relu(self, bit_width: int = 8) -> qnn.QuantReLU:
@@ -246,10 +262,10 @@ class QuantResNetCIFAR(nn.Module):
         Returns:
             Quantized ReLU layer.
         """
-        return qnn.QuantReLU(bit_width=bit_width)
+        return qnn.QuantReLU(bit_width=bit_width, return_quant_tensor=True)
 
     def _make_quant_linear(
-        self, in_features: int, out_features: int, weight_bit_width: int = 8
+        self, in_features: int, out_features: int, weight_bit_width: int = 8, weight_quant=CommonIntWeightPerTensorQuant
     ) -> qnn.QuantLinear:
         """Create quantized linear layer.
 
@@ -262,10 +278,10 @@ class QuantResNetCIFAR(nn.Module):
             Quantized linear layer.
         """
         return qnn.QuantLinear(
-            in_features, out_features, bias=True, weight_bit_width=weight_bit_width
+            in_features=in_features, out_features=out_features, bias=True, weight_bit_width=weight_bit_width, weight_quant=weight_quant
         )
 
-    def _make_layer(self, planes: int, num_blocks: int, stride: int) -> nn.Sequential:
+    def _make_layer(self, planes: int, num_blocks: int, stride: int, weight_quant) -> nn.Sequential:
         """Build a stage of quantized residual blocks.
 
         Args:
@@ -285,6 +301,7 @@ class QuantResNetCIFAR(nn.Module):
                     kernel_size=1,
                     stride=stride,
                     weight_bit_width=self.weight_bit_width,
+                    weight_quant=weight_quant,
                 ),
                 nn.BatchNorm2d(planes),
             )
@@ -292,22 +309,24 @@ class QuantResNetCIFAR(nn.Module):
         layers: List[nn.Module] = []
         layers.append(
             QuantBasicBlock(
-                self.in_planes,
-                planes,
-                stride,
-                downsample,
-                self.weight_bit_width,
-                self.act_bit_width,
+                in_planes=self.in_planes,
+                planes=planes,
+                stride=stride,
+                downsample=downsample,
+                weight_bit_width=self.weight_bit_width,
+                act_bit_width=self.act_bit_width,
+                weight_quant=weight_quant,
             )
         )
         self.in_planes = planes
         for _ in range(1, num_blocks):
             layers.append(
                 QuantBasicBlock(
-                    self.in_planes,
-                    planes,
+                    in_planes=self.in_planes,
+                    planes=planes,
                     weight_bit_width=self.weight_bit_width,
                     act_bit_width=self.act_bit_width,
+                    weight_quant=weight_quant,
                 )
             )
 
@@ -331,8 +350,7 @@ class QuantResNetCIFAR(nn.Module):
         Returns:
             Output logits of shape (N, num_classes).
         """
-        out = self.quant_inp(x)
-        out = self.conv1(out)
+        out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
 
@@ -350,6 +368,7 @@ class QuantResNetCIFAR(nn.Module):
 def QuantResNet20(
     num_classes: int = 10,
     in_channels: int = 3,
+    in_weight_bit_width: int = 8,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
     **kwargs,
@@ -359,6 +378,7 @@ def QuantResNet20(
     Args:
         num_classes: Number of output classes.
         in_channels: Number of input channels.
+        in_weight_bit_width: Bit width for input weight quantization.
         weight_bit_width: Bit width for weights.
         act_bit_width: Bit width for activations.
         **kwargs: Additional arguments (ignored).
@@ -367,57 +387,61 @@ def QuantResNet20(
         Quantized ResNet-20 model.
     """
     return QuantResNetCIFAR(
-        3, num_classes, in_channels, weight_bit_width, act_bit_width
+        num_blocks=3, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
     )
 
 
 def QuantResNet32(
     num_classes: int = 10,
     in_channels: int = 3,
+    in_weight_bit_width: int = 8,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
     **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-32 for CIFAR."""
     return QuantResNetCIFAR(
-        5, num_classes, in_channels, weight_bit_width, act_bit_width
+        num_blocks=5, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
     )
 
 
 def QuantResNet44(
     num_classes: int = 10,
     in_channels: int = 3,
+    in_weight_bit_width: int = 8,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
     **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-44 for CIFAR."""
     return QuantResNetCIFAR(
-        7, num_classes, in_channels, weight_bit_width, act_bit_width
+        num_blocks=7, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
     )
 
 
 def QuantResNet56(
     num_classes: int = 10,
     in_channels: int = 3,
+    in_weight_bit_width: int = 8,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
     **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-56 for CIFAR."""
     return QuantResNetCIFAR(
-        9, num_classes, in_channels, weight_bit_width, act_bit_width
+        num_blocks=9, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
     )
 
 
 def QuantResNet110(
     num_classes: int = 10,
     in_channels: int = 3,
+    in_weight_bit_width: int = 8,
     weight_bit_width: int = 8,
     act_bit_width: int = 8,
     **kwargs,
 ) -> QuantResNetCIFAR:
     """Create quantized ResNet-110 for CIFAR."""
     return QuantResNetCIFAR(
-        18, num_classes, in_channels, weight_bit_width, act_bit_width
+        num_blocks=18, num_classes=num_classes, in_channels=in_channels, in_weight_bit_width=in_weight_bit_width, weight_bit_width=weight_bit_width, act_bit_width=act_bit_width
     )
