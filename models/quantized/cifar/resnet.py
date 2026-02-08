@@ -180,6 +180,8 @@ class QuantResNetCIFAR(nn.Module):
         self.weight_bit_width = weight_bit_width
         self.act_bit_width = act_bit_width
 
+        self.quant_inp = self._make_quant_identity(act_bit_width)
+
         # Initial convolution
         self.conv1 = self._make_quant_conv2d(
             in_channels=in_channels,
@@ -350,7 +352,8 @@ class QuantResNetCIFAR(nn.Module):
         Returns:
             Output logits of shape (N, num_classes).
         """
-        out = self.conv1(x)
+        out = self.quant_inp(x)
+        out = self.conv1(out)
         out = self.bn1(out)
         out = self.relu(out)
 
