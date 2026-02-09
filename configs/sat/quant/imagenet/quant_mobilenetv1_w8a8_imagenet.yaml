@@ -1,0 +1,57 @@
+# Quantized MobileNetV1 on ImageNet-1K (W8A8 - 8-bit weights/activations)
+# Quantization-aware training (QAT) using Brevitas with FINN-style quantization
+# Higher precision quantization for better accuracy
+# Expected accuracy: ~68-72% top-1 after 120 epochs with W8A8 quantization
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "imagenet"
+  root: "./data/imagenet"
+  download: false
+  num_workers: 8
+
+model:
+  name: "quant_mobilenetv1"
+  num_classes: 1000
+
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 8
+  act_bit_width: 8
+
+training:
+  batch_size: 256
+  epochs: 120
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  momentum: 0.9
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 120
+  warmup_epochs: 5
+
+loss:
+  name: "cross_entropy"
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 20
+  save_best: true

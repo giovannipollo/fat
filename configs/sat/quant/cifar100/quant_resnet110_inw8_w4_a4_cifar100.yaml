@@ -1,0 +1,46 @@
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar100"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_resnet110"
+
+# Quantization settings (Brevitas)
+quantization:
+  in_weight_bit_width: 8  # Bit width for input quantization
+  weight_bit_width: 4   # Bit width for weight quantization
+  act_bit_width: 4      # Bit width for activation quantization
+
+loss:
+  name: "sqr_hinge"
+
+training:
+  batch_size: 256
+  epochs: 300
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.01
+  momentum: 0.9
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 300
+  warmup_epochs: 0
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 50
+  save_best: true
