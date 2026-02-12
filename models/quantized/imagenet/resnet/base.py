@@ -62,7 +62,7 @@ class QuantBasicBlock(nn.Module):
             weight_quant=weight_quant,
             return_quant_tensor=True,
         )
-        self.bn1 = nn.BatchNorm2d(planes)
+        self.bn1 = nn.BatchNorm2d(num_features=planes)
         self.relu1 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.conv2 = qnn.QuantConv2d(
@@ -76,7 +76,7 @@ class QuantBasicBlock(nn.Module):
             weight_quant=weight_quant,
             return_quant_tensor=True,
         )
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.BatchNorm2d(num_features=planes)
         self.relu2 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.downsample = downsample
@@ -150,7 +150,7 @@ class QuantBottleneck(nn.Module):
             weight_quant=weight_quant,
             return_quant_tensor=True,
         )
-        self.bn1 = nn.BatchNorm2d(planes)
+        self.bn1 = nn.BatchNorm2d(num_features=planes)
         self.relu1 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.conv2 = qnn.QuantConv2d(
@@ -164,7 +164,7 @@ class QuantBottleneck(nn.Module):
             weight_quant=weight_quant,
             return_quant_tensor=True,
         )
-        self.bn2 = nn.BatchNorm2d(planes)
+        self.bn2 = nn.BatchNorm2d(num_features=planes)
         self.relu2 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.conv3 = qnn.QuantConv2d(
@@ -176,7 +176,7 @@ class QuantBottleneck(nn.Module):
             weight_quant=weight_quant,
             return_quant_tensor=True,
         )
-        self.bn3 = nn.BatchNorm2d(planes * self.expansion)
+        self.bn3 = nn.BatchNorm2d(num_features=planes * self.expansion)
         self.relu3 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.downsample = downsample
@@ -297,17 +297,17 @@ class QuantResNetBase(nn.Module, ABC):
             weight_quant=first_layer_weight_quant,
             return_quant_tensor=True,
         )
-        self.bn1 = nn.BatchNorm2d(64)
+        self.bn1 = nn.BatchNorm2d(num_features=64)
         self.relu = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         # Max pooling layer (3x3 with stride=2)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         # Residual layers
-        self.layer1 = self._make_layer(64, self.layers[0], stride=1)
-        self.layer2 = self._make_layer(128, self.layers[1], stride=2)
-        self.layer3 = self._make_layer(256, self.layers[2], stride=2)
-        self.layer4 = self._make_layer(512, self.layers[3], stride=2)
+        self.layer1 = self._make_layer(planes=64, num_blocks=self.layers[0], stride=1)
+        self.layer2 = self._make_layer(planes=128, num_blocks=self.layers[1], stride=2)
+        self.layer3 = self._make_layer(planes=256, num_blocks=self.layers[2], stride=2)
+        self.layer4 = self._make_layer(planes=512, num_blocks=self.layers[3], stride=2)
 
         # Classifier
         self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
@@ -351,27 +351,27 @@ class QuantResNetBase(nn.Module, ABC):
                     weight_quant=self.weight_quant,
                     return_quant_tensor=True,
                 ),
-                nn.BatchNorm2d(planes * self.block.expansion),
+                nn.BatchNorm2d(num_features=planes * self.block.expansion),
             )
 
         layers: List[nn.Module] = []
         layers.append(
             self.block(
-                self.in_planes,
-                planes,
-                stride,
-                downsample,
-                self.weight_bit_width,
-                self.act_bit_width,
-                self.weight_quant,
+                in_planes=self.in_planes,
+                planes=planes,
+                stride=stride,
+                downsample=downsample,
+                weight_bit_width=self.weight_bit_width,
+                act_bit_width=self.act_bit_width,
+                weight_quant=self.weight_quant,
             )
         )
         self.in_planes = planes * self.block.expansion
         for _ in range(1, num_blocks):
             layers.append(
                 self.block(
-                    self.in_planes,
-                    planes,
+                    in_planes=self.in_planes,
+                    planes=planes,
                     weight_bit_width=self.weight_bit_width,
                     act_bit_width=self.act_bit_width,
                     weight_quant=self.weight_quant,
