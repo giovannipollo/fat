@@ -35,16 +35,18 @@ class WarmupScheduler:
         self.optimizer = optimizer
         self.warmup_epochs: int = warmup_epochs
         self.main_scheduler: Optional[optim.lr_scheduler.LRScheduler] = main_scheduler
-        self.current_epoch: int = 0
 
         # Store initial learning rates (target LR after warmup)
         self.base_lrs: List[float] = [group["lr"] for group in optimizer.param_groups]
         
-        # Set initial LR to first warmup value (warmup_factor = 1/warmup_epochs)
+        # Set initial LR to first warmup value and start at epoch 1
         if warmup_epochs > 0:
+            self.current_epoch: int = 1
             initial_warmup_factor = 1.0 / warmup_epochs
             for i, param_group in enumerate(self.optimizer.param_groups):
                 param_group["lr"] = self.base_lrs[i] * initial_warmup_factor
+        else:
+            self.current_epoch: int = 0
 
     def step(self) -> None:
         """Advance the scheduler by one epoch.
