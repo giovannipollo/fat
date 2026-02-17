@@ -463,11 +463,7 @@ class Trainer:
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
-        """Run the full training loop."""
-        self._train_single_phase()
-
-    def _train_single_phase(self) -> None:
-        """Run the full training loop (single-phase legacy mode).
+        """Run the full training loop
 
         Executes training for the configured number of epochs,
         handling validation/test evaluation, checkpointing, and logging.
