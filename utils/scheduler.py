@@ -134,7 +134,7 @@ class SchedulerFactory:
         Args:
             optimizer: The optimizer to schedule.
             config: Full configuration dictionary.
-            total_epochs: Optional explicit epoch count. If provided, this is used instead of computing from config. Required for multi-phase training where each phase should have its own scheduler with phase-specific epochs.
+            total_epochs: Optional explicit epoch count. If provided, this is used instead of computing from config.
 
         Returns:
             Configured scheduler (possibly wrapped with warmup), or None.
@@ -150,10 +150,6 @@ class SchedulerFactory:
         computed_epochs: int
         if total_epochs is not None:
             computed_epochs = total_epochs
-        elif "phases" in config:
-            computed_epochs = sum(
-                phase.get("epochs", 0) for phase in config["phases"]
-            )
         else:
             computed_epochs = config["training"]["epochs"]
 

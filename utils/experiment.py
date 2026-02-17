@@ -260,7 +260,6 @@ class ExperimentManager:
         scaler: Optional[Any] = None,
         is_best: bool = False,
         test_acc: Optional[float] = None,
-        phase_info: Optional[Dict[str, Any]] = None,
         act_fault_injector: Optional["ActivationFaultInjector"] = None,
         weight_fault_injector: Optional["WeightFaultInjector"] = None,
         act_fault_config: Optional[Any] = None,
@@ -278,7 +277,6 @@ class ExperimentManager:
             scaler: GradScaler for AMP (optional).
             is_best: Whether this is the best model so far.
             test_acc: Test accuracy (for best model with validation).
-            phase_info: Optional phase information for multi-phase training.
             act_fault_injector: Optional activation fault injector to remove before saving.
             weight_fault_injector: Optional weight fault injector to remove before saving.
             act_fault_config: Optional activation fault injection config for re-injection.
@@ -307,23 +305,12 @@ class ExperimentManager:
             "config": self.config,
         }
 
-        # Save phase info if provided
-        if phase_info is not None:
-            checkpoint["phase_info"] = phase_info
-
         # Save scaler state if using AMP
         if scaler is not None:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
 
         # Save periodic checkpoint
-        # Include phase name in filename for multi-phase training
-        if phase_info is not None and phase_info.get("mode") == "multi_phase":
-            phase_name = phase_info.get("phase_name", "unknown")
-            checkpoint_path: Path = (
-                self.checkpoint_dir / f"epoch_{epoch:04d}_{phase_name}.pt"
-            )
-        else:
-            checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
+        checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
         torch.save(checkpoint, checkpoint_path)
 
         # Save latest checkpoint (always overwritten)
@@ -336,15 +323,8 @@ class ExperimentManager:
             if test_acc is not None:
                 checkpoint["test_acc"] = test_acc
             
-            # Always save the global best.pt (latest best across all phases)
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
-            
-            # Also save phase-specific best if in multi-phase mode
-            if phase_info is not None and phase_info.get("mode") == "multi_phase":
-                phase_name = phase_info.get("phase_name", "unknown")
-                phase_best_path = self.checkpoint_dir / f"best_{phase_name}.pt"
-                torch.save(checkpoint, phase_best_path)
             
             if test_acc is not None:
                 print(
@@ -369,7 +349,7 @@ class ExperimentManager:
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
         strict: bool = True,
-    ) -> Tuple[int, float, Optional[Dict[str, Any]]]:
+    ) -> Tuple[int, float]:
         """Load a model checkpoint.
 
         Args:
@@ -383,12 +363,12 @@ class ExperimentManager:
                     Useful for loading float checkpoints into quantized models.
 
         Returns:
-            Tuple of (start_epoch, best_acc, phase_info).
+            Tuple of (start_epoch, best_acc).
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             print(f"Warning: Checkpoint not found at {checkpoint_path}")
-            return 0, 0.0, None
+            return 0, 0.0
 
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
@@ -422,10 +402,9 @@ class ExperimentManager:
 
         start_epoch: int = checkpoint["epoch"] + 1
         best_acc: float = checkpoint.get("best_acc", 0.0)
-        phase_info: Optional[Dict[str, Any]] = checkpoint.get("phase_info", None)
 
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
-        return start_epoch, best_acc, phase_info
+        return start_epoch, best_acc
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
