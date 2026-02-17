@@ -215,6 +215,23 @@ class PhaseManager:
             "total_epochs": self.total_epochs,
         }
 
+    def get_phases_summary(self) -> List[Dict[str, Any]]:
+        """Get serializable summary of all phases for checkpoint storage.
+
+        Returns:
+            List of phase summaries, each containing name, epochs, and boundaries.
+        """
+        return [
+            {
+                "name": p.name,
+                "epochs": p.epochs,
+                "start_epoch": p.start_epoch,
+                "end_epoch": p.end_epoch,
+                "phase_idx": p.phase_idx,
+            }
+            for p in self.phases
+        ]
+
     # Private methods
 
     def _parse_phases(self, phases_config: List[Dict[str, Any]]) -> None:

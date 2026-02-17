@@ -335,8 +335,17 @@ class ExperimentManager:
             # Include test accuracy in best checkpoint
             if test_acc is not None:
                 checkpoint["test_acc"] = test_acc
+            
+            # Always save the global best.pt (latest best across all phases)
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
+            
+            # Also save phase-specific best if in multi-phase mode
+            if phase_info is not None and phase_info.get("mode") == "multi_phase":
+                phase_name = phase_info.get("phase_name", "unknown")
+                phase_best_path = self.checkpoint_dir / f"best_{phase_name}.pt"
+                torch.save(checkpoint, phase_best_path)
+            
             if test_acc is not None:
                 print(
                     f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)"

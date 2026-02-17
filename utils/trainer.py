@@ -585,6 +585,11 @@ class Trainer:
 
             # Save checkpoint (only on rank 0)
             if self.rank == 0 and self.experiment.should_save(epoch, is_best):
+                # Add phase_info for consistency with multi-phase checkpoints
+                phase_info = {
+                    "mode": "single_phase",
+                    "total_epochs": epochs,
+                }
                 model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
@@ -600,6 +605,7 @@ class Trainer:
                     weight_fault_injector=self.weight_fault_injector,
                     act_fault_config=self.act_fault_config,
                     weight_fault_config=self.weight_fault_config,
+                    phase_info=phase_info,
                 )
 
                 # Log best model to file
@@ -758,6 +764,8 @@ class Trainer:
             if self.rank == 0 and self.experiment.should_save(epoch, is_best):
                 model_to_save = self.model.module if self.is_distributed else self.model
                 phase_info = self.phase_manager.get_phase_info(epoch)
+                # Include phases summary for better resume validation
+                phase_info["phases_summary"] = self.phase_manager.get_phases_summary()
                 self.experiment.save_checkpoint(
                     epoch=epoch,
                     model=model_to_save,
@@ -889,6 +897,12 @@ class Trainer:
         print(f"Epoch Range: [{phase.start_epoch}, {phase.end_epoch})")
         print(f"Duration: {phase.epochs} epochs")
         print("=" * 80)
+
+        # Reset best_acc for the new phase
+        # Each phase tracks its own best model independently
+        old_best = self.best_acc
+        self.best_acc = 0.0
+        print(f"Reset best_acc: {old_best:.2f}% → 0.00% (new phase)")
 
         # Load checkpoint if specified
         if phase.load_checkpoint is not None:
@@ -1088,9 +1102,12 @@ class Trainer:
         if is_cross_arch_load:
             self._load_model_weights_only(str(ckpt_file), ckpt)
         else:
-            # Standard loading with full state
-            self._load_full_checkpoint(ckpt)
-            self.best_acc = ckpt.get("best_acc", 0.0)
+            # For phase checkpoint loading, only restore model weights
+            # The phase transition will set up optimizer/scheduler with phase-specific config
+            model_to_load = self.model.module if self.is_distributed else self.model
+            model_to_load.load_state_dict(ckpt["model_state_dict"])
+            print(f"  Loaded model weights (skipped optimizer/scheduler for phase transition)")
+            # Note: best_acc was already reset in _handle_phase_transition()
 
         # Ensure model is on correct device after loading
         self.model = self.model.to(self.device)
@@ -1099,7 +1116,9 @@ class Trainer:
         if is_cross_arch_load:
             self._log_cross_arch_loading_stats()
 
-        print(f"Checkpoint loaded: best_acc={self.best_acc:.2f}%")
+        # Log checkpoint's original best_acc for reference (current best_acc is reset for new phase)
+        ckpt_best_acc = ckpt.get("best_acc", 0.0)
+        print(f"Checkpoint loaded (original best_acc={ckpt_best_acc:.2f}%)")
 
     def _load_model_weights_only(self, ckpt_path: str, ckpt: Dict[str, Any]) -> None:
         """Load only model weights, skipping optimizer/scheduler states.
@@ -1166,42 +1185,86 @@ class Trainer:
     def _validate_phase_resumption(
         self, loaded_phase_info: Optional[Dict[str, Any]], start_epoch: int
     ) -> None:
-        """Validate that checkpoint phase matches current config.
+        """Validate that checkpoint phase matches current config and take corrective action.
 
         Args:
             loaded_phase_info: Phase info from loaded checkpoint.
             start_epoch: Epoch to resume from.
         """
+        if self.phase_manager is None or not self.phase_manager.is_multi_phase():
+            # Single-phase training - nothing to validate
+            return
+
         if loaded_phase_info is None:
-            # Old checkpoint format without phase info
-            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
-                print(
-                    "WARNING: Loaded checkpoint is in legacy format (no phase info). "
-                    "Resuming multi-phase training from legacy checkpoint."
-                )
+            # Legacy checkpoint without phase info
+            print(
+                "WARNING: Legacy checkpoint (no phase_info). "
+                "Phase state will be inferred from epoch number."
+            )
+            # Reset best_acc since we don't know phase context
+            self.best_acc = 0.0
+            print("  Reset best_acc to 0.00% (unknown phase context)")
             return
 
-        if loaded_phase_info.get("mode") == "single_phase":
-            # Checkpoint from single-phase training
-            if self.phase_manager is not None and self.phase_manager.is_multi_phase():
-                print(
-                    "WARNING: Resuming multi-phase training from single-phase checkpoint. "
-                    "Phase info will be inferred from epoch number."
-                )
+        loaded_mode = loaded_phase_info.get("mode", "unknown")
+
+        if loaded_mode == "single_phase":
+            print(
+                "WARNING: Single-phase checkpoint loaded for multi-phase training. "
+                "Optimizer/scheduler state may be incompatible."
+            )
+            # Reset best_acc - different phase context
+            self.best_acc = 0.0
+            print("  Reset best_acc to 0.00% (phase context changed)")
             return
 
-        # Multi-phase checkpoint
+        # Multi-phase checkpoint: validate phase consistency
         loaded_phase_idx = loaded_phase_info.get("phase_idx", -1)
-        if self.phase_manager is not None:
-            current_phase_idx = self.phase_manager.get_phase_at_epoch(start_epoch)
+        current_phase_idx = self.phase_manager.get_phase_at_epoch(start_epoch)
 
-            if loaded_phase_idx != current_phase_idx:
-                loaded_phase_name = loaded_phase_info.get("phase_name", "unknown")
-                current_phase = self.phase_manager.get_phase_by_index(current_phase_idx)
-                current_phase_name = current_phase.name if current_phase else "unknown"
+        if loaded_phase_idx != current_phase_idx:
+            loaded_name = loaded_phase_info.get("phase_name", "unknown")
+            current_phase = self.phase_manager.get_phase_by_index(current_phase_idx)
+            current_name = current_phase.name if current_phase else "unknown"
 
+            print(
+                f"WARNING: Checkpoint from phase {loaded_phase_idx} "
+                f"({loaded_name}) but resuming into phase {current_phase_idx} "
+                f"({current_name}). Resetting best_acc."
+            )
+            # Reset best_acc - different phase context
+            self.best_acc = 0.0
+            print(f"  Reset best_acc to 0.00% (phase {loaded_phase_idx} -> {current_phase_idx})")
+
+        # Validate total_epochs match
+        loaded_total = loaded_phase_info.get("total_epochs", 0)
+        current_total = self.phase_manager.get_total_epochs()
+        if loaded_total != current_total:
+            print(
+                f"WARNING: Checkpoint total_epochs={loaded_total} differs "
+                f"from current config total_epochs={current_total}. "
+                f"Phase boundaries may have changed."
+            )
+
+        # Validate phase structure matches
+        loaded_phases = loaded_phase_info.get("phases_summary", [])
+        current_phases = self.phase_manager.get_phases_summary()
+
+        if loaded_phases and loaded_phases != current_phases:
+            print("WARNING: Phase structure changed since checkpoint was saved.")
+            # Show detailed diff
+            max_phases = max(len(loaded_phases), len(current_phases))
+            for i in range(max_phases):
+                old = loaded_phases[i] if i < len(loaded_phases) else None
+                new = current_phases[i] if i < len(current_phases) else None
+                if old != new:
+                    if old is None:
+                        print(f"  Phase {i}: (new) -> {new}")
+                    elif new is None:
+                        print(f"  Phase {i}: {old} -> (removed)")
+                    else:
+                        print(f"  Phase {i}: {old} -> {new}")
+            if len(loaded_phases) != len(current_phases):
                 print(
-                    f"WARNING: Checkpoint was saved in phase {loaded_phase_idx} "
-                    f"({loaded_phase_name}) but resuming in phase {current_phase_idx} "
-                    f"({current_phase_name}). Ensure config phases match checkpoint."
+                    f"  Phase count: {len(loaded_phases)} -> {len(current_phases)}"
                 )
