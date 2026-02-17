@@ -159,12 +159,20 @@ class SchedulerFactory:
 
         # Create main scheduler
         main_scheduler = cls._create_main_scheduler(
-            optimizer, sched_name, sched_config, computed_epochs, warmup_epochs
+            optimizer=optimizer,
+            sched_name=sched_name,
+            sched_config=sched_config,
+            computed_epochs=computed_epochs,
+            warmup_epochs=warmup_epochs,
         )
 
         # Wrap with warmup if requested
         if warmup_epochs > 0:
-            return WarmupScheduler(optimizer, warmup_epochs, main_scheduler)
+            return WarmupScheduler(
+                optimizer=optimizer,
+                warmup_epochs=warmup_epochs,
+                main_scheduler=main_scheduler,
+            )
 
         return main_scheduler
 
@@ -194,34 +202,34 @@ class SchedulerFactory:
 
         if name == "cosine":
             return optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
+                optimizer=optimizer,
                 T_max=sched_config.get("T_max", total_epochs - warmup_epochs),
                 eta_min=sched_config.get("eta_min", 0),
             )
 
         if name == "step":
             return optim.lr_scheduler.StepLR(
-                optimizer,
+                optimizer=optimizer,
                 step_size=sched_config.get("step_size", 30),
                 gamma=sched_config.get("gamma", 0.1),
             )
 
         if name == "multistep":
             return optim.lr_scheduler.MultiStepLR(
-                optimizer,
+                optimizer=optimizer,
                 milestones=sched_config.get("milestones", [30, 60, 90]),
                 gamma=sched_config.get("gamma", 0.1),
             )
 
         if name == "exponential":
             return optim.lr_scheduler.ExponentialLR(
-                optimizer,
+                optimizer=optimizer,
                 gamma=sched_config.get("gamma", 0.95),
             )
 
         if name == "plateau":
             return optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer,
+                optimizer=optimizer,
                 mode=sched_config.get("mode", "max"),
                 factor=sched_config.get("factor", 0.1),
                 patience=sched_config.get("patience", 10),
