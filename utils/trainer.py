@@ -154,7 +154,16 @@ class Trainer:
         self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(
             self.model, config
         )
-        self.scheduler: SchedulerType = SchedulerFactory.create(self.optimizer, config)
+
+        # Create scheduler with phase-specific epochs for multi-phase training
+        if self.phase_manager is not None:
+            first_phase = self.phase_manager.get_phase_by_index(0)
+            first_phase_epochs = first_phase.epochs if first_phase else self.total_epochs
+            self.scheduler: SchedulerType = SchedulerFactory.create(
+                self.optimizer, config, total_epochs=first_phase_epochs
+            )
+        else:
+            self.scheduler: SchedulerType = SchedulerFactory.create(self.optimizer, config)
 
         # Mixed precision training (AMP)
         amp_config: Dict[str, Any] = config.get("amp", {})
@@ -533,11 +542,10 @@ class Trainer:
             train_loss, train_acc = self.train_epoch(epoch)
 
             if self.scheduler is not None:
-                self.scheduler.step()
                 lr = self.scheduler.get_last_lr()[0]
+                self.scheduler.step()
             else:
                 lr = self.config["optimizer"]["learning_rate"]
-
             # Evaluate on validation or test set
             if self.has_validation:
                 eval_loss, eval_acc = self.validate()
@@ -897,10 +905,12 @@ class Trainer:
             new_lr = self.optimizer.param_groups[0]["lr"]
             print(f"  Learning rate: {old_lr} → {new_lr}")
 
-        # Recreate scheduler if overridden
+        # Always recreate scheduler for new phase to reset step count and use phase epochs
         if phase.scheduler is not None:
             print(f"Recreating scheduler with phase-specific config...")
-            self._recreate_scheduler(phase_config)
+        else:
+            print(f"Recreating scheduler for new phase (using base config)...")
+        self._recreate_scheduler(phase_config, phase.epochs)
 
         # Update fault injection if overridden
         if phase.activation_fault_injection is not None:
@@ -938,15 +948,18 @@ class Trainer:
         if old_lr is not None and old_lr != new_lr:
             print(f"  Optimizer learning rate changed: {old_lr} → {new_lr}")
 
-    def _recreate_scheduler(self, config: Dict[str, Any]) -> None:
+    def _recreate_scheduler(self, config: Dict[str, Any], phase_epochs: int) -> None:
         """Recreate learning rate scheduler with new configuration.
 
         Args:
             config: Configuration with 'scheduler' section.
+            phase_epochs: Number of epochs for this phase (used for T_max default).
         """
         if "scheduler" in config and config["scheduler"].get("name"):
-            self.scheduler = SchedulerFactory.create(self.optimizer, config)
-            print(f"  Scheduler recreated: {config['scheduler']['name']}")
+            self.scheduler = SchedulerFactory.create(
+                self.optimizer, config, total_epochs=phase_epochs
+            )
+            print(f"  Scheduler recreated: {config['scheduler']['name']} (T_max based on {phase_epochs} phase epochs)")
         else:
             self.scheduler = None
             print(f"  Scheduler disabled")

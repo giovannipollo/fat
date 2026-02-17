@@ -70,6 +70,13 @@ class ConfigValidator:
             if section not in self.config:
                 self.errors.append(f"Missing required section: '{section}'")
 
+        # Ensure training.epochs exists when phases are absent
+        if "phases" not in self.config or self.config["phases"] is None:
+            if "epochs" not in self.config.get("training", {}):
+                self.errors.append(
+                    "Missing 'training.epochs' — required when 'phases' is not defined."
+                )
+
     def _validate_phases(self) -> None:
         """Validate multi-phase configuration."""
         phases = self.config["phases"]
@@ -85,6 +92,16 @@ class ConfigValidator:
                 "'phases' list is empty - remove 'phases' key or add at least one phase"
             )
             return
+
+        # Error if training.epochs is specified alongside phases
+        training_epochs = self.config.get("training", {}).get("epochs")
+        if training_epochs is not None:
+            phase_sum = sum(p.get("epochs", 0) for p in phases)
+            self.errors.append(
+                "'training.epochs' must not be specified when 'phases' is defined. "
+                "The total epoch count is derived from the sum of phase epochs. "
+                f"Found training.epochs={training_epochs}, phase sum={phase_sum}."
+            )
 
         # Validate each phase
         for idx, phase_dict in enumerate(phases):
@@ -319,6 +336,7 @@ class ConfigValidator:
             self.warnings.append(f"Duplicate phase names detected: {duplicates}")
 
         # Validate scheduler T_max matches phase epochs (for cosine scheduler)
+        # Note: T_max can be omitted — it auto-defaults to phase_epochs - warmup_epochs
         for idx, phase in enumerate(phases):
             if "scheduler" in phase and phase["scheduler"].get("name") == "cosine":
                 t_max = phase["scheduler"].get("T_max")
@@ -327,7 +345,8 @@ class ConfigValidator:
                 if t_max is not None and t_max != phase_epochs:
                     self.warnings.append(
                         f"Phase {idx} ('{phase.get('name')}'): cosine scheduler T_max={t_max} "
-                        f"doesn't match phase epochs={phase_epochs}. Consider T_max={phase_epochs}."
+                        f"differs from phase epochs={phase_epochs}. If unintended, "
+                        f"set T_max={phase_epochs} or omit it to auto-default."
                     )
 
 

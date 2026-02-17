@@ -127,12 +127,14 @@ class SchedulerFactory:
         cls,
         optimizer: optim.Optimizer,
         config: Dict[str, Any],
+        total_epochs: Optional[int] = None,
     ) -> SchedulerType:
         """Create a learning rate scheduler from configuration.
 
         Args:
             optimizer: The optimizer to schedule.
             config: Full configuration dictionary.
+            total_epochs: Optional explicit epoch count. If provided, this is used instead of computing from config. Required for multi-phase training where each phase should have its own scheduler with phase-specific epochs.
 
         Returns:
             Configured scheduler (possibly wrapped with warmup), or None.
@@ -144,13 +146,16 @@ class SchedulerFactory:
         sched_name: str = sched_config.get("name", "cosine").lower()
         warmup_epochs: int = sched_config.get("warmup_epochs", 0)
 
-        # Handle multi-phase configs where epochs are in phases, not training.epochs
-        if "phases" in config:
-            total_epochs: int = sum(
+        # Determine total epochs: use explicit value if provided, otherwise compute from config
+        computed_epochs: int
+        if total_epochs is not None:
+            computed_epochs = total_epochs
+        elif "phases" in config:
+            computed_epochs = sum(
                 phase.get("epochs", 0) for phase in config["phases"]
             )
         else:
-            total_epochs: int = config["training"]["epochs"]
+            computed_epochs = config["training"]["epochs"]
 
         if sched_name not in cls.SCHEDULERS:
             available: List[str] = list(cls.SCHEDULERS.keys())
@@ -158,7 +163,7 @@ class SchedulerFactory:
 
         # Create main scheduler
         main_scheduler = cls._create_main_scheduler(
-            optimizer, sched_name, sched_config, total_epochs, warmup_epochs
+            optimizer, sched_name, sched_config, computed_epochs, warmup_epochs
         )
 
         # Wrap with warmup if requested

@@ -377,11 +377,6 @@ class PhaseManager:
                 merged.get("weight_fault_injection", {}), phase.weight_fault_injection
             )
 
-        # Override total epochs to reflect phase duration
-        if "training" not in merged:
-            merged["training"] = {}
-        merged["training"]["epochs"] = phase.end_epoch
-
         return merged
 
     def _deep_merge_dicts(
