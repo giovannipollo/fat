@@ -359,6 +359,7 @@ class ExperimentManager:
         scheduler: Any,
         scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
+        strict: bool = True,
     ) -> Tuple[int, float, Optional[Dict[str, Any]]]:
         """Load a model checkpoint.
 
@@ -369,6 +370,8 @@ class ExperimentManager:
             scheduler: Scheduler to load state into (can be None).
             scaler: GradScaler for AMP (optional).
             device: Device to load the checkpoint to.
+            strict: If False, allows loading state dict with missing/unexpected keys.
+                    Useful for loading float checkpoints into quantized models.
 
         Returns:
             Tuple of (start_epoch, best_acc, phase_info).
@@ -381,7 +384,24 @@ class ExperimentManager:
         print(f"Loading checkpoint from {checkpoint_path}")
         checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
 
-        model.load_state_dict(checkpoint["model_state_dict"])
+        # Load model state dict with strict parameter
+        try:
+            missing_keys, unexpected_keys = model.load_state_dict(
+                checkpoint["model_state_dict"], strict=strict
+            )
+
+            # Log results if non-strict loading
+            if not strict:
+                if missing_keys:
+                    print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
+                if unexpected_keys:
+                    print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
+
+        except RuntimeError as e:
+            if strict:
+                raise
+            print(f"Warning: Non-strict loading encountered error: {e}")
+
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
         if scheduler and checkpoint.get("scheduler_state_dict"):

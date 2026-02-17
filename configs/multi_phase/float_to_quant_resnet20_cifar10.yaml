@@ -1,0 +1,102 @@
+# Float-to-Quant Training: Load pretrained float ResNet20 and fine-tune as quantized model
+# 
+# This config demonstrates Tier 1 float-to-quant training using multi-phase infrastructure.
+# Phase 1: Load float checkpoint and run 1 epoch to initialize quantization scales (1 epoch)
+# Phase 2: Fine-tune quantized model with lower learning rate (50 epochs)
+
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+  train_shuffle: true
+  augmentation:
+    random_crop: true
+    random_horizontal_flip: true
+    normalize: true
+
+model:
+  name: "quant_resnet20"
+
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 4
+  act_bit_width: 4
+
+# Enable Brevitas compatibility for loading float weights into quantized model
+brevitas:
+  ignore_missing_keys: true
+
+training:
+  batch_size: 128
+  epochs: 51
+
+# Base optimizer (will be overridden in phase 2)
+optimizer:
+  name: "sgd"
+  learning_rate: 0.01
+  momentum: 0.9
+  weight_decay: 0.0001
+
+# Base scheduler (will be overridden in phase 2)
+scheduler:
+  name: "cosine"
+  T_max: 51
+
+loss:
+  name: "sqr_hinge"
+
+amp:
+  enabled: false
+
+tensorboard:
+  enabled: true
+
+progress:
+  enabled: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true
+
+# Multi-phase training configuration
+phases:
+  # Phase 1: Load pretrained float checkpoint and run 1 epoch to initialize quantization scales
+  - name: "load_float_weights"
+    epochs: 1
+    load_checkpoint: "/your/path/to/pretrained_float_resnet20.pth"  # Path to pretrained float checkpoint
+    
+    # Use same low LR for initial epoch
+    optimizer:
+      name: "sgd"
+      learning_rate: 0.001
+      momentum: 0.9
+      weight_decay: 0.0001
+    
+    scheduler:
+      name: "cosine"
+      T_max: 51
+
+  # Phase 2: Fine-tune quantized model with lower learning rate
+  - name: "quantized_finetuning"
+    epochs: 50
+
+    optimizer:
+      name: "sgd"
+      learning_rate: 0.01
+      momentum: 0.9
+      weight_decay: 0.0001
+
+    scheduler:
+      name: "cosine"
+      T_max: 50
+      eta_min: 0.0001
+      warmup_epochs: 5
+      warmup_start_lr: 0.001

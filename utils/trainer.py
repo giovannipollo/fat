@@ -121,6 +121,16 @@ class Trainer:
         self.config: Dict[str, Any] = config
         self.device: torch.device = device
 
+        brevitas_config: Dict[str, Any] = config.get("brevitas", {})
+        if brevitas_config.get("ignore_missing_keys", False):
+            try:
+                from brevitas import config as brev_config
+                brev_config.IGNORE_MISSING_KEYS = True
+                if self.rank == 0 or not self.is_distributed:
+                    print("Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading")
+            except ImportError:
+                pass
+
         # Training state
         self.start_epoch: int = 0
         self.best_acc: float = 0.0
@@ -1014,6 +1024,8 @@ class Trainer:
     def _load_phase_checkpoint(self, checkpoint_path: str) -> None:
         """Load checkpoint at the start of a phase.
 
+        Supports cross-architecture loading (float -> quantized models).
+
         Args:
             checkpoint_path: Path to checkpoint file or special value ("best", "latest").
         """
@@ -1038,20 +1050,105 @@ class Trainer:
 
         print(f"Loading phase checkpoint: {ckpt_file}")
 
-        # Load checkpoint using existing method
-        start_epoch, best_acc, phase_info = self.experiment.load_checkpoint(
-            checkpoint_path=str(ckpt_file),
-            model=self.model,
-            optimizer=self.optimizer,
-            scheduler=self.scheduler,
-            scaler=self.scaler,
-            device=self.device,
+        # Load checkpoint to CPU first to avoid device mismatch issues
+        ckpt = torch.load(str(ckpt_file), map_location="cpu")
+
+        # Check if this is a cross-architecture load (float -> quant)
+        is_cross_arch_load = False
+        if "config" in ckpt:
+            src_model = ckpt["config"].get("model", {}).get("name", "")
+            dst_model = self.config["model"]["name"]
+
+            # Detect float -> quant conversion
+            if not src_model.startswith("quant_") and dst_model.startswith("quant_"):
+                is_cross_arch_load = True
+                print(f"Detected cross-architecture load: {src_model} -> {dst_model}")
+
+                # Enable Brevitas compatibility
+                try:
+                    from brevitas import config as brev_config
+                    brev_config.IGNORE_MISSING_KEYS = True
+                except ImportError:
+                    pass
+
+        # For cross-architecture loads, only load model weights (skip optimizer/scheduler)
+        if is_cross_arch_load:
+            self._load_model_weights_only(str(ckpt_file), ckpt)
+        else:
+            # Standard loading with full state
+            self._load_full_checkpoint(ckpt)
+            self.best_acc = ckpt.get("best_acc", 0.0)
+
+        # Ensure model is on correct device after loading
+        self.model = self.model.to(self.device)
+
+        # Log loading statistics for cross-architecture loads
+        if is_cross_arch_load:
+            self._log_cross_arch_loading_stats()
+
+        print(f"Checkpoint loaded: best_acc={self.best_acc:.2f}%")
+
+    def _load_model_weights_only(self, ckpt_path: str, ckpt: Dict[str, Any]) -> None:
+        """Load only model weights, skipping optimizer/scheduler states.
+
+        Used for cross-architecture loading where optimizer states are incompatible.
+
+        Args:
+            ckpt_path: Path to checkpoint (for logging).
+            ckpt: Already loaded checkpoint dictionary.
+        """
+        model_to_load = self.model.module if self.is_distributed else self.model
+
+        # Load model weights with strict=False to allow missing quantization params
+        missing_keys, unexpected_keys = model_to_load.load_state_dict(
+            ckpt["model_state_dict"], strict=False
         )
 
-        # Update best accuracy (but don't change start_epoch - phase controls that)
-        self.best_acc = best_acc
+        # Log loading results
+        if missing_keys:
+            print(f"  Missing keys ({len(missing_keys)}): quantization-specific parameters")
+        if unexpected_keys:
+            print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
 
-        print(f"Checkpoint loaded: best_acc={best_acc:.2f}%")
+        # Get best accuracy from checkpoint
+        self.best_acc = ckpt.get("best_acc", 0.0)
+
+        print("  Skipped optimizer/scheduler state (incompatible architecture)")
+
+    def _load_full_checkpoint(self, ckpt: Dict[str, Any]) -> None:
+        """Load full checkpoint including optimizer and scheduler states.
+
+        Args:
+            ckpt: Already loaded checkpoint dictionary.
+        """
+        model_to_load = self.model.module if self.is_distributed else self.model
+        model_to_load.load_state_dict(ckpt["model_state_dict"])
+        self.optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+
+        if self.scheduler and ckpt.get("scheduler_state_dict"):
+            self.scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+
+        if self.scaler is not None and "scaler_state_dict" in ckpt:
+            self.scaler.load_state_dict(ckpt["scaler_state_dict"])
+
+    def _log_cross_arch_loading_stats(self) -> None:
+        """Log statistics about parameter loading after cross-architecture checkpoint load."""
+        model_to_analyze = self.model.module if self.is_distributed else self.model
+        
+        total_params = sum(p.numel() for p in model_to_analyze.parameters())
+        trainable_params = sum(p.numel() for p in model_to_analyze.parameters() if p.requires_grad)
+
+        # Count quantization-specific parameters
+        quant_params = 0
+        for name, param in model_to_analyze.named_parameters():
+            if any(x in name for x in ["scale", "zero_point", "bit_width"]):
+                quant_params += param.numel()
+
+        print("Cross-architecture loading statistics:")
+        print(f"  Total parameters: {total_params:,}")
+        print(f"  Trainable parameters: {trainable_params:,}")
+        print(f"  Quantization parameters: {quant_params:,}")
+        print(f"  Float parameters loaded: {total_params - quant_params:,}")
 
     def _validate_phase_resumption(
         self, loaded_phase_info: Optional[Dict[str, Any]], start_epoch: int
