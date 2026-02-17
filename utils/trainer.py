@@ -195,7 +195,7 @@ class Trainer:
 
         self._setup_fault_injection(config)
 
-        # Resume from checkpoint if specified
+        # Resume from checkpoint if specified (full training state)
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         resume_path: Optional[str] = checkpoint_config.get("resume")
         if resume_path:
@@ -212,6 +212,17 @@ class Trainer:
 
             # Validate phase resumption
             self._validate_phase_resumption(phase_info, self.start_epoch)
+
+        # Load model weights only (no training state) if specified
+        # Uses same logic as phase checkpoint loading
+        load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
+        if load_weights_path:
+            print("\n" + "=" * 60)
+            print("Loading pretrained weights (no training state)")
+            print("=" * 60)
+            self._load_phase_checkpoint(load_weights_path)
+            # Reset best_acc since this is a fresh start (not a resume)
+            self.best_acc = 0.0
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
