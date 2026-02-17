@@ -37,24 +37,39 @@ class WarmupScheduler:
         self.main_scheduler: Optional[optim.lr_scheduler.LRScheduler] = main_scheduler
         self.current_epoch: int = 0
 
-        # Store initial learning rates
+        # Store initial learning rates (target LR after warmup)
         self.base_lrs: List[float] = [group["lr"] for group in optimizer.param_groups]
+        
+        # Set initial LR to first warmup value (warmup_factor = 1/warmup_epochs)
+        if warmup_epochs > 0:
+            initial_warmup_factor = 1.0 / warmup_epochs
+            for i, param_group in enumerate(self.optimizer.param_groups):
+                param_group["lr"] = self.base_lrs[i] * initial_warmup_factor
 
     def step(self) -> None:
         """Advance the scheduler by one epoch.
 
-        During warmup, linearly scales LR from 0 to base_lr.
+        During warmup, linearly scales LR from base_lr/warmup_epochs to base_lr.
         After warmup, delegates to the main scheduler if present.
         """
-        self.current_epoch += 1
-
-        if self.current_epoch <= self.warmup_epochs:
+        if self.current_epoch < self.warmup_epochs:
+            # Increment epoch counter
+            self.current_epoch += 1
             # Linear warmup
             warmup_factor: float = self.current_epoch / self.warmup_epochs
             for i, param_group in enumerate(self.optimizer.param_groups):
                 param_group["lr"] = self.base_lrs[i] * warmup_factor
-        elif self.main_scheduler is not None:
-            self.main_scheduler.step()
+        elif self.current_epoch == self.warmup_epochs:
+            # Transition from warmup to main scheduler
+            self.current_epoch += 1
+            # Ensure LR is at base value before starting main scheduler
+            for i, param_group in enumerate(self.optimizer.param_groups):
+                param_group["lr"] = self.base_lrs[i]
+        else:
+            # After warmup, use main scheduler
+            self.current_epoch += 1
+            if self.main_scheduler is not None:
+                self.main_scheduler.step()
 
     def get_last_lr(self) -> List[float]:
         """Return last computed learning rate.
@@ -160,9 +175,9 @@ class SchedulerFactory:
         # Create main scheduler
         main_scheduler = cls._create_main_scheduler(
             optimizer=optimizer,
-            sched_name=sched_name,
+            name=sched_name,
             sched_config=sched_config,
-            computed_epochs=computed_epochs,
+            total_epochs=computed_epochs,
             warmup_epochs=warmup_epochs,
         )
 
