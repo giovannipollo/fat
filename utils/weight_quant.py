@@ -12,6 +12,9 @@ from brevitas.core.zero_point import ZeroZeroPoint
 from brevitas.inject import ExtendedInjector
 from brevitas.quant.solver import ActQuantSolver
 from brevitas.quant.solver import WeightQuantSolver
+from brevitas.quant import Int8ActPerTensorFloat
+from brevitas.quant import Int8WeightPerTensorFloat
+from brevitas.quant import Uint8ActPerTensorFloat
 
 
 class CommonQuant(ExtendedInjector):
@@ -41,12 +44,6 @@ class CommonWeightQuant(CommonQuant, WeightQuantSolver):
 class CommonActQuant(CommonQuant, ActQuantSolver):
     min_val = -1.0
     max_val = 1.0
-
-
-from brevitas.quant import Int8ActPerTensorFloat
-from brevitas.quant import Int8WeightPerTensorFloat
-from brevitas.quant import Uint8ActPerTensorFloat
-
 
 class CommonIntWeightPerTensorQuant(Int8WeightPerTensorFloat):
     """
