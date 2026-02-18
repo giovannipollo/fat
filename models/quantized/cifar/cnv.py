@@ -59,6 +59,7 @@ class QuantCNV(nn.Module):
         in_channels: int = 3,
         in_weight_bit_width: int = 8,
         weight_bit_width: int = 8,
+        out_weight_bit_width: int = 8,
         act_bit_width: int = 8,
         **kwargs,
     ):
@@ -69,12 +70,14 @@ class QuantCNV(nn.Module):
             in_channels: Number of input channels.
             in_weight_bit_width: Bit width for input quantization.
             weight_bit_width: Bit width for weight quantization.
+            out_weight_bit_width: Bit width for output weight quantization.
             act_bit_width: Bit width for activation quantization.
             **kwargs: Additional arguments (ignored).
         """
         super().__init__()
 
         self.weight_bit_width = weight_bit_width
+        self.out_weight_bit_width = out_weight_bit_width
         self.act_bit_width = act_bit_width
 
         self.conv_features = nn.ModuleList()
@@ -164,7 +167,7 @@ class QuantCNV(nn.Module):
                 in_features=LAST_FC_IN_FEATURES,
                 out_features=num_classes,
                 bias=False,
-                weight_bit_width=weight_bit_width,
+                weight_bit_width=self.out_weight_bit_width,
                 weight_quant=CommonWeightQuant,
                 return_quant_tensor=True,
             )
