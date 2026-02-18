@@ -129,6 +129,7 @@ class QuantResNetCIFAR(nn.Module):
         in_channels: int = 3,
         in_weight_bit_width: int = 8,
         weight_bit_width: int = 8,
+        out_weight_bit_width: int = 8,
         act_bit_width: int = 8,
         first_layer_weight_quant=CommonIntWeightPerChannelQuant,
         weight_quant=CommonIntWeightPerChannelQuant,
@@ -151,11 +152,12 @@ class QuantResNetCIFAR(nn.Module):
         self.in_planes: int = 16
         self.in_weight_bit_width = in_weight_bit_width
         self.weight_bit_width = weight_bit_width
+        self.out_weight_bit_width = out_weight_bit_width
         self.act_bit_width = act_bit_width
         self.weight_quant = weight_quant
 
         # Input quantization
-        self.quant_inp = qnn.QuantIdentity(bit_width=act_bit_width)
+        self.quant_inp = qnn.QuantIdentity(bit_width=8, return_quant_tensor=True)
 
         # Initial convolution
         self.conv1 = qnn.QuantConv2d(
@@ -165,12 +167,14 @@ class QuantResNetCIFAR(nn.Module):
             stride=1,
             padding=1,
             bias=False,
-            weight_bit_width=in_weight_bit_width,
+            weight_bit_width=self.in_weight_bit_width,
             weight_quant=first_layer_weight_quant,
             return_quant_tensor=True,
         )
         self.bn1 = nn.BatchNorm2d(num_features=16)
-        self.relu = qnn.QuantReLU(bit_width=self.act_bit_width, return_quant_tensor=True)
+        self.relu = qnn.QuantReLU(
+            bit_width=self.act_bit_width, return_quant_tensor=True
+        )
 
         # Three stages with increasing filter counts
         self.layer1 = self._make_layer(planes=16, num_blocks=num_blocks, stride=1)
@@ -183,8 +187,8 @@ class QuantResNetCIFAR(nn.Module):
             in_features=64,
             out_features=num_classes,
             bias=True,
-            weight_bit_width=weight_bit_width,
-            weight_quant=last_layer_weight_quant
+            weight_bit_width=self.out_weight_bit_width,
+            weight_quant=last_layer_weight_quant,
         )
 
         # Weight initialization
