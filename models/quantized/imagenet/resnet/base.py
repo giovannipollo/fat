@@ -80,7 +80,6 @@ class QuantBasicBlock(nn.Module):
         self.relu2 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.downsample = downsample
-        self.stride: int = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with residual connection.
@@ -180,7 +179,6 @@ class QuantBottleneck(nn.Module):
         self.relu3 = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
 
         self.downsample = downsample
-        self.stride: int = stride
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass with residual connection.
@@ -255,6 +253,7 @@ class QuantResNetBase(nn.Module, ABC):
         in_channels: int = 3,
         in_weight_bit_width: int = 8,
         weight_bit_width: int = 8,
+        out_weight_bit_width: int = 8,
         act_bit_width: int = 8,
         first_layer_weight_quant=CommonIntWeightPerChannelQuant,
         weight_quant=CommonIntWeightPerChannelQuant,
@@ -279,11 +278,12 @@ class QuantResNetBase(nn.Module, ABC):
         self.in_channels = in_channels
         self.in_weight_bit_width = in_weight_bit_width
         self.weight_bit_width = weight_bit_width
+        self.out_weight_bit_width = out_weight_bit_width
         self.act_bit_width = act_bit_width
         self.weight_quant = weight_quant
 
         # Input quantization
-        self.quant_inp = qnn.QuantIdentity(bit_width=act_bit_width)
+        self.quant_inp = qnn.QuantIdentity(bit_width=8, return_quant_tensor=True)
 
         # Initial convolution layer (7x7 conv with stride=2)
         self.conv1 = qnn.QuantConv2d(
@@ -293,12 +293,14 @@ class QuantResNetBase(nn.Module, ABC):
             stride=2,
             padding=3,
             bias=False,
-            weight_bit_width=in_weight_bit_width,
+            weight_bit_width=self.in_weight_bit_width,
             weight_quant=first_layer_weight_quant,
             return_quant_tensor=True,
         )
         self.bn1 = nn.BatchNorm2d(num_features=64)
-        self.relu = qnn.QuantReLU(bit_width=act_bit_width, return_quant_tensor=True)
+        self.relu = qnn.QuantReLU(
+            bit_width=self.act_bit_width, return_quant_tensor=True
+        )
 
         # Max pooling layer (3x3 with stride=2)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -315,7 +317,7 @@ class QuantResNetBase(nn.Module, ABC):
             in_features=512 * self.block.expansion,
             out_features=num_classes,
             bias=True,
-            weight_bit_width=weight_bit_width,
+            weight_bit_width=self.out_weight_bit_width,
             weight_quant=last_layer_weight_quant,
         )
 
