@@ -83,7 +83,9 @@ class SweepRunner(BaseRunner):
                 self.evaluator.update_injection_probability(injection.name, prob)
 
             # Run evaluation with faults applied at the current probability
-            fault_metrics = self.evaluator.evaluate_with_faults()
+            fault_metrics = self.evaluator.evaluate_with_faults(
+                injection_configs=self.config.get_enabled_injections()
+            )
 
             baseline_mean = baseline_metrics.mean
             if baseline_mean is None:
