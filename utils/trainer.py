@@ -282,11 +282,14 @@ class Trainer:
         """
         return self.val_loader is not None
 
-    def train_epoch(self, epoch: int) -> Tuple[float, float]:
+    def train_epoch(
+        self, epoch: int, is_faulty_epoch: bool = True
+    ) -> Tuple[float, float]:
         """Train for one epoch.
 
         Args:
             epoch: Current epoch number (for progress bar display).
+            is_faulty_epoch: Whether this epoch should have fault injection enabled.
 
         Returns:
             Tuple of (average_loss, accuracy).
@@ -302,10 +305,10 @@ class Trainer:
 
         # Setup activation fault injection for this epoch
         if self.act_fault_injector is not None and self.act_fault_config is not None:
-            # Set mode based on apply_during config
             apply_during = self.act_fault_config.apply_during
-            if apply_during in ("train", "both"):
-                self.act_fault_injector.set_enabled(self.model, True)
+            inject_this_epoch = is_faulty_epoch and apply_during in ("train", "both")
+            if self.act_fault_config.step_interval == 1:
+                self.act_fault_injector.set_enabled(self.model, inject_this_epoch)
             else:
                 self.act_fault_injector.set_enabled(self.model, False)
 
@@ -315,8 +318,9 @@ class Trainer:
             and self.weight_fault_config is not None
         ):
             apply_during = self.weight_fault_config.apply_during
-            if apply_during in ("train", "both"):
-                self.weight_fault_injector.set_enabled(self.model, True)
+            inject_this_epoch = is_faulty_epoch and apply_during in ("train", "both")
+            if self.weight_fault_config.step_interval == 1:
+                self.weight_fault_injector.set_enabled(self.model, inject_this_epoch)
             else:
                 self.weight_fault_injector.set_enabled(self.model, False)
 
@@ -331,8 +335,38 @@ class Trainer:
         else:
             pbar = self.train_loader
 
-        for inputs, labels in pbar:
+        for step, (inputs, labels) in enumerate(pbar):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
+
+            # Per-step fault injection gate (only relevant when step_interval > 1)
+            if is_faulty_epoch:
+                if (
+                    self.act_fault_injector is not None
+                    and self.act_fault_config is not None
+                ):
+                    if self.act_fault_config.step_interval > 1:
+                        apply_during = self.act_fault_config.apply_during
+                        inject_this_step = apply_during in (
+                            "train",
+                            "both",
+                        ) and self.act_fault_config.is_faulty_step(step)
+                        self.act_fault_injector.set_enabled(
+                            self.model, inject_this_step
+                        )
+
+                if (
+                    self.weight_fault_injector is not None
+                    and self.weight_fault_config is not None
+                ):
+                    if self.weight_fault_config.step_interval > 1:
+                        apply_during = self.weight_fault_config.apply_during
+                        inject_this_step = apply_during in (
+                            "train",
+                            "both",
+                        ) and self.weight_fault_config.is_faulty_step(step)
+                        self.weight_fault_injector.set_enabled(
+                            self.model, inject_this_step
+                        )
 
             self.optimizer.zero_grad()
 
@@ -495,7 +529,8 @@ class Trainer:
                 print(
                     f"Activation fault injection: {num_layers} layers, "
                     f"prob={self.act_fault_config.probability}%, "
-                    f"mode=full_model, "
+                    f"epoch_interval={self.act_fault_config.epoch_interval}, "
+                    f"step_interval={self.act_fault_config.step_interval}, "
                     f"type={self.act_fault_config.injection_type}"
                 )
 
@@ -507,12 +542,30 @@ class Trainer:
                 print(
                     f"Weight fault injection: {num_layers} hooks, "
                     f"prob={self.weight_fault_config.probability}%, "
-                    f"mode=full_model, "
+                    f"epoch_interval={self.weight_fault_config.epoch_interval}, "
+                    f"step_interval={self.weight_fault_config.step_interval}, "
                     f"type={self.weight_fault_config.injection_type}"
                 )
 
         for epoch in range(self.start_epoch, epochs):
-            train_loss, train_acc = self.train_epoch(epoch)
+            # Compute epoch-level injection flags for both injectors
+            act_faulty_epoch = (
+                self.act_fault_injector is not None
+                and self.act_fault_config is not None
+                and self.act_fault_config.should_inject_during_training()
+                and self.act_fault_config.is_faulty_epoch(epoch)
+            )
+            weight_faulty_epoch = (
+                self.weight_fault_injector is not None
+                and self.weight_fault_config is not None
+                and self.weight_fault_config.should_inject_during_training()
+                and self.weight_fault_config.is_faulty_epoch(epoch)
+            )
+            is_faulty_epoch = act_faulty_epoch or weight_faulty_epoch
+
+            train_loss, train_acc = self.train_epoch(
+                epoch=epoch, is_faulty_epoch=is_faulty_epoch
+            )
 
             if self.scheduler is not None:
                 lr = self.scheduler.get_last_lr()[0]

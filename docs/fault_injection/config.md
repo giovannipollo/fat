@@ -75,6 +75,42 @@ This parameter provides flexibility for different use cases:
 - **Resilience evaluation**: Setting to "eval" injects faults only during testing, measuring the model's inherent resilience
 - **Comprehensive testing**: Setting to "both" evaluates both training-time robustness and inference-time resilience
 
+epoch_interval
+^^^^^^^^^^^^^^^^^
+
+The epoch_interval parameter controls how often (measured in epochs) fault injection is active during training. It is a positive integer with a default of 1.
+
+- 1 (default): Every training epoch is a faulty epoch. Behaviour is identical to the original implementation.
+- 2: Faults are injected on epochs 0, 2, 4, ... (every other epoch). On epochs 1, 3, 5, ... injection is disabled, allowing the model to train cleanly on alternating epochs.
+- N: Faults are injected on epochs 0, N, 2N, ...
+
+This parameter only affects the training phase. Evaluation always runs with injection either fully on or fully off as determined by apply_during.
+
+Use cases:
+
+- **Curriculum scheduling**: Start training without faults for early epochs, then introduce them gradually by decreasing epoch_interval over time (requires custom scheduling logic outside the config).
+- **Balanced exposure**: With epoch_interval=2, the model alternates between clean and faulty epochs, which can improve convergence compared to continuous fault injection.
+- **Reproducibility**: A fixed epoch_interval combined with a fixed seed gives a deterministic fault schedule.
+
+step_interval
+^^^^^^^^^^^^^^^^
+
+The step_interval parameter controls how often (measured in steps/batches) fault injection fires within a single faulty epoch. It is a positive integer with a default of 1.
+
+- 1 (default): Every batch within a faulty epoch is a faulty step. Behaviour is identical to the original implementation.
+- 4: Faults are injected on steps 0, 4, 8, ... of each faulty epoch. On steps 1, 2, 3, 5, 6, 7, ... injection is disabled.
+- N: Faults are injected on steps 0, N, 2N, ...
+
+The step counter resets to 0 at the beginning of every epoch, so step_interval=4 always fires on the first batch of every faulty epoch.
+
+This parameter only affects the training phase. Evaluation always processes all batches with a fixed injection state (no per-step toggling during eval).
+
+Use cases:
+
+- **Reduced fault exposure**: With step_interval=N the model processes roughly 1/N of its training batches with faults, reducing the overall fault exposure without changing the probability parameter.
+- **Fine-grained curriculum**: Combine with epoch_interval to create a two-dimensional schedule that controls both how often epochs are faulty and how densely each faulty epoch is saturated.
+- **Faster training convergence**: Injecting faults only every N steps can reduce gradient interference, potentially improving convergence speed on difficult datasets.
+
 track_statistics
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -157,6 +193,23 @@ The apply_during parameter is validated against the list of supported phases:
 
 This validation ensures that only the supported phase options are used.
 
+Epoch Interval and Step Interval Validation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Both epoch_interval and step_interval must be positive integers (>= 1). The value 0 would cause a ZeroDivisionError in the modulo check, and negative values have no meaningful ML interpretation. Invalid values raise ValueError at config construction time:
+
+.. code-block:: python
+
+    if not isinstance(self.epoch_interval, int) or self.epoch_interval < 1:
+        raise ValueError(
+            f"epoch_interval must be a positive integer >= 1, got {self.epoch_interval}"
+        )
+
+    if not isinstance(self.step_interval, int) or self.step_interval < 1:
+        raise ValueError(
+            f"step_interval must be a positive integer >= 1, got {self.step_interval}"
+        )
+
 Loading from Dictionary
 -----------------------
 
@@ -174,6 +227,8 @@ When loading from a dictionary, the following keys are recognized:
       probability: 5.0
       injection_type: "lsb_flip"
       apply_during: "train"
+      epoch_interval: 2
+      step_interval: 4
       track_statistics: false
       verbose: false
 
@@ -223,6 +278,25 @@ This method is similar to the training query but checks for the evaluation phase
 
 These convenience methods are useful because they encapsulate the logic for determining when to inject, preventing the training code from having to implement this logic directly.
 
+Epoch and Step Frequency Queries
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The is_faulty_epoch() method checks if a given epoch should have fault injection active:
+
+.. code-block:: python
+
+    def is_faulty_epoch(self, epoch: int) -> bool:
+        return epoch % self.epoch_interval == 0
+
+The is_faulty_step() method checks if a given step within a faulty epoch should have fault injection active:
+
+.. code-block:: python
+
+    def is_faulty_step(self, step: int) -> bool:
+        return step % self.step_interval == 0
+
+These methods intentionally do not check the enabled flag or apply_during setting; they only encode the interval logic. The trainer is responsible for combining these with the phase and enabled checks.
+
 Configuration Export
 ------------------
 
@@ -250,7 +324,7 @@ Usage Examples
 --------------
 
 Direct Instantiation
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Create a configuration by directly specifying parameters:
 
@@ -263,9 +337,37 @@ Create a configuration by directly specifying parameters:
         probability=5.0,
         injection_type="lsb_flip",
         apply_during="train",
+        epoch_interval=2,
+        step_interval=4,
         track_statistics=True,
         verbose=True,
     )
+
+Frequency Scheduling Example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Inject faults every 2 epochs, on every 4th step within each faulty epoch:
+
+.. code-block:: python
+
+    from utils.fault_injection import FaultInjectionConfig
+
+    config = FaultInjectionConfig(
+        enabled=True,
+        probability=5.0,
+        injection_type="random",
+        apply_during="train",
+        epoch_interval=2,
+        step_interval=4,
+    )
+
+    # Check schedule at runtime
+    for epoch in range(100):
+        if config.is_faulty_epoch(epoch):
+            print(f"Epoch {epoch}: faulty epoch")
+        for step in range(steps_per_epoch):
+            if config.is_faulty_step(step):
+                print(f"  Step {step}: fault injection active")
 
 Loading from Dictionary
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

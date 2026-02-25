@@ -91,6 +91,21 @@ activation_fault_injection:
   # Default (if not specified): ["QuantIdentity", "QuantReLU", "QuantHardTanh", "QuantConv2d"]
   target_layers: ["QuantReLU"]
 
+  # How often to inject faults at the epoch level.
+  # epoch_interval: 1   → every epoch is a faulty epoch (default)
+  # epoch_interval: 2   → faulty on epochs 0, 2, 4, ... (every other epoch)
+  # epoch_interval: N   → faulty on epochs 0, N, 2N, ...
+  # Omit this key to use the default (1 = every epoch).
+  epoch_interval: 1
+
+  # How often to inject faults within a faulty epoch at the step level.
+  # step_interval: 1   → every batch/step is a faulty step (default)
+  # step_interval: 4   → faulty on steps 0, 4, 8, ... within each faulty epoch
+  # step_interval: N   → faulty on steps 0, N, 2N, ... within each faulty epoch
+  # Only effective when apply_during is "train" or "both".
+  # Omit this key to use the default (1 = every step).
+  step_interval: 1
+
   # Track injection statistics (RMSE, cosine similarity, etc.)
   track_statistics: true
 
@@ -126,6 +141,12 @@ activation_fault_injection:
 #   # Available: "QuantConv2d", "QuantLinear"
 #   # Default (if not specified): ["QuantConv2d", "QuantLinear"]
 #   target_layers: ["QuantConv2d"]
+
+#   # How often to inject faults at the epoch level (default: 1 = every epoch)
+#   epoch_interval: 1
+
+#   # How often to inject faults within a faulty epoch at the step level (default: 1 = every step)
+#   step_interval: 1
 
 #   # Track injection statistics (RMSE, cosine similarity, etc.)
 #   track_statistics: true

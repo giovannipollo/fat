@@ -194,6 +194,8 @@ The fault injection system provides multiple levels of control:
 
 - **Global enable/disable**: Master switch to turn fault injection on or off
 - **Phase control**: Inject during training, evaluation, or both
+- **Epoch frequency**: Inject on every Nth epoch via epoch_interval
+- **Step frequency**: Inject on every Nth step via step_interval
 - **Probability tuning**: Adjust injection rate from 0% to 100%
 - **Strategy selection**: Choose between different fault models
 - **Per-layer control**: Fine-tune behavior for specific layers
