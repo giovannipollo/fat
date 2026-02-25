@@ -23,6 +23,9 @@ class FaultInjectionConfig:
         target_layers: List of layer types to inject (context depends on target_type).
         track_statistics: Enable statistics tracking (RMSE, cosine similarity).
         verbose: Print injection details.
+        epoch_interval: Inject faults only every N epochs (1 = every epoch, default).
+        step_interval: Inject faults only every N steps within a faulty epoch
+                       (1 = every step, default).
 
     Example:
         ```python
@@ -31,6 +34,8 @@ class FaultInjectionConfig:
             target_type="activation",
             probability=5.0,
             injection_type="random",
+            epoch_interval=2,
+            step_interval=4,
         )
 
         # Or from YAML dict
@@ -46,6 +51,8 @@ class FaultInjectionConfig:
     target_layers: List[str] = field(default_factory=list)
     track_statistics: bool = False
     verbose: bool = False
+    epoch_interval: int = 1
+    step_interval: int = 1
 
     # Valid values for validation
     _VALID_TARGET_TYPES: List[str] = field(
@@ -136,6 +143,8 @@ class FaultInjectionConfig:
             target_layers=config.get("target_layers", default_layers),
             track_statistics=config.get("track_statistics", False),
             verbose=config.get("verbose", False),
+            epoch_interval=config.get("epoch_interval", 1),
+            step_interval=config.get("step_interval", 1),
         )
 
     def validate(self) -> None:
@@ -179,6 +188,16 @@ class FaultInjectionConfig:
                     f"got '{layer}'"
                 )
 
+        if not isinstance(self.epoch_interval, int) or self.epoch_interval < 1:
+            raise ValueError(
+                f"epoch_interval must be a positive integer >= 1, got {self.epoch_interval}"
+            )
+
+        if not isinstance(self.step_interval, int) or self.step_interval < 1:
+            raise ValueError(
+                f"step_interval must be a positive integer >= 1, got {self.step_interval}"
+            )
+
     def should_inject_during_training(self) -> bool:
         """Check if injection should occur during training.
 
@@ -195,6 +214,28 @@ class FaultInjectionConfig:
         """
         return self.enabled and self.apply_during in ("eval", "both")
 
+    def is_faulty_epoch(self, epoch: int) -> bool:
+        """Return True if fault injection should be active during this epoch.
+
+        Args:
+            epoch: Current epoch index (0-based).
+
+        Returns:
+            True when (epoch % epoch_interval == 0).
+        """
+        return epoch % self.epoch_interval == 0
+
+    def is_faulty_step(self, step: int) -> bool:
+        """Return True if fault injection should fire on this step.
+
+        Args:
+            step: Current step index within the epoch (0-based).
+
+        Returns:
+            True when (step % step_interval == 0).
+        """
+        return step % self.step_interval == 0
+
     def to_dict(self) -> Dict[str, Any]:
         """Export configuration as dictionary.
 
@@ -210,4 +251,6 @@ class FaultInjectionConfig:
             "target_layers": self.target_layers,
             "track_statistics": self.track_statistics,
             "verbose": self.verbose,
+            "epoch_interval": self.epoch_interval,
+            "step_interval": self.step_interval,
         }
