@@ -124,9 +124,12 @@ class Trainer:
         if brevitas_config.get("ignore_missing_keys", False):
             try:
                 from brevitas import config as brev_config
+
                 brev_config.IGNORE_MISSING_KEYS = True
                 if self.rank == 0 or not self.is_distributed:
-                    print("Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading")
+                    print(
+                        "Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading"
+                    )
             except ImportError:
                 pass
 
@@ -297,12 +300,8 @@ class Trainer:
         if self.is_distributed and hasattr(self.train_loader, "sampler"):
             self.train_loader.sampler.set_epoch(epoch)
 
-        # Setup fault injection for this epoch
+        # Setup activation fault injection for this epoch
         if self.act_fault_injector is not None and self.act_fault_config is not None:
-
-            # Set up condition injector for step_interval-based injection
-            # No step interval setup needed for simplified injection
-
             # Set mode based on apply_during config
             apply_during = self.act_fault_config.apply_during
             if apply_during in ("train", "both"):
@@ -651,7 +650,9 @@ class Trainer:
             if self.experiment.experiment_dir is not None:
                 ckpt_file = self.experiment.experiment_dir / checkpoint_path
             else:
-                raise FileNotFoundError(f"Cannot resolve relative path: {checkpoint_path}")
+                raise FileNotFoundError(
+                    f"Cannot resolve relative path: {checkpoint_path}"
+                )
 
         if not ckpt_file.exists():
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
@@ -668,9 +669,9 @@ class Trainer:
         if missing_keys:
             print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
         if unexpected_keys:
-            print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
+            print(
+                f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
+            )
 
         self.model = self.model.to(self.device)
         print(f"  Loaded model weights (optimizer/scheduler not restored)")
-
-
