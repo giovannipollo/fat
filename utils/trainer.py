@@ -176,10 +176,20 @@ class Trainer:
         self.weight_fault_config: Optional[FaultInjectionConfig] = None
         self.weight_fault_statistics: Optional[FaultStatistics] = None
 
+        checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
+
+        # Load model weights only (no training state) if specified
+        load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
+        if load_weights_path:
+            print("\n" + "=" * 60)
+            print("Loading pretrained weights (no training state)")
+            print("=" * 60)
+            self._load_weights_only(load_weights_path)
+            self.best_acc = 0.0
+
         self._setup_fault_injection(config)
 
         # Resume from checkpoint if specified (full training state)
-        checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
         resume_path: Optional[str] = checkpoint_config.get("resume")
         if resume_path:
             self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
@@ -190,15 +200,6 @@ class Trainer:
                 self.scaler,
                 self.device,
             )
-
-        # Load model weights only (no training state) if specified
-        load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
-        if load_weights_path:
-            print("\n" + "=" * 60)
-            print("Loading pretrained weights (no training state)")
-            print("=" * 60)
-            self._load_weights_only(load_weights_path)
-            self.best_acc = 0.0
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
