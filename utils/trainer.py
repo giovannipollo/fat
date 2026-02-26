@@ -33,7 +33,6 @@ from .fault_injection import (
     FaultInjectionConfig,
     ActivationFaultInjector,
     WeightFaultInjector,
-    FaultStatistics,
 )
 
 
@@ -170,11 +169,9 @@ class Trainer:
         # Setup fault injection (if configured)
         self.act_fault_injector: Optional[ActivationFaultInjector] = None
         self.act_fault_config: Optional[FaultInjectionConfig] = None
-        self.act_fault_statistics: Optional[FaultStatistics] = None
 
         self.weight_fault_injector: Optional[WeightFaultInjector] = None
         self.weight_fault_config: Optional[FaultInjectionConfig] = None
-        self.weight_fault_statistics: Optional[FaultStatistics] = None
 
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
 
@@ -224,14 +221,6 @@ class Trainer:
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
 
-            # Setup statistics tracking if enabled
-            if self.act_fault_config.track_statistics:
-                num_layers = self.act_fault_injector.get_num_layers(self.model)
-                self.act_fault_statistics = FaultStatistics(num_layers=num_layers)
-                self.act_fault_injector.set_statistics(
-                    self.model, self.act_fault_statistics
-                )
-
             # Log setup
             if self.act_fault_config.verbose:
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
@@ -255,14 +244,6 @@ class Trainer:
                 # Print model architecture with weight hooks
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
-
-            # Setup statistics tracking if enabled
-            if self.weight_fault_config.track_statistics:
-                num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                self.weight_fault_statistics = FaultStatistics(num_layers=num_layers)
-                self.weight_fault_injector.set_statistics(
-                    self.model, self.weight_fault_statistics
-                )
 
             # Log setup
             if self.weight_fault_config.verbose:
@@ -643,45 +624,8 @@ class Trainer:
             final_test_loss, final_test_acc = self.test()
             self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
 
-        # Print fault injection statistics
+        # Log completion
         if self.rank == 0:
-            if self.act_fault_statistics is not None:
-                print("\n" + "=" * 60)
-                print("Activation Fault Injection Statistics:")
-                print("=" * 60)
-                self.act_fault_statistics.print_report()
-
-                # Save statistics to experiment directory
-                experiment_dir = self.experiment.get_experiment_dir()
-                if experiment_dir is not None:
-                    import os
-
-                    stats_path = os.path.join(
-                        experiment_dir, "activation_fault_injection_stats.json"
-                    )
-                    self.act_fault_statistics.save_to_file(stats_path)
-                    print(
-                        f"Activation fault injection statistics saved to: {stats_path}"
-                    )
-
-            if self.weight_fault_statistics is not None:
-                print("\n" + "=" * 60)
-                print("Weight Fault Injection Statistics:")
-                print("=" * 60)
-                self.weight_fault_statistics.print_report()
-
-                # Save statistics to experiment directory
-                experiment_dir = self.experiment.get_experiment_dir()
-                if experiment_dir is not None:
-                    import os
-
-                    stats_path = os.path.join(
-                        experiment_dir, "weight_fault_injection_stats.json"
-                    )
-                    self.weight_fault_statistics.save_to_file(stats_path)
-                    print(f"Weight fault injection statistics saved to: {stats_path}")
-
-            # Log completion
             self.logger.log_training_complete(self.best_acc, eval_name)
 
             experiment_dir = self.experiment.get_experiment_dir()
