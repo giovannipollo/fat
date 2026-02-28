@@ -22,7 +22,7 @@ from torch.cuda.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, SchedulerType
@@ -34,6 +34,7 @@ from .fault_injection import (
     ActivationFaultInjector,
     WeightFaultInjector,
 )
+from .phase_config import PhaseConfig, parse_phases
 
 
 class Trainer:
@@ -135,26 +136,15 @@ class Trainer:
         # Training state
         self.start_epoch: int = 0
         self.best_acc: float = 0.0
-        self.total_epochs: int = config["training"]["epochs"]
 
-        # Setup loss function
-        self.criterion: nn.Module = LossFactory.create(config)
+        # Parse phases (phases key is required)
+        self.phases: List[PhaseConfig] = parse_phases(config)
+        self.total_epochs: int = sum(p.epochs for p in self.phases)
 
-        self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(
-            self.model, config
-        )
-
-        _act_fault_warmup: int = config.get(
-            "activation_fault_injection", {}
-        ).get("warmup_epochs", 0)
-        _weight_fault_warmup: int = config.get(
-            "weight_fault_injection", {}
-        ).get("warmup_epochs", 0)
-        _fault_warmup: int = max(_act_fault_warmup, _weight_fault_warmup)
-
-        self.scheduler: SchedulerType = SchedulerFactory.create(
-            self.optimizer, config, fault_warmup_epochs=_fault_warmup
-        )
+        # Per-phase setup deferred to _setup_phase()
+        self.criterion: Optional[nn.Module] = None
+        self.optimizer: Optional[torch.optim.Optimizer] = None
+        self.scheduler: Optional[SchedulerType] = None
 
         # Mixed precision training (AMP)
         amp_config: Dict[str, Any] = config.get("amp", {})
@@ -193,19 +183,10 @@ class Trainer:
             self._load_weights_only(load_weights_path)
             self.best_acc = 0.0
 
-        self._setup_fault_injection(config)
-
         # Resume from checkpoint if specified (full training state)
-        resume_path: Optional[str] = checkpoint_config.get("resume")
-        if resume_path:
-            self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
-                resume_path,
-                self.model,
-                self.optimizer,
-                self.scheduler,
-                self.scaler,
-                self.device,
-            )
+        # Note: optimizer/scheduler are created per-phase, so resume happens
+        # after we set up the appropriate phase in train()
+        self._resume_path: Optional[str] = checkpoint_config.get("resume")
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
@@ -303,6 +284,50 @@ class Trainer:
         if self.weight_fault_config is not None:
             warmup = max(warmup, self.weight_fault_config.warmup_epochs)
         return warmup
+
+    def _teardown_fault_injection(self) -> None:
+        """Remove any active fault injection from the model."""
+        if self.act_fault_injector is not None:
+            self.model = self.act_fault_injector.remove(self.model)
+            self.act_fault_injector = None
+            self.act_fault_config = None
+
+        if self.weight_fault_injector is not None:
+            self.model = self.weight_fault_injector.remove(self.model)
+            self.weight_fault_injector = None
+            self.weight_fault_config = None
+
+    def _setup_phase(self, phase: PhaseConfig) -> None:
+        """Configure optimizer, scheduler, loss, and fault injection for a phase."""
+        flat = phase.to_flat_config(self.config)
+
+        self.criterion = LossFactory.create(flat)
+
+        self.optimizer = OptimizerFactory.create(self.model, flat)
+
+        act_warmup = phase.activation_fault_injection.get("warmup_epochs", 0)
+        wgt_warmup = phase.weight_fault_injection.get("warmup_epochs", 0)
+        fault_warmup = max(act_warmup, wgt_warmup)
+
+        self.scheduler = SchedulerFactory.create(
+            self.optimizer, flat, fault_warmup_epochs=fault_warmup
+        )
+
+        self._teardown_fault_injection()
+        self._setup_fault_injection(flat)
+
+    def _log_phase_start(self, phase: PhaseConfig) -> None:
+        """Log the start of a training phase."""
+        print("\n" + "=" * 60)
+        print(f"Phase: {phase.name} (index={phase.phase_index})")
+        print(f"  Epochs: {phase.epochs} (global {phase.global_epoch_offset} - {phase.global_epoch_offset + phase.epochs - 1})")
+        print(f"  Batch size: {phase.batch_size}")
+        print(f"  Optimizer: {phase.optimizer.get('name', 'unknown')} (lr={phase.optimizer.get('learning_rate')})")
+        print(f"  Scheduler: {phase.scheduler.get('name', 'unknown')}")
+        print(f"  Loss: {phase.loss.get('name', 'unknown')}")
+        if phase.has_fault_injection:
+            print(f"  Fault injection: enabled")
+        print("=" * 60)
 
     @property
     def has_validation(self) -> bool:
@@ -527,20 +552,13 @@ class Trainer:
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
-        """Run the full training loop
-
-        Executes training for the configured number of epochs,
-        handling validation/test evaluation, checkpointing, and logging.
-        """
+        """Run the full training loop across all phases."""
         epochs: int = self.total_epochs
         model_name: str = self.config["model"]["name"]
         eval_name: str = "Val" if self.has_validation else "Test"
 
-        # Test evaluation frequency (only when using validation set)
-        training_config: Dict[str, Any] = self.config.get("training", {})
-        test_frequency: int = training_config.get("test_frequency", 10)
+        test_frequency: int = 10
 
-        # Log training start
         if self.rank == 0:
             self.logger.log_training_start(
                 model_name=model_name,
@@ -550,147 +568,170 @@ class Trainer:
                 use_amp=self.use_amp,
                 experiment_dir=self.experiment.get_experiment_dir(),
             )
+            print(f"\nTraining will run {len(self.phases)} phase(s):")
+            for p in self.phases:
+                print(f"  - {p.name}: {p.epochs} epochs")
 
-            # Log fault injection info
-            if (
-                self.act_fault_injector is not None
-                and self.act_fault_config is not None
-            ):
-                num_layers = self.act_fault_injector.get_num_layers(self.model)
-                warmup_info = ""
-                if self.act_fault_config.warmup_epochs > 0:
-                    warmup_info = (
-                        f", warmup_epochs={self.act_fault_config.warmup_epochs}, "
-                        f"warmup_schedule={self.act_fault_config.warmup_schedule}"
-                    )
-                print(
-                    f"Activation fault injection: {num_layers} layers, "
-                    f"prob={self.act_fault_config.probability}%{warmup_info}, "
-                    f"epoch_interval={self.act_fault_config.epoch_interval}, "
-                    f"step_interval={self.act_fault_config.step_interval}, "
-                    f"type={self.act_fault_config.injection_type}"
-                )
+        global_epoch = self.start_epoch
 
-            if (
-                self.weight_fault_injector is not None
-                and self.weight_fault_config is not None
-            ):
-                num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                warmup_info = ""
-                if self.weight_fault_config.warmup_epochs > 0:
-                    warmup_info = (
-                        f", warmup_epochs={self.weight_fault_config.warmup_epochs}, "
-                        f"warmup_schedule={self.weight_fault_config.warmup_schedule}"
-                    )
-                print(
-                    f"Weight fault injection: {num_layers} hooks, "
-                    f"prob={self.weight_fault_config.probability}%{warmup_info}, "
-                    f"epoch_interval={self.weight_fault_config.epoch_interval}, "
-                    f"step_interval={self.weight_fault_config.step_interval}, "
-                    f"type={self.weight_fault_config.injection_type}"
-                )
+        for phase in self.phases:
+            phase_end = phase.global_epoch_offset + phase.epochs
+            if global_epoch >= phase_end:
+                continue
 
-        for epoch in range(self.start_epoch, epochs):
-            self._apply_fault_warmup(epoch)
+            self._setup_phase(phase)
 
-            act_faulty_epoch = (
-                self.act_fault_injector is not None
-                and self.act_fault_config is not None
-                and self.act_fault_config.should_inject_during_training()
-                and self.act_fault_config.is_faulty_epoch(epoch)
-            )
-            weight_faulty_epoch = (
-                self.weight_fault_injector is not None
-                and self.weight_fault_config is not None
-                and self.weight_fault_config.should_inject_during_training()
-                and self.weight_fault_config.is_faulty_epoch(epoch)
-            )
-            is_faulty_epoch = act_faulty_epoch or weight_faulty_epoch
-
-            train_loss, train_acc = self.train_epoch(
-                epoch=epoch, is_faulty_epoch=is_faulty_epoch
-            )
-
-            fault_warmup_epochs = self._fault_warmup_epochs()
-            in_fault_warmup = epoch < fault_warmup_epochs
-
-            if self.scheduler is not None:
-                lr = self.scheduler.get_last_lr()[0]
-                if not in_fault_warmup:
-                    self.scheduler.step()
-            else:
-                lr = self.config["optimizer"]["learning_rate"]
-            # Evaluate on validation or test set
-            if self.has_validation:
-                eval_loss, eval_acc = self.validate()
-            else:
-                eval_loss, eval_acc = self.test()
-
-            # Check if this is the best model
-            is_best = eval_acc > self.best_acc
-            if is_best:
-                self.best_acc = eval_acc
-
-            # Evaluate on test set when:
-            # 1. We find a new best model (when using validation), OR
-            # 2. It's a periodic test evaluation epoch (when using validation)
-            test_loss, test_acc = None, None
-            if self.has_validation:
-                is_periodic_test = test_frequency > 0 and (
-                    (epoch + 1) % test_frequency == 0 or epoch == epochs - 1
-                )
-                if is_best or is_periodic_test:
-                    test_loss, test_acc = self.test()
-
-            # Log epoch metrics
             if self.rank == 0:
-                self.logger.log_epoch(
-                    epoch=epoch,
-                    total_epochs=epochs,
-                    lr=lr,
-                    train_loss=train_loss,
-                    train_acc=train_acc,
-                    eval_loss=eval_loss,
-                    eval_acc=eval_acc,
-                    eval_name=eval_name,
-                    test_loss=test_loss,
-                    test_acc=test_acc,
-                )
+                self._log_phase_start(phase)
 
-            # Save checkpoint (only on rank 0)
-            if self.rank == 0 and self.experiment.should_save(epoch, is_best):
-                model_to_save = self.model.module if self.is_distributed else self.model
-                self.experiment.save_checkpoint(
-                    epoch=epoch,
-                    model=model_to_save,
-                    optimizer=self.optimizer,
-                    scheduler=self.scheduler,
-                    best_acc=self.best_acc,
-                    current_acc=eval_acc,
-                    scaler=self.scaler,
-                    is_best=is_best,
-                    test_acc=test_acc if is_best and self.has_validation else None,
-                    act_fault_injector=self.act_fault_injector,
-                    weight_fault_injector=self.weight_fault_injector,
-                    act_fault_config=self.act_fault_config,
-                    weight_fault_config=self.weight_fault_config,
-                )
-
-                # Log best model to file
-                if is_best:
-                    self.logger.log_best_model(
-                        epoch=epoch,
-                        val_acc=eval_acc,
-                        test_acc=test_acc if self.has_validation else None,
+                if (
+                    self.act_fault_injector is not None
+                    and self.act_fault_config is not None
+                ):
+                    num_layers = self.act_fault_injector.get_num_layers(self.model)
+                    warmup_info = ""
+                    if self.act_fault_config.warmup_epochs > 0:
+                        warmup_info = (
+                            f", warmup_epochs={self.act_fault_config.warmup_epochs}, "
+                            f"warmup_schedule={self.act_fault_config.warmup_schedule}"
+                        )
+                    print(
+                        f"Activation fault injection: {num_layers} layers, "
+                        f"prob={self.act_fault_config.probability}%{warmup_info}, "
+                        f"epoch_interval={self.act_fault_config.epoch_interval}, "
+                        f"step_interval={self.act_fault_config.step_interval}, "
+                        f"type={self.act_fault_config.injection_type}"
                     )
 
-        # Final evaluation on test set (if we used validation during training)
+                if (
+                    self.weight_fault_injector is not None
+                    and self.weight_fault_config is not None
+                ):
+                    num_layers = self.weight_fault_injector.get_num_layers(self.model)
+                    warmup_info = ""
+                    if self.weight_fault_config.warmup_epochs > 0:
+                        warmup_info = (
+                            f", warmup_epochs={self.weight_fault_config.warmup_epochs}, "
+                            f"warmup_schedule={self.weight_fault_config.warmup_schedule}"
+                        )
+                    print(
+                        f"Weight fault injection: {num_layers} hooks, "
+                        f"prob={self.weight_fault_config.probability}%{warmup_info}, "
+                        f"epoch_interval={self.weight_fault_config.epoch_interval}, "
+                        f"step_interval={self.weight_fault_config.step_interval}, "
+                        f"type={self.weight_fault_config.injection_type}"
+                    )
+
+            if self._resume_path is not None and global_epoch == self.start_epoch:
+                self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
+                    self._resume_path,
+                    self.model,
+                    self.optimizer,
+                    self.scheduler,
+                    self.scaler,
+                    self.device,
+                )
+                global_epoch = self.start_epoch
+                self._resume_path = None
+
+            local_start = max(0, global_epoch - phase.global_epoch_offset)
+
+            for local_epoch in range(local_start, phase.epochs):
+                global_epoch = phase.global_epoch_offset + local_epoch
+
+                self._apply_fault_warmup(local_epoch)
+
+                act_faulty_epoch = (
+                    self.act_fault_injector is not None
+                    and self.act_fault_config is not None
+                    and self.act_fault_config.should_inject_during_training()
+                    and self.act_fault_config.is_faulty_epoch(local_epoch)
+                )
+                weight_faulty_epoch = (
+                    self.weight_fault_injector is not None
+                    and self.weight_fault_config is not None
+                    and self.weight_fault_config.should_inject_during_training()
+                    and self.weight_fault_config.is_faulty_epoch(local_epoch)
+                )
+                is_faulty_epoch = act_faulty_epoch or weight_faulty_epoch
+
+                train_loss, train_acc = self.train_epoch(
+                    epoch=global_epoch, is_faulty_epoch=is_faulty_epoch
+                )
+
+                fault_warmup_epochs = self._fault_warmup_epochs()
+                in_fault_warmup = local_epoch < fault_warmup_epochs
+
+                if self.scheduler is not None:
+                    lr = self.scheduler.get_last_lr()[0]
+                    if not in_fault_warmup:
+                        self.scheduler.step()
+                else:
+                    lr = phase.optimizer.get("learning_rate", 0.0)
+
+                if self.has_validation:
+                    eval_loss, eval_acc = self.validate()
+                else:
+                    eval_loss, eval_acc = self.test()
+
+                is_best = eval_acc > self.best_acc
+                if is_best:
+                    self.best_acc = eval_acc
+
+                test_loss, test_acc = None, None
+                if self.has_validation:
+                    is_periodic_test = test_frequency > 0 and (
+                        (global_epoch + 1) % test_frequency == 0 or global_epoch == epochs - 1
+                    )
+                    if is_best or is_periodic_test:
+                        test_loss, test_acc = self.test()
+
+                if self.rank == 0:
+                    self.logger.log_epoch(
+                        epoch=global_epoch,
+                        total_epochs=epochs,
+                        lr=lr,
+                        train_loss=train_loss,
+                        train_acc=train_acc,
+                        eval_loss=eval_loss,
+                        eval_acc=eval_acc,
+                        eval_name=eval_name,
+                        test_loss=test_loss,
+                        test_acc=test_acc,
+                    )
+
+                if self.rank == 0 and self.experiment.should_save(global_epoch, is_best):
+                    model_to_save = self.model.module if self.is_distributed else self.model
+                    self.experiment.save_checkpoint(
+                        epoch=global_epoch,
+                        model=model_to_save,
+                        optimizer=self.optimizer,
+                        scheduler=self.scheduler,
+                        best_acc=self.best_acc,
+                        current_acc=eval_acc,
+                        scaler=self.scaler,
+                        is_best=is_best,
+                        test_acc=test_acc if is_best and self.has_validation else None,
+                        act_fault_injector=self.act_fault_injector,
+                        weight_fault_injector=self.weight_fault_injector,
+                        act_fault_config=self.act_fault_config,
+                        weight_fault_config=self.weight_fault_config,
+                    )
+
+                    if is_best:
+                        self.logger.log_best_model(
+                            epoch=global_epoch,
+                            val_acc=eval_acc,
+                            test_acc=test_acc if self.has_validation else None,
+                        )
+
+            self._teardown_fault_injection()
+
         if self.has_validation and self.rank == 0:
             print("\nRunning final evaluation on test set...")
             final_test_loss, final_test_acc = self.test()
             self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
 
-        # Log completion
         if self.rank == 0:
             self.logger.log_training_complete(self.best_acc, eval_name)
 
@@ -698,7 +739,6 @@ class Trainer:
             if experiment_dir is not None:
                 print(f"Results saved to: {experiment_dir}")
 
-            # Close logger
             self.logger.close()
 
     def _load_weights_only(self, checkpoint_path: str) -> None:
