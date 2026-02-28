@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
+import math
 
 
 @dataclass
@@ -26,6 +27,10 @@ class FaultInjectionConfig:
         epoch_interval: Inject faults only every N epochs (1 = every epoch, default).
         step_interval: Inject faults only every N steps within a faulty epoch
                        (1 = every step, default).
+        warmup_epochs: Number of epochs over which to ramp the injection probability
+                       from 0 to `probability`. 0 = no warmup (default).
+        warmup_schedule: Shape of the warmup ramp. "linear" (default) or "cosine".
+                         Only meaningful when warmup_epochs > 0.
 
     Example:
         ```python
@@ -53,8 +58,9 @@ class FaultInjectionConfig:
     verbose: bool = False
     epoch_interval: int = 1
     step_interval: int = 1
+    warmup_epochs: int = 0
+    warmup_schedule: str = "linear"
 
-    # Valid values for validation
     _VALID_TARGET_TYPES: List[str] = field(
         default_factory=lambda: ["activation", "weight"],
         repr=False,
@@ -79,6 +85,10 @@ class FaultInjectionConfig:
     )
     _VALID_WEIGHT_LAYERS: List[str] = field(
         default_factory=lambda: ["QuantConv2d", "QuantLinear"],
+        repr=False,
+    )
+    _VALID_WARMUP_SCHEDULES: List[str] = field(
+        default_factory=lambda: ["linear", "cosine"],
         repr=False,
     )
 
@@ -145,6 +155,8 @@ class FaultInjectionConfig:
             verbose=config.get("verbose", False),
             epoch_interval=config.get("epoch_interval", 1),
             step_interval=config.get("step_interval", 1),
+            warmup_epochs=config.get("warmup_epochs", 0),
+            warmup_schedule=config.get("warmup_schedule", "linear"),
         )
 
     def validate(self) -> None:
@@ -198,6 +210,17 @@ class FaultInjectionConfig:
                 f"step_interval must be a positive integer >= 1, got {self.step_interval}"
             )
 
+        if not isinstance(self.warmup_epochs, int) or self.warmup_epochs < 0:
+            raise ValueError(
+                f"warmup_epochs must be a non-negative integer, got {self.warmup_epochs}"
+            )
+
+        if self.warmup_schedule not in self._VALID_WARMUP_SCHEDULES:
+            raise ValueError(
+                f"warmup_schedule must be one of {self._VALID_WARMUP_SCHEDULES}, "
+                f"got '{self.warmup_schedule}'"
+            )
+
     def should_inject_during_training(self) -> bool:
         """Check if injection should occur during training.
 
@@ -236,6 +259,39 @@ class FaultInjectionConfig:
         """
         return step % self.step_interval == 0
 
+    def get_warmup_probability(self, epoch: int) -> float:
+        """Return the effective injection probability for the given epoch.
+
+        During the warmup window [0, warmup_epochs), the probability is
+        interpolated from 0 to self.probability. At epoch >= warmup_epochs
+        the full target probability is returned.
+
+        When warmup_epochs == 0, always returns self.probability unchanged.
+
+        Args:
+            epoch: Current epoch index (0-based).
+
+        Returns:
+            Effective probability value in [0, self.probability].
+
+        Example:
+            >>> cfg = FaultInjectionConfig(probability=10.0, warmup_epochs=5,
+            ...                            warmup_schedule="linear")
+            >>> [cfg.get_warmup_probability(e) for e in range(7)]
+            [2.0, 4.0, 6.0, 8.0, 10.0, 10.0, 10.0]
+        """
+        if self.warmup_epochs == 0 or epoch >= self.warmup_epochs:
+            return self.probability
+
+        progress: float = (epoch + 1) / self.warmup_epochs
+
+        if self.warmup_schedule == "linear":
+            factor = progress
+        else:
+            factor = (1.0 - math.cos(math.pi * progress)) / 2.0
+
+        return self.probability * factor
+
     def to_dict(self) -> Dict[str, Any]:
         """Export configuration as dictionary.
 
@@ -253,4 +309,6 @@ class FaultInjectionConfig:
             "verbose": self.verbose,
             "epoch_interval": self.epoch_interval,
             "step_interval": self.step_interval,
+            "warmup_epochs": self.warmup_epochs,
+            "warmup_schedule": self.warmup_schedule,
         }
