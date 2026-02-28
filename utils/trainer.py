@@ -678,7 +678,8 @@ class Trainer:
                 if is_best:
                     self.best_acc = eval_acc
 
-                if eval_acc > phase_best_acc:
+                is_phase_best = eval_acc > phase_best_acc
+                if is_phase_best:
                     phase_best_acc = eval_acc
 
                 test_loss, test_acc = None, None
@@ -715,6 +716,7 @@ class Trainer:
                         current_acc=eval_acc,
                         scaler=self.scaler,
                         is_best=is_best,
+                        is_phase_best=is_phase_best,
                         test_acc=test_acc if is_best and self.has_validation else None,
                         act_fault_injector=self.act_fault_injector,
                         weight_fault_injector=self.weight_fault_injector,

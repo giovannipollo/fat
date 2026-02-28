@@ -94,27 +94,21 @@ class ExperimentManager:
             custom_name: Optional custom prefix.
 
         Returns:
-            Experiment name string (format: [prefix_]model_timestamp).
+            Experiment name string (format: [prefix_]timestamp_model_precision_dataset_sat/fat).
+            Phase information is NOT included - it lives in subdirectories.
         """
         model_name: str = self.config["model"]["name"].lower()
         sat_or_fat: str = self._get_sat_or_fat()
-        activation_or_weight: str = self._get_activation_or_weight_fault_injection()
         dataset_name: str = self._get_dataset_name()
         timestamp: str = datetime.now().strftime("%Y%m%d_%H%M%S")
         precision: str = self._get_precision()
 
+        base = f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
+
         if custom_name:
-            if activation_or_weight == "":
-                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
-            else:
-                return f"{custom_name}_{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
-        else:
-            if activation_or_weight == "":
-                return (
-                    f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}"
-                )
-            else:
-                return f"{timestamp}_{model_name}_{precision}_{dataset_name}_{sat_or_fat}_{activation_or_weight}"
+            base = f"{custom_name}_{base}"
+
+        return base
 
     def _get_dataset_name(self) -> str:
         """Get the dataset name from config.
@@ -127,9 +121,18 @@ class ExperimentManager:
     def _get_sat_or_fat(self) -> str:
         """Determine if the experiment is SAT or FAT based on config.
 
+        Checks all phases - FAT if any phase has fault injection enabled.
+
         Returns:
             "sat" if no fault injection, "fat" if any fault injection enabled.
         """
+        phases = self.config.get("phases", [])
+        for phase in phases:
+            act = phase.get("activation_fault_injection", {})
+            wgt = phase.get("weight_fault_injection", {})
+            if act.get("enabled", False) or wgt.get("enabled", False):
+                return "fat"
+
         activation_fault_injection: Dict[str, Any] = self.config.get(
             "activation_fault_injection", {}
         )
@@ -194,9 +197,10 @@ class ExperimentManager:
         base_dir: str,
         custom_name: Optional[str] = None,
     ):
-        """Setup experiment directory structure.
+        """Setup experiment directory structure with per-phase subdirectories.
 
-        Creates a hierarchical structure: base_dir/dataset/model_timestamp/
+        Creates a hierarchical structure: base_dir/sat_or_fat/dataset/model/precision/experiment_name/
+        with per-phase subdirectories inside.
 
         Args:
             base_dir: Base directory for experiments.
@@ -217,15 +221,25 @@ class ExperimentManager:
             / precision_folder
             / experiment_name
         )
-        self.checkpoint_dir = self.experiment_dir / "checkpoints"
-        self.tensorboard_dir = self.experiment_dir / "tensorboard"
 
-        # Create directories
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
+
+        self.phase_dirs: Dict[int, Path] = {}
+        phases = self.config.get("phases", [])
+        for i, phase in enumerate(phases):
+            phase_name = phase.get("name", f"phase_{i}")
+            phase_dir = self.experiment_dir / f"{i}_{phase_name}"
+            phase_dir.mkdir(parents=True, exist_ok=True)
+            (phase_dir / "checkpoints").mkdir(exist_ok=True)
+            (phase_dir / "tensorboard").mkdir(exist_ok=True)
+            self.phase_dirs[i] = phase_dir
+
+        self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+        self.tensorboard_dir = self.experiment_dir / "tensorboard"
         self.tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save config
         self._save_config()
 
     def _save_config(self) -> None:
@@ -262,6 +276,7 @@ class ExperimentManager:
         current_acc: float,
         scaler: Optional[Any] = None,
         is_best: bool = False,
+        is_phase_best: bool = False,
         test_acc: Optional[float] = None,
         act_fault_injector: Optional["ActivationFaultInjector"] = None,
         weight_fault_injector: Optional["WeightFaultInjector"] = None,
@@ -283,6 +298,7 @@ class ExperimentManager:
             current_acc: Current epoch's accuracy.
             scaler: GradScaler for AMP (optional).
             is_best: Whether this is the best model so far (global).
+            is_phase_best: Whether this is the best model within the current phase.
             test_acc: Test accuracy (for best model with validation).
             act_fault_injector: Optional activation fault injector to remove before saving.
             weight_fault_injector: Optional weight fault injector to remove before saving.
@@ -296,7 +312,6 @@ class ExperimentManager:
         if not self.enabled or self.checkpoint_dir is None:
             return
 
-        # Remove fault injection wrappers/hooks before saving
         needs_act_reinject = act_fault_injector is not None
         needs_weight_reinject = weight_fault_injector is not None
 
@@ -320,26 +335,31 @@ class ExperimentManager:
             "total_phases": total_phases,
         }
 
-        # Save scaler state if using AMP
         if scaler is not None:
             checkpoint["scaler_state_dict"] = scaler.state_dict()
 
-        # Save periodic checkpoint
-        checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
-        torch.save(checkpoint, checkpoint_path)
+        phase_ckpt_dir = self.get_phase_checkpoint_dir(phase_index, phase_name)
+        if phase_ckpt_dir is not None:
+            checkpoint_path = phase_ckpt_dir / f"epoch_{epoch:04d}.pt"
+            torch.save(checkpoint, checkpoint_path)
 
-        # Save latest checkpoint (always overwritten)
-        latest_path: Path = self.checkpoint_dir / "latest.pt"
-        torch.save(checkpoint, latest_path)
+            torch.save(checkpoint, phase_ckpt_dir / "latest.pt")
 
-        # Save best checkpoint
+            if is_phase_best and self.save_best:
+                phase_best_ckpt = dict(checkpoint)
+                if test_acc is not None:
+                    phase_best_ckpt["test_acc"] = test_acc
+                torch.save(phase_best_ckpt, phase_ckpt_dir / "best.pt")
+
+        torch.save(checkpoint, self.checkpoint_dir / "latest.pt")
+
         if is_best and self.save_best:
-            # Include test accuracy in best checkpoint
+            global_best_ckpt = dict(checkpoint)
             if test_acc is not None:
-                checkpoint["test_acc"] = test_acc
+                global_best_ckpt["test_acc"] = test_acc
             
             best_path: Path = self.checkpoint_dir / "best.pt"
-            torch.save(checkpoint, best_path)
+            torch.save(global_best_ckpt, best_path)
             
             if test_acc is not None:
                 print(
@@ -348,7 +368,6 @@ class ExperimentManager:
             else:
                 print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
 
-        # Re-inject fault injection wrappers/hooks after saving
         if needs_act_reinject and act_fault_config is not None:
             model = act_fault_injector.inject(model, act_fault_config)
 
@@ -432,22 +451,59 @@ class ExperimentManager:
         """Get the phase name from the last loaded checkpoint."""
         return self._resumed_phase_name
 
-    def get_phase_checkpoint_dir(self, phase_index: int, phase_name: str) -> Optional[Path]:
+    def get_phase_dir(self, phase_index: int) -> Optional[Path]:
+        """Get the directory for a specific phase.
+
+        Args:
+            phase_index: Index of the phase (0-based).
+
+        Returns:
+            Path to phase directory, or None if disabled.
+        """
+        if not self.enabled:
+            return None
+        if hasattr(self, "phase_dirs") and phase_index in self.phase_dirs:
+            return self.phase_dirs[phase_index]
+        if self.experiment_dir is None:
+            return None
+        return self.experiment_dir / f"{phase_index}_phase_{phase_index}"
+
+    def get_phase_checkpoint_dir(self, phase_index: int, phase_name: str = "") -> Optional[Path]:
         """Get the checkpoint directory for a specific phase.
 
         Args:
             phase_index: Index of the phase (0-based).
-            phase_name: Name of the phase.
+            phase_name: Name of the phase (optional, used for fallback).
 
         Returns:
             Path to phase checkpoint directory, or None if disabled.
         """
+        if not self.enabled:
+            return None
+        if hasattr(self, "phase_dirs") and phase_index in self.phase_dirs:
+            return self.phase_dirs[phase_index] / "checkpoints"
         if self.experiment_dir is None:
             return None
-
         phase_dir = self.experiment_dir / f"{phase_index}_{phase_name}" / "checkpoints"
         phase_dir.mkdir(parents=True, exist_ok=True)
         return phase_dir
+
+    def get_phase_tensorboard_dir(self, phase_index: int) -> Optional[Path]:
+        """Get the TensorBoard directory for a specific phase.
+
+        Args:
+            phase_index: Index of the phase (0-based).
+
+        Returns:
+            Path to phase TensorBoard directory, or None if disabled.
+        """
+        if not self.enabled:
+            return None
+        if hasattr(self, "phase_dirs") and phase_index in self.phase_dirs:
+            return self.phase_dirs[phase_index] / "tensorboard"
+        if self.experiment_dir is None:
+            return None
+        return self.experiment_dir / f"{phase_index}_phase_{phase_index}" / "tensorboard"
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
