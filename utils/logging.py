@@ -133,6 +133,7 @@ class MetricsLogger:
         test_loss: Optional[float] = None,
         test_acc: Optional[float] = None,
         is_best: bool = False,
+        phase_name: str = "",
     ) -> None:
         """Log metrics for an epoch.
 
@@ -148,10 +149,11 @@ class MetricsLogger:
             test_loss: Optional test loss (when using validation).
             test_acc: Optional test accuracy (when using validation).
             is_best: Whether this epoch achieved the best accuracy.
+            phase_name: Name of the current phase (for labeling).
         """
-        # Build log message
+        phase_prefix = f"[{phase_name}] " if phase_name else ""
         log_msg = (
-            f"Epoch [{epoch + 1}/{total_epochs}] "
+            f"{phase_prefix}Epoch [{epoch + 1}/{total_epochs}] "
             f"LR: {lr:.5f} | "
             f"Train Loss: {train_loss:.4f} | "
             f"Train Acc: {train_acc:.2f}% | "
@@ -159,22 +161,17 @@ class MetricsLogger:
             f"{eval_name} Acc: {eval_acc:.2f}%"
         )
 
-        # Add test metrics if available
         if test_loss is not None and test_acc is not None:
             log_msg += f" | Test Loss: {test_loss:.4f} | Test Acc: {test_acc:.2f}%"
 
-        # Add best model indicator
         if is_best:
             log_msg += " [BEST]"
 
-        # Console logging
         if self.console_enabled:
             print(log_msg)
 
-        # File logging
         self._write_to_file(log_msg)
 
-        # TensorBoard logging
         if self.writer is not None:
             self.writer.add_scalar("Learning Rate", lr, epoch)
             self.writer.add_scalar("Loss/train", train_loss, epoch)
@@ -182,10 +179,19 @@ class MetricsLogger:
             self.writer.add_scalar("Accuracy/train", train_acc, epoch)
             self.writer.add_scalar(f"Accuracy/{eval_name.lower()}", eval_acc, epoch)
 
-            # Log test metrics if available
+            if phase_name:
+                self.writer.add_scalar(f"{phase_name}/Loss/train", train_loss, epoch)
+                self.writer.add_scalar(f"{phase_name}/Loss/{eval_name.lower()}", eval_loss, epoch)
+                self.writer.add_scalar(f"{phase_name}/Accuracy/train", train_acc, epoch)
+                self.writer.add_scalar(f"{phase_name}/Accuracy/{eval_name.lower()}", eval_acc, epoch)
+                self.writer.add_scalar(f"{phase_name}/Learning Rate", lr, epoch)
+
             if test_loss is not None and test_acc is not None:
                 self.writer.add_scalar("Loss/test", test_loss, epoch)
                 self.writer.add_scalar("Accuracy/test", test_acc, epoch)
+                if phase_name:
+                    self.writer.add_scalar(f"{phase_name}/Loss/test", test_loss, epoch)
+                    self.writer.add_scalar(f"{phase_name}/Accuracy/test", test_acc, epoch)
 
     def log_final_test(self, loss: float, accuracy: float, epoch: int) -> None:
         """Log final test results.
@@ -237,6 +243,7 @@ class MetricsLogger:
         has_validation: bool = False,
         use_amp: bool = False,
         experiment_dir: Optional[Path] = None,
+        num_phases: int = 1,
     ) -> None:
         """Log training start information.
 
@@ -247,10 +254,11 @@ class MetricsLogger:
             has_validation: Whether validation set is available.
             use_amp: Whether AMP is enabled.
             experiment_dir: Experiment directory path.
+            num_phases: Number of training phases.
         """
-        # Build messages
+        phase_str = f" ({num_phases} phase{'s' if num_phases > 1 else ''})" if num_phases > 1 else ""
         messages: List[str] = [
-            f"\nStarting training {model_name} for {epochs} epochs...",
+            f"\nStarting training {model_name} for {epochs} epochs{phase_str}...",
             f"Using device: {device}",
         ]
         if has_validation:
@@ -263,16 +271,78 @@ class MetricsLogger:
             )
         if experiment_dir is not None:
             messages.append(f"Experiment directory: {experiment_dir}")
-        messages.append("")  # Empty line
+        messages.append("")
 
-        # Console logging
         if self.console_enabled:
             for msg in messages:
                 print(msg)
 
-        # File logging
         for msg in messages:
             self._write_to_file(msg)
+
+    def log_phase_start(
+        self,
+        phase_name: str,
+        phase_index: int,
+        total_phases: int,
+        epochs: int,
+        global_epoch_offset: int,
+        optimizer_name: str,
+        learning_rate: float,
+        has_fault_injection: bool = False,
+    ) -> None:
+        """Log the start of a new training phase.
+
+        Args:
+            phase_name: Name of the phase.
+            phase_index: Index of the phase (0-based).
+            total_phases: Total number of phases.
+            epochs: Number of epochs in this phase.
+            global_epoch_offset: Starting global epoch for this phase.
+            optimizer_name: Name of the optimizer.
+            learning_rate: Learning rate for this phase.
+            has_fault_injection: Whether fault injection is enabled.
+        """
+        separator = "=" * 60
+        messages = [
+            "",
+            separator,
+            f"Phase {phase_index + 1}/{total_phases}: '{phase_name}'",
+            f"  Epochs: {epochs} (global {global_epoch_offset + 1} to {global_epoch_offset + epochs})",
+            f"  Optimizer: {optimizer_name}, LR: {learning_rate}",
+        ]
+        if has_fault_injection:
+            messages.append("  Fault injection: enabled")
+        messages.append(separator)
+
+        if self.console_enabled:
+            for msg in messages:
+                print(msg)
+
+        for msg in messages:
+            self._write_to_file(msg)
+
+    def log_phase_complete(
+        self,
+        phase_name: str,
+        phase_index: int,
+        best_acc: float,
+        eval_name: str = "Val",
+    ) -> None:
+        """Log completion of a training phase.
+
+        Args:
+            phase_name: Name of the phase.
+            phase_index: Index of the phase (0-based).
+            best_acc: Best accuracy achieved in this phase.
+            eval_name: Name of the evaluation set.
+        """
+        msg = f"Phase '{phase_name}' complete. Best {eval_name} acc: {best_acc:.2f}%"
+
+        if self.console_enabled:
+            print(msg)
+
+        self._write_to_file(msg)
 
     def log_training_complete(self, best_acc: float, eval_name: str = "Val") -> None:
         """Log training completion message.

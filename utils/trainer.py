@@ -318,16 +318,16 @@ class Trainer:
 
     def _log_phase_start(self, phase: PhaseConfig) -> None:
         """Log the start of a training phase."""
-        print("\n" + "=" * 60)
-        print(f"Phase: {phase.name} (index={phase.phase_index})")
-        print(f"  Epochs: {phase.epochs} (global {phase.global_epoch_offset} - {phase.global_epoch_offset + phase.epochs - 1})")
-        print(f"  Batch size: {phase.batch_size}")
-        print(f"  Optimizer: {phase.optimizer.get('name', 'unknown')} (lr={phase.optimizer.get('learning_rate')})")
-        print(f"  Scheduler: {phase.scheduler.get('name', 'unknown')}")
-        print(f"  Loss: {phase.loss.get('name', 'unknown')}")
-        if phase.has_fault_injection:
-            print(f"  Fault injection: enabled")
-        print("=" * 60)
+        self.logger.log_phase_start(
+            phase_name=phase.name,
+            phase_index=phase.phase_index,
+            total_phases=len(self.phases),
+            epochs=phase.epochs,
+            global_epoch_offset=phase.global_epoch_offset,
+            optimizer_name=phase.optimizer.get("name", "unknown"),
+            learning_rate=phase.optimizer.get("learning_rate", 0.0),
+            has_fault_injection=phase.has_fault_injection,
+        )
 
     @property
     def has_validation(self) -> bool:
@@ -567,10 +567,8 @@ class Trainer:
                 has_validation=self.has_validation,
                 use_amp=self.use_amp,
                 experiment_dir=self.experiment.get_experiment_dir(),
+                num_phases=len(self.phases),
             )
-            print(f"\nTraining will run {len(self.phases)} phase(s):")
-            for p in self.phases:
-                print(f"  - {p.name}: {p.epochs} epochs")
 
         global_epoch = self.start_epoch
 
@@ -636,6 +634,8 @@ class Trainer:
 
             local_start = max(0, global_epoch - phase.global_epoch_offset)
 
+            phase_best_acc = 0.0
+
             for local_epoch in range(local_start, phase.epochs):
                 global_epoch = phase.global_epoch_offset + local_epoch
 
@@ -678,6 +678,9 @@ class Trainer:
                 if is_best:
                     self.best_acc = eval_acc
 
+                if eval_acc > phase_best_acc:
+                    phase_best_acc = eval_acc
+
                 test_loss, test_acc = None, None
                 if self.has_validation:
                     is_periodic_test = test_frequency > 0 and (
@@ -698,6 +701,7 @@ class Trainer:
                         eval_name=eval_name,
                         test_loss=test_loss,
                         test_acc=test_acc,
+                        phase_name=phase.name,
                     )
 
                 if self.rank == 0 and self.experiment.should_save(global_epoch, is_best):
@@ -728,6 +732,14 @@ class Trainer:
                             val_acc=eval_acc,
                             test_acc=test_acc if self.has_validation else None,
                         )
+
+            if self.rank == 0:
+                self.logger.log_phase_complete(
+                    phase_name=phase.name,
+                    phase_index=phase.phase_index,
+                    best_acc=phase_best_acc,
+                    eval_name=eval_name,
+                )
 
             self._teardown_fault_injection()
 
