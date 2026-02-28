@@ -140,12 +140,21 @@ class Trainer:
         # Setup loss function
         self.criterion: nn.Module = LossFactory.create(config)
 
-        # Setup optimizer and scheduler using factories
         self.optimizer: torch.optim.Optimizer = OptimizerFactory.create(
             self.model, config
         )
 
-        self.scheduler: SchedulerType = SchedulerFactory.create(self.optimizer, config)
+        _act_fault_warmup: int = config.get(
+            "activation_fault_injection", {}
+        ).get("warmup_epochs", 0)
+        _weight_fault_warmup: int = config.get(
+            "weight_fault_injection", {}
+        ).get("warmup_epochs", 0)
+        _fault_warmup: int = max(_act_fault_warmup, _weight_fault_warmup)
+
+        self.scheduler: SchedulerType = SchedulerFactory.create(
+            self.optimizer, config, fault_warmup_epochs=_fault_warmup
+        )
 
         # Mixed precision training (AMP)
         amp_config: Dict[str, Any] = config.get("amp", {})
@@ -254,6 +263,46 @@ class Trainer:
                 print(f"  Probability: {self.weight_fault_config.probability}%")
                 print(f"  Injection type: {self.weight_fault_config.injection_type}")
                 print(f"  Apply during: {self.weight_fault_config.apply_during}")
+
+    def _apply_fault_warmup(self, epoch: int) -> None:
+        """Update fault injection probabilities for the current warmup epoch.
+
+        Called once per epoch from the main training loop. When warmup_epochs > 0,
+        the effective probability is computed by FaultInjectionConfig.get_warmup_probability()
+        and pushed to all injection layers via update_probability(). When warmup is
+        complete or not configured, this method is a no-op.
+
+        Args:
+            epoch: Current epoch index (0-based).
+        """
+        if (
+            self.act_fault_injector is not None
+            and self.act_fault_config is not None
+            and self.act_fault_config.warmup_epochs > 0
+        ):
+            p = self.act_fault_config.get_warmup_probability(epoch)
+            self.act_fault_injector.update_probability(self.model, p)
+
+        if (
+            self.weight_fault_injector is not None
+            and self.weight_fault_config is not None
+            and self.weight_fault_config.warmup_epochs > 0
+        ):
+            p = self.weight_fault_config.get_warmup_probability(epoch)
+            self.weight_fault_injector.update_probability(self.model, p)
+
+    def _fault_warmup_epochs(self) -> int:
+        """Return the number of epochs over which fault probability is being warmed up.
+
+        This is the maximum warmup_epochs across both active injector configs.
+        Returns 0 if no fault warmup is configured.
+        """
+        warmup = 0
+        if self.act_fault_config is not None:
+            warmup = max(warmup, self.act_fault_config.warmup_epochs)
+        if self.weight_fault_config is not None:
+            warmup = max(warmup, self.weight_fault_config.warmup_epochs)
+        return warmup
 
     @property
     def has_validation(self) -> bool:
@@ -530,7 +579,8 @@ class Trainer:
                 )
 
         for epoch in range(self.start_epoch, epochs):
-            # Compute epoch-level injection flags for both injectors
+            self._apply_fault_warmup(epoch)
+
             act_faulty_epoch = (
                 self.act_fault_injector is not None
                 and self.act_fault_config is not None
@@ -549,9 +599,13 @@ class Trainer:
                 epoch=epoch, is_faulty_epoch=is_faulty_epoch
             )
 
+            fault_warmup_epochs = self._fault_warmup_epochs()
+            in_fault_warmup = epoch < fault_warmup_epochs
+
             if self.scheduler is not None:
                 lr = self.scheduler.get_last_lr()[0]
-                self.scheduler.step()
+                if not in_fault_warmup:
+                    self.scheduler.step()
             else:
                 lr = self.config["optimizer"]["learning_rate"]
             # Evaluate on validation or test set

@@ -145,6 +145,7 @@ class SchedulerFactory:
         optimizer: optim.Optimizer,
         config: Dict[str, Any],
         total_epochs: Optional[int] = None,
+        fault_warmup_epochs: int = 0,
     ) -> SchedulerType:
         """Create a learning rate scheduler from configuration.
 
@@ -152,6 +153,9 @@ class SchedulerFactory:
             optimizer: The optimizer to schedule.
             config: Full configuration dictionary.
             total_epochs: Optional explicit epoch count. If provided, this is used instead of computing from config.
+            fault_warmup_epochs: Number of epochs the LR scheduler will be frozen
+                due to fault probability warmup. Subtracted from the cosine T_max
+                default so the curve spans exactly the epochs the scheduler runs.
 
         Returns:
             Configured scheduler (possibly wrapped with warmup), or None.
@@ -181,6 +185,7 @@ class SchedulerFactory:
             sched_config=sched_config,
             total_epochs=computed_epochs,
             warmup_epochs=warmup_epochs,
+            fault_warmup_epochs=fault_warmup_epochs,
         )
 
         # Wrap with warmup if requested
@@ -201,6 +206,7 @@ class SchedulerFactory:
         sched_config: Dict[str, Any],
         total_epochs: int,
         warmup_epochs: int,
+        fault_warmup_epochs: int = 0,
     ) -> Optional[optim.lr_scheduler.LRScheduler]:
         """Create the main scheduler without warmup wrapper.
 
@@ -210,6 +216,7 @@ class SchedulerFactory:
             sched_config: Scheduler configuration section.
             total_epochs: Total training epochs.
             warmup_epochs: Number of warmup epochs (for T_max adjustment).
+            fault_warmup_epochs: Number of fault warmup epochs (for T_max adjustment).
 
         Returns:
             Configured scheduler or None.
@@ -220,7 +227,10 @@ class SchedulerFactory:
         if name == "cosine":
             return optim.lr_scheduler.CosineAnnealingLR(
                 optimizer=optimizer,
-                T_max=sched_config.get("T_max", total_epochs - warmup_epochs),
+                T_max=sched_config.get(
+                    "T_max",
+                    total_epochs - warmup_epochs - fault_warmup_epochs,
+                ),
                 eta_min=sched_config.get("eta_min", 0),
             )
 
