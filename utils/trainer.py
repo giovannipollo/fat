@@ -557,9 +557,15 @@ class Trainer:
                 and self.act_fault_config is not None
             ):
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
+                warmup_info = ""
+                if self.act_fault_config.warmup_epochs > 0:
+                    warmup_info = (
+                        f", warmup_epochs={self.act_fault_config.warmup_epochs}, "
+                        f"warmup_schedule={self.act_fault_config.warmup_schedule}"
+                    )
                 print(
                     f"Activation fault injection: {num_layers} layers, "
-                    f"prob={self.act_fault_config.probability}%, "
+                    f"prob={self.act_fault_config.probability}%{warmup_info}, "
                     f"epoch_interval={self.act_fault_config.epoch_interval}, "
                     f"step_interval={self.act_fault_config.step_interval}, "
                     f"type={self.act_fault_config.injection_type}"
@@ -570,9 +576,15 @@ class Trainer:
                 and self.weight_fault_config is not None
             ):
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
+                warmup_info = ""
+                if self.weight_fault_config.warmup_epochs > 0:
+                    warmup_info = (
+                        f", warmup_epochs={self.weight_fault_config.warmup_epochs}, "
+                        f"warmup_schedule={self.weight_fault_config.warmup_schedule}"
+                    )
                 print(
                     f"Weight fault injection: {num_layers} hooks, "
-                    f"prob={self.weight_fault_config.probability}%, "
+                    f"prob={self.weight_fault_config.probability}%{warmup_info}, "
                     f"epoch_interval={self.weight_fault_config.epoch_interval}, "
                     f"step_interval={self.weight_fault_config.step_interval}, "
                     f"type={self.weight_fault_config.injection_type}"
