@@ -716,6 +716,10 @@ class Trainer:
                         weight_fault_injector=self.weight_fault_injector,
                         act_fault_config=self.act_fault_config,
                         weight_fault_config=self.weight_fault_config,
+                        phase_index=phase.phase_index,
+                        phase_name=phase.name,
+                        phase_local_epoch=local_epoch,
+                        total_phases=len(self.phases),
                     )
 
                     if is_best:

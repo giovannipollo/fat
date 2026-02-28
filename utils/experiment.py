@@ -81,6 +81,9 @@ class ExperimentManager:
         self.checkpoint_dir: Optional[Path] = None
         self.tensorboard_dir: Optional[Path] = None
 
+        self._resumed_phase_index: int = 0
+        self._resumed_phase_name: str = ""
+
         if enabled:
             self._setup_experiment_dir(base_dir, experiment_name)
 
@@ -264,23 +267,31 @@ class ExperimentManager:
         weight_fault_injector: Optional["WeightFaultInjector"] = None,
         act_fault_config: Optional[Any] = None,
         weight_fault_config: Optional[Any] = None,
+        phase_index: int = 0,
+        phase_name: str = "default",
+        phase_local_epoch: int = 0,
+        total_phases: int = 1,
     ):
         """Save a model checkpoint.
 
         Args:
-            epoch: Current epoch number (0-indexed).
+            epoch: Current epoch number (0-indexed, global across all phases).
             model: The model to save.
             optimizer: The optimizer state.
             scheduler: The scheduler state (can be None).
-            best_acc: Best accuracy achieved so far.
+            best_acc: Best accuracy achieved so far (global).
             current_acc: Current epoch's accuracy.
             scaler: GradScaler for AMP (optional).
-            is_best: Whether this is the best model so far.
+            is_best: Whether this is the best model so far (global).
             test_acc: Test accuracy (for best model with validation).
             act_fault_injector: Optional activation fault injector to remove before saving.
             weight_fault_injector: Optional weight fault injector to remove before saving.
             act_fault_config: Optional activation fault injection config for re-injection.
             weight_fault_config: Optional weight fault injection config for re-injection.
+            phase_index: Index of the current phase (0-based).
+            phase_name: Name of the current phase.
+            phase_local_epoch: Epoch number within the current phase (0-based).
+            total_phases: Total number of phases in the training run.
         """
         if not self.enabled or self.checkpoint_dir is None:
             return
@@ -303,6 +314,10 @@ class ExperimentManager:
             "best_acc": best_acc,
             "current_acc": current_acc,
             "config": self.config,
+            "phase_index": phase_index,
+            "phase_name": phase_name,
+            "phase_local_epoch": phase_local_epoch,
+            "total_phases": total_phases,
         }
 
         # Save scaler state if using AMP
@@ -403,8 +418,36 @@ class ExperimentManager:
         start_epoch: int = checkpoint["epoch"] + 1
         best_acc: float = checkpoint.get("best_acc", 0.0)
 
+        self._resumed_phase_index = checkpoint.get("phase_index", 0)
+        self._resumed_phase_name = checkpoint.get("phase_name", "")
+
         print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
         return start_epoch, best_acc
+
+    def get_resumed_phase_index(self) -> int:
+        """Get the phase index from the last loaded checkpoint."""
+        return self._resumed_phase_index
+
+    def get_resumed_phase_name(self) -> str:
+        """Get the phase name from the last loaded checkpoint."""
+        return self._resumed_phase_name
+
+    def get_phase_checkpoint_dir(self, phase_index: int, phase_name: str) -> Optional[Path]:
+        """Get the checkpoint directory for a specific phase.
+
+        Args:
+            phase_index: Index of the phase (0-based).
+            phase_name: Name of the phase.
+
+        Returns:
+            Path to phase checkpoint directory, or None if disabled.
+        """
+        if self.experiment_dir is None:
+            return None
+
+        phase_dir = self.experiment_dir / f"{phase_index}_{phase_name}" / "checkpoints"
+        phase_dir.mkdir(parents=True, exist_ok=True)
+        return phase_dir
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
