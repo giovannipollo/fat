@@ -27,6 +27,8 @@ from .fault_injection import (
 
 from .config_validator import ConfigValidator, validate_config, ConfigValidationError
 
+from .phase_config import PhaseConfig, parse_phases
+
 __all__ = [
     # Core utilities
     "get_device",
@@ -49,4 +51,7 @@ __all__ = [
     "ConfigValidator",
     "validate_config",
     "ConfigValidationError",
+    # Phase configuration
+    "PhaseConfig",
+    "parse_phases",
 ]
