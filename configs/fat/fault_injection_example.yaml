@@ -106,6 +106,23 @@ activation_fault_injection:
   # Omit this key to use the default (1 = every step).
   step_interval: 1
 
+  # Fault probability warmup
+  # Gradually increases the injection probability from 0 to `probability`
+  # over the first N training epochs. 0 = no warmup (default).
+  #
+  # Example: probability: 5, warmup_epochs: 10
+  #   epoch 0 → 0.5%   epoch 5 → 2.75%  epoch 9 → 5.0%   epoch 10+ → 5.0%
+  #
+  # warmup_epochs: 0    (disabled, default)
+  # warmup_epochs: 10   (ramp over first 10 epochs)
+  warmup_epochs: 0
+
+  # Shape of the warmup ramp:
+  # - "linear":  probability grows linearly each epoch (default)
+  # - "cosine":  probability follows a half-cosine curve (slower start/end,
+  #              faster middle — mirrors cosine LR warmup)
+  warmup_schedule: "linear"
+
   # Track injection statistics (RMSE, cosine similarity, etc.)
   track_statistics: true
 
@@ -147,6 +164,14 @@ activation_fault_injection:
 
 #   # How often to inject faults within a faulty epoch at the step level (default: 1 = every step)
 #   step_interval: 1
+
+#   # Fault probability warmup
+#   # Gradually increases the injection probability from 0 to `probability`
+#   # over the first N training epochs. 0 = no warmup (default).
+#   warmup_epochs: 0
+
+#   # Shape of the warmup ramp: "linear" (default) or "cosine"
+#   warmup_schedule: "linear"
 
 #   # Track injection statistics (RMSE, cosine similarity, etc.)
 #   track_statistics: true
