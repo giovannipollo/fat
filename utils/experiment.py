@@ -1,6 +1,6 @@
 """Experiment manager for checkpoints and experiment organization.
 
-Handles experiment directory structure, checkpoint saving/loading,
+Handles experiment directory structure, checkpoint saving,
 and configuration persistence for reproducibility.
 """
 
@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+import yaml as yaml_module
 from .fault_injection import ActivationFaultInjector, WeightFaultInjector
 
 import torch
@@ -29,7 +30,7 @@ class ExperimentManager:
 
     - Hierarchical directory organization (dataset/model_timestamp)
     - Config saving for reproducibility
-    - Checkpoint saving/loading with best model tracking
+    - Checkpoint saving with best model tracking
 
     Directory Structure::
 
@@ -227,19 +228,11 @@ class ExperimentManager:
         if self.experiment_dir is None:
             return
 
-        if YAML_AVAILABLE:
-            import yaml as yaml_module
-
-            config_path: Path = self.experiment_dir / "config.yaml"
-            with open(config_path, "w") as f:
-                yaml_module.dump(
-                    self.config, f, default_flow_style=False, sort_keys=False
-                )
-        else:
-            # Fallback: save as simple text representation
-            config_path = self.experiment_dir / "config.txt"
-            with open(config_path, "w") as f:
-                f.write(str(self.config))
+        config_path: Path = self.experiment_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml_module.dump(
+                self.config, f, default_flow_style=False, sort_keys=False
+            )
 
         print(f"Config saved to: {config_path}")
 
@@ -247,11 +240,9 @@ class ExperimentManager:
         self,
         epoch: int,
         model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Any,
-        best_acc: float,
-        current_acc: float,
-        scaler: Optional[Any] = None,
+        val_acc: Optional[float],
+        best_val_acc: Optional[float],
+        best_test_acc: float,
         is_best: bool = False,
         test_acc: Optional[float] = None,
         act_fault_injector: Optional["ActivationFaultInjector"] = None,
@@ -264,13 +255,11 @@ class ExperimentManager:
         Args:
             epoch: Current epoch number (0-indexed).
             model: The model to save.
-            optimizer: The optimizer state.
-            scheduler: The scheduler state (can be None).
-            best_acc: Best accuracy achieved so far.
-            current_acc: Current epoch's accuracy.
-            scaler: GradScaler for AMP (optional).
+            val_acc: Current epoch's validation accuracy (None if no validation).
+            best_val_acc: Best validation accuracy achieved so far (None if no validation).
+            best_test_acc: Best test accuracy achieved so far.
             is_best: Whether this is the best model so far.
-            test_acc: Test accuracy (for best model with validation).
+            test_acc: Current epoch's test accuracy (None if not evaluated this epoch).
             act_fault_injector: Optional activation fault injector to remove before saving.
             weight_fault_injector: Optional weight fault injector to remove before saving.
             act_fault_config: Optional activation fault injection config for re-injection.
@@ -292,16 +281,20 @@ class ExperimentManager:
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
-            "best_acc": best_acc,
-            "current_acc": current_acc,
+            "best_test_acc": best_test_acc,
             "config": self.config,
         }
-
-        # Save scaler state if using AMP
-        if scaler is not None:
-            checkpoint["scaler_state_dict"] = scaler.state_dict()
+        
+        # Add validation metrics if available
+        if val_acc is not None:
+            checkpoint["val_acc"] = val_acc
+        
+        if best_val_acc is not None:
+            checkpoint["best_val_acc"] = best_val_acc
+        
+        # Add test accuracy if evaluated this epoch
+        if test_acc is not None:
+            checkpoint["test_acc"] = test_acc
 
         # Save periodic checkpoint
         checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
@@ -313,19 +306,17 @@ class ExperimentManager:
 
         # Save best checkpoint
         if is_best and self.save_best:
-            # Include test accuracy in best checkpoint
-            if test_acc is not None:
-                checkpoint["test_acc"] = test_acc
-            
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
             
-            if test_acc is not None:
+            if val_acc is not None and test_acc is not None:
                 print(
-                    f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)"
+                    f"  -> New best model saved! (val: {val_acc:.2f}%, test: {test_acc:.2f}%)"
                 )
+            elif test_acc is not None:
+                print(f"  -> New best model saved! (test: {test_acc:.2f}%)")
             else:
-                print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
+                print(f"  -> New best model saved!")
 
         # Re-inject fault injection wrappers/hooks after saving
         if needs_act_reinject and act_fault_config is not None:
@@ -334,71 +325,49 @@ class ExperimentManager:
         if needs_weight_reinject and weight_fault_config is not None:
             model = weight_fault_injector.inject(model, weight_fault_config)
 
-    def load_checkpoint(
+    def load_weights(
         self,
         checkpoint_path: Union[str, Path],
         model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Any,
-        scaler: Optional[Any] = None,
         device: torch.device = torch.device("cpu"),
-        strict: bool = True,
-    ) -> Tuple[int, float]:
-        """Load a model checkpoint.
+        strict: bool = False,
+    ) -> None:
+        """Load only model weights from checkpoint.
 
         Args:
-            checkpoint_path: Path to the checkpoint file.
-            model: Model to load state into.
-            optimizer: Optimizer to load state into.
-            scheduler: Scheduler to load state into (can be None).
-            scaler: GradScaler for AMP (optional).
+            checkpoint_path: Path to checkpoint file (absolute or relative to experiment_dir).
+            model: Model to load weights into.
             device: Device to load the checkpoint to.
             strict: If False, allows loading state dict with missing/unexpected keys.
-                    Useful for loading float checkpoints into quantized models.
-
-        Returns:
-            Tuple of (start_epoch, best_acc).
         """
-        checkpoint_path = Path(checkpoint_path)
-        if not checkpoint_path.exists():
-            print(f"Warning: Checkpoint not found at {checkpoint_path}")
-            return 0, 0.0
+        ckpt_file = Path(checkpoint_path)
+        if not ckpt_file.is_absolute():
+            if self.experiment_dir is not None:
+                ckpt_file = self.experiment_dir / checkpoint_path
+            else:
+                raise FileNotFoundError(
+                    f"Cannot resolve relative path: {checkpoint_path}"
+                )
 
-        print(f"Loading checkpoint from {checkpoint_path}")
-        checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
+        if not ckpt_file.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
 
-        # Load model state dict with strict parameter
-        try:
-            missing_keys, unexpected_keys = model.load_state_dict(
-                checkpoint["model_state_dict"], strict=strict
+        print(f"Loading weights from: {ckpt_file}")
+
+        ckpt = torch.load(str(ckpt_file), map_location=device)
+
+        missing_keys, unexpected_keys = model.load_state_dict(
+            ckpt["model_state_dict"], strict=strict
+        )
+
+        if missing_keys:
+            print(f"Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
+        if unexpected_keys:
+            print(
+                f"Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
             )
 
-            # Log results if non-strict loading
-            if not strict:
-                if missing_keys:
-                    print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
-                if unexpected_keys:
-                    print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
-
-        except RuntimeError as e:
-            if strict:
-                raise
-            print(f"Warning: Non-strict loading encountered error: {e}")
-
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-        if scheduler and checkpoint.get("scheduler_state_dict"):
-            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-
-        # Load scaler state if using AMP
-        if scaler is not None and "scaler_state_dict" in checkpoint:
-            scaler.load_state_dict(checkpoint["scaler_state_dict"])
-
-        start_epoch: int = checkpoint["epoch"] + 1
-        best_acc: float = checkpoint.get("best_acc", 0.0)
-
-        print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
-        return start_epoch, best_acc
+        print("Loaded model weights")
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
@@ -421,27 +390,6 @@ class ExperimentManager:
             Path to experiment directory, or None if disabled.
         """
         return self.experiment_dir
-
-    def cleanup_old_checkpoints(self, keep_last_n: int = 5):
-        """Remove old periodic checkpoints, keeping only the last N.
-
-        Args:
-            keep_last_n: Number of recent checkpoints to keep.
-
-        Note:
-            Does not remove best.pt or latest.pt.
-        """
-        if self.checkpoint_dir is None:
-            return
-
-        # Find all epoch checkpoints
-        checkpoints: list[Path] = sorted(self.checkpoint_dir.glob("epoch_*.pt"))
-
-        # Keep best.pt and latest.pt, remove old epoch checkpoints
-        if len(checkpoints) > keep_last_n:
-            for ckpt in checkpoints[:-keep_last_n]:
-                ckpt.unlink()
-                print(f"Removed old checkpoint: {ckpt.name}")
 
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> ExperimentManager:

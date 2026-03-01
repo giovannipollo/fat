@@ -111,6 +111,37 @@ Use cases:
 - **Fine-grained curriculum**: Combine with epoch_interval to create a two-dimensional schedule that controls both how often epochs are faulty and how densely each faulty epoch is saturated.
 - **Faster training convergence**: Injecting faults only every N steps can reduce gradient interference, potentially improving convergence speed on difficult datasets.
 
+warmup_epochs
+^^^^^^^^^^^^^^^
+
+The warmup_epochs parameter enables a gradual ramp of the fault injection probability at the start of training. It is a non-negative integer with a default of 0.
+
+- 0 (default): No warmup. Fault injection starts at the configured `probability` from epoch 0.
+- N > 0: The probability ramps from near 0 to `probability` over the first N epochs.
+
+During warmup, the effective probability is computed as:
+
+.. code-block:: python
+
+    progress = (epoch + 1) / warmup_epochs
+    effective_p = probability * progress  # for linear schedule
+
+Use cases:
+
+- **Gradient stability**: The FAT mechanism zeros gradients at faulty positions. Starting at high probability from epoch 0 can destabilize learning before the model has converged.
+- **Curriculum learning**: The model first learns under mild fault pressure, then adapts to the full fault rate.
+- **BatchNorm sensitivity**: Models with BatchNorm are sensitive to large input distribution shifts. Warmup avoids the spike in activation variance that sudden high-probability injection would cause.
+
+warmup_schedule
+^^^^^^^^^^^^^^^^^^
+
+The warmup_schedule parameter selects the shape of the warmup ramp. Supported values are:
+
+- **linear** (default): Probability increases linearly each epoch: ``p(e) = probability × e / warmup_epochs``
+- **cosine**: Probability follows a half-cosine curve: ``p(e) = probability × (1 − cos(π × e / warmup_epochs)) / 2``
+
+The cosine schedule starts and ends more gently, with faster growth in the middle. This may be preferable when `probability` is large (e.g., > 10%).
+
 track_statistics
 ^^^^^^^^^^^^^^^^^^^^^
 
@@ -319,6 +350,52 @@ This is useful for:
 - **Reconstruction**: Recreating a configuration object from saved data
 
 The exported dictionary contains all of the configuration parameters with their current values, providing a complete representation of the fault injection settings.
+
+Fault Probability Warmup
+------------------------
+
+The `warmup_epochs` parameter enables a gradual ramp of the fault injection probability at the start of training. Instead of applying faults at full probability from epoch 0, the probability starts near 0 and increases each epoch until it reaches the configured `probability` value.
+
+Why use warmup?
+^^^^^^^^^^^^^^^
+
+Training with a high fault probability from the very first epoch can destabilise learning, because the FAT mechanism zeros gradients at faulty positions. When a large fraction of gradients is zeroed before the model has converged, the model may struggle to learn a useful representation. Warmup acts as a fault curriculum: the model first learns under mild fault pressure, then adapts to the full fault rate.
+
+This mirrors the motivation for learning-rate warmup: avoid large, destabilising updates at the start of training.
+
+Schedule shapes
+^^^^^^^^^^^^^^^
+
+**linear** (default):
+    The probability increases by `probability / warmup_epochs` each epoch. Simple and predictable.
+
+**cosine**:
+    The probability follows a half-cosine curve: slow at the beginning, fast in the middle, slow again at the end. Gentler entry into fault injection; may be preferable at high fault probabilities (e.g., > 10%).
+
+Interaction with epoch_interval
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The probability ramp advances every epoch, including non-faulty ones. This keeps the ramp schedule aligned with wall-clock training time rather than with the number of faulty epochs.
+
+Backwards compatibility
+^^^^^^^^^^^^^^^^^^^^^^^
+
+`warmup_epochs: 0` (the default) disables warmup entirely. All existing configs that omit this key behave identically to before.
+
+Warmup Example
+^^^^^^^^^^^^^^
+
+.. code-block:: yaml
+
+    activation_fault_injection:
+      enabled: true
+      probability: 5.0
+      injection_type: "random"
+      apply_during: "train"
+      warmup_epochs: 20
+      warmup_schedule: "cosine"
+
+With 20 warmup epochs and cosine schedule, the effective probabilities for the first few epochs are approximately: 0.06%, 0.24%, 0.54%, 0.95%, 1.46%, 2.0%, 2.54%, 3.05%, 3.46%, 3.76%, 4.0%, ..., 5.0% at epoch 19, then 5.0% for all subsequent epochs.
 
 Usage Examples
 --------------

@@ -22,6 +22,8 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from pathlib import Path
+from brevitas import config as brev_config
 
 from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, SchedulerType
@@ -119,20 +121,14 @@ class Trainer:
 
         brevitas_config: Dict[str, Any] = config.get("brevitas", {})
         if brevitas_config.get("ignore_missing_keys", False):
-            try:
-                from brevitas import config as brev_config
-
-                brev_config.IGNORE_MISSING_KEYS = True
-                if self.rank == 0 or not self.is_distributed:
-                    print(
-                        "Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading"
-                    )
-            except ImportError:
-                pass
+            brev_config.IGNORE_MISSING_KEYS = True
+            if self.rank == 0 or not self.is_distributed:
+                print("Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading")
 
         # Training state
         self.start_epoch: int = 0
-        self.best_acc: float = 0.0
+        self.best_val_acc: float = 0.0
+        self.best_test_acc: float = 0.0
         self.total_epochs: int = config["training"]["epochs"]
 
         # Setup loss function
@@ -142,12 +138,12 @@ class Trainer:
             self.model, config
         )
 
-        _act_fault_warmup: int = config.get(
-            "activation_fault_injection", {}
-        ).get("warmup_epochs", 0)
-        _weight_fault_warmup: int = config.get(
-            "weight_fault_injection", {}
-        ).get("warmup_epochs", 0)
+        _act_fault_warmup: int = config.get("activation_fault_injection", {}).get(
+            "warmup_epochs", 0
+        )
+        _weight_fault_warmup: int = config.get("weight_fault_injection", {}).get(
+            "warmup_epochs", 0
+        )
         _fault_warmup: int = max(_act_fault_warmup, _weight_fault_warmup)
 
         self.scheduler: SchedulerType = SchedulerFactory.create(
@@ -185,24 +181,14 @@ class Trainer:
         load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
         if load_weights_path:
             print("\n" + "=" * 60)
-            print("Loading pretrained weights (no training state)")
+            print("Loading pretrained weights")
             print("=" * 60)
-            self._load_weights_only(load_weights_path)
-            self.best_acc = 0.0
+            model_to_load = self.model.module if self.is_distributed else self.model
+            self.experiment.load_weights(
+                load_weights_path, model_to_load, self.device, strict=False
+            )
 
         self._setup_fault_injection(config)
-
-        # Resume from checkpoint if specified (full training state)
-        resume_path: Optional[str] = checkpoint_config.get("resume")
-        if resume_path:
-            self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
-                resume_path,
-                self.model,
-                self.optimizer,
-                self.scheduler,
-                self.scaler,
-                self.device,
-            )
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
@@ -513,7 +499,7 @@ class Trainer:
         """
         if self.val_loader is None:
             raise ValueError("No validation set available")
-        return self.evaluate(self.val_loader, desc="Validating")
+        return self.evaluate(self.val_loader, desc="Validation")
 
     def test(self) -> Tuple[float, float]:
         """Evaluate model on test set.
@@ -521,6 +507,8 @@ class Trainer:
         Returns:
             Tuple of (average_loss, accuracy).
         """
+        if self.test_loader is None:
+            raise ValueError("No test set available")
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
@@ -531,7 +519,6 @@ class Trainer:
         """
         epochs: int = self.total_epochs
         model_name: str = self.config["model"]["name"]
-        eval_name: str = "Val" if self.has_validation else "Test"
 
         # Test evaluation frequency (only when using validation set)
         training_config: Dict[str, Any] = self.config.get("training", {})
@@ -617,27 +604,43 @@ class Trainer:
                     self.scheduler.step()
             else:
                 lr = self.config["optimizer"]["learning_rate"]
-            # Evaluate on validation or test set
-            if self.has_validation:
-                eval_loss, eval_acc = self.validate()
-            else:
-                eval_loss, eval_acc = self.test()
 
-            # Check if this is the best model
-            is_best = eval_acc > self.best_acc
-            if is_best:
-                self.best_acc = eval_acc
+            # Evaluate on validation and/or test set
+            val_loss: Optional[float] = None
+            val_acc: Optional[float] = None
+            test_loss: Optional[float] = None
+            test_acc: Optional[float] = None
 
-            # Evaluate on test set when:
-            # 1. We find a new best model (when using validation), OR
-            # 2. It's a periodic test evaluation epoch (when using validation)
-            test_loss, test_acc = None, None
             if self.has_validation:
-                is_periodic_test = test_frequency > 0 and (
-                    (epoch + 1) % test_frequency == 0 or epoch == epochs - 1
-                )
-                if is_best or is_periodic_test:
+                val_loss, val_acc = self.validate()
+                # Check if this is the best model
+                is_best = val_acc > self.best_val_acc
+                if is_best:
+                    self.best_val_acc = val_acc
+
+                # Check if we should run test evaluation this epoch based on test_frequency
+                is_periodic_test = False
+                if test_frequency > 0 and (epoch + 1) % test_frequency == 0:
+                    is_periodic_test = True
+
+                # Check if this is the last epoch (always test at the end)
+                is_last_epoch = False
+                if epoch == epochs - 1:
+                    is_last_epoch = True
+
+                # If this is the best model so far, or if it's a periodic test epoch, or if it's the last epoch, run test evaluation
+                if is_best or is_periodic_test or is_last_epoch:
                     test_loss, test_acc = self.test()
+                    # Track best test accuracy
+                    if test_acc > self.best_test_acc:
+                        self.best_test_acc = test_acc
+            else:
+                # No validation set - use test set for monitoring
+                test_loss, test_acc = self.test()
+                # Check if this is the best model
+                is_best = test_acc > self.best_test_acc
+                if is_best:
+                    self.best_test_acc = test_acc
 
             # Log epoch metrics
             if self.rank == 0:
@@ -647,26 +650,26 @@ class Trainer:
                     lr=lr,
                     train_loss=train_loss,
                     train_acc=train_acc,
-                    eval_loss=eval_loss,
-                    eval_acc=eval_acc,
-                    eval_name=eval_name,
+                    val_loss=val_loss,
+                    val_acc=val_acc,
                     test_loss=test_loss,
                     test_acc=test_acc,
+                    is_best=is_best,
                 )
 
-            # Save checkpoint (only on rank 0)
-            if self.rank == 0 and self.experiment.should_save(epoch, is_best):
+            # Save checkpoint
+            if self.rank == 0 and self.experiment.should_save(
+                epoch=epoch, is_best=is_best
+            ):
                 model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
                     model=model_to_save,
-                    optimizer=self.optimizer,
-                    scheduler=self.scheduler,
-                    best_acc=self.best_acc,
-                    current_acc=eval_acc,
-                    scaler=self.scaler,
+                    val_acc=val_acc,
+                    best_val_acc=self.best_val_acc if self.has_validation else None,
+                    test_acc=test_acc,
+                    best_test_acc=self.best_test_acc,
                     is_best=is_best,
-                    test_acc=test_acc if is_best and self.has_validation else None,
                     act_fault_injector=self.act_fault_injector,
                     weight_fault_injector=self.weight_fault_injector,
                     act_fault_config=self.act_fault_config,
@@ -677,8 +680,8 @@ class Trainer:
                 if is_best:
                     self.logger.log_best_model(
                         epoch=epoch,
-                        val_acc=eval_acc,
-                        test_acc=test_acc if self.has_validation else None,
+                        val_acc=val_acc,
+                        test_acc=test_acc,
                     )
 
         # Final evaluation on test set (if we used validation during training)
@@ -689,7 +692,15 @@ class Trainer:
 
         # Log completion
         if self.rank == 0:
-            self.logger.log_training_complete(self.best_acc, eval_name)
+            if self.has_validation:
+                monitor_name = "validation"
+                best_acc = self.best_val_acc
+            else:
+                monitor_name = "test"
+                best_acc = self.best_test_acc
+            self.logger.log_training_complete(
+                best_acc=best_acc, monitor_name=monitor_name
+            )
 
             experiment_dir = self.experiment.get_experiment_dir()
             if experiment_dir is not None:
@@ -697,42 +708,3 @@ class Trainer:
 
             # Close logger
             self.logger.close()
-
-    def _load_weights_only(self, checkpoint_path: str) -> None:
-        """Load only model weights from checkpoint.
-
-        Args:
-            checkpoint_path: Path to checkpoint file.
-        """
-        from pathlib import Path
-
-        ckpt_file = Path(checkpoint_path)
-        if not ckpt_file.is_absolute():
-            if self.experiment.experiment_dir is not None:
-                ckpt_file = self.experiment.experiment_dir / checkpoint_path
-            else:
-                raise FileNotFoundError(
-                    f"Cannot resolve relative path: {checkpoint_path}"
-                )
-
-        if not ckpt_file.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
-
-        print(f"Loading weights from: {ckpt_file}")
-
-        ckpt = torch.load(str(ckpt_file), map_location="cpu")
-
-        model_to_load = self.model.module if self.is_distributed else self.model
-        missing_keys, unexpected_keys = model_to_load.load_state_dict(
-            ckpt["model_state_dict"], strict=False
-        )
-
-        if missing_keys:
-            print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
-        if unexpected_keys:
-            print(
-                f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
-            )
-
-        self.model = self.model.to(self.device)
-        print(f"  Loaded model weights (optimizer/scheduler not restored)")
