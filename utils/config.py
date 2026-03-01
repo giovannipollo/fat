@@ -41,7 +41,6 @@ def validate_config_structure(config: Dict[str, Any]) -> None:
     ignored_keys = [
         "optimizer",
         "scheduler",
-        "training",
         "loss",
         "activation_fault_injection",
         "weight_fault_injection",
