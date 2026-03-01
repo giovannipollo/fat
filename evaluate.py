@@ -23,9 +23,7 @@ from typing import Any, Dict
 
 # Suppress pkg_resources deprecation warning from brevitas
 warnings.filterwarnings(
-    "ignore",
-    message="pkg_resources is deprecated as an API",
-    category=UserWarning
+    "ignore", message="pkg_resources is deprecated as an API", category=UserWarning
 )
 
 import torch
@@ -102,8 +100,8 @@ def load_model_and_dataset(
 
     if "model_state_dict" in checkpoint:
         model.load_state_dict(checkpoint["model_state_dict"])
-        if "best_acc" in checkpoint:
-            print(f"Checkpoint accuracy: {checkpoint['best_acc']:.2f}%")
+        if "test_acc" in checkpoint:
+            print(f"Checkpoint accuracy: {checkpoint['test_acc']:.2f}%")
     else:
         # Assume it's just the state dict
         model.load_state_dict(checkpoint)
