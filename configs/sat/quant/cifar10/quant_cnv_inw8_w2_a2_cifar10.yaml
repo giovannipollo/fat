@@ -39,9 +39,6 @@ scheduler:
   T_max: 300
   warmup_epochs: 0
 
-tensorboard:
-  enabled: true
-
 progress:
   enabled: true
 

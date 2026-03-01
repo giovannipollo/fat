@@ -34,9 +34,6 @@ scheduler:
 amp:
   enabled: true  # Recommended for ImageNet training
 
-tensorboard:
-  enabled: true
-
 progress:
   enabled: true
 

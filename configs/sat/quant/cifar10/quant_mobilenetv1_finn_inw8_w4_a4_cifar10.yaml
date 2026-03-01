@@ -44,9 +44,6 @@ loss:
 amp:
   enabled: false
 
-tensorboard:
-  enabled: true
-
 progress:
   enabled: true
 

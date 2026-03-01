@@ -38,9 +38,6 @@ scheduler:
 amp:
   enabled: false  # Disable AMP for quantized training
 
-tensorboard:
-  enabled: true
-
 progress:
   enabled: true
 

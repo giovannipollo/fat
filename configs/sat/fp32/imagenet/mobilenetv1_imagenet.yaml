@@ -36,9 +36,6 @@ scheduler:
 amp:
   enabled: true
 
-tensorboard:
-  enabled: true
-
 progress:
   enabled: true
 
