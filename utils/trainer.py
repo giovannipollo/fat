@@ -147,7 +147,7 @@ class Trainer:
         _fault_warmup: int = max(_act_fault_warmup, _weight_fault_warmup)
 
         self.scheduler: SchedulerType = SchedulerFactory.create(
-            self.optimizer, config, fault_warmup_epochs=_fault_warmup
+            optimizer=self.optimizer, config=config, fault_warmup_epochs=_fault_warmup
         )
 
         # Mixed precision training (AMP)
@@ -180,9 +180,7 @@ class Trainer:
         # Load model weights only (no training state) if specified
         load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
         if load_weights_path:
-            print("\n" + "=" * 60)
-            print("Loading pretrained weights")
-            print("=" * 60)
+            self.logger.log_weights_loaded(load_weights_path)
             model_to_load = self.model.module if self.is_distributed else self.model
             self.experiment.load_weights(
                 load_weights_path, model_to_load, self.device, strict=False
@@ -209,19 +207,15 @@ class Trainer:
             )
 
             if self.act_fault_config.verbose:
-                # Print model architecture with injection layers
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
 
-            # Log setup
-            if self.act_fault_config.verbose:
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
-                print(
-                    f"Activation fault injection enabled: {num_layers} injection layers added"
+                self.logger.log_fault_injection_setup(
+                    injector_type="activation",
+                    num_layers=num_layers,
+                    config=self.act_fault_config,
                 )
-                print(f"  Probability: {self.act_fault_config.probability}%")
-                print(f"  Injection type: {self.act_fault_config.injection_type}")
-                print(f"  Apply during: {self.act_fault_config.apply_during}")
 
         # Setup weight fault injection
         weight_config = config.get("weight_fault_injection", {})
@@ -233,19 +227,15 @@ class Trainer:
             )
 
             if self.weight_fault_config.verbose:
-                # Print model architecture with weight hooks
                 for name, module in self.model.named_modules():
                     print(f"{name}: {module}")
 
-            # Log setup
-            if self.weight_fault_config.verbose:
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                print(
-                    f"Weight fault injection enabled: {num_layers} injection hooks added"
+                self.logger.log_fault_injection_setup(
+                    injector_type="weight",
+                    num_layers=num_layers,
+                    config=self.weight_fault_config,
                 )
-                print(f"  Probability: {self.weight_fault_config.probability}%")
-                print(f"  Injection type: {self.weight_fault_config.injection_type}")
-                print(f"  Apply during: {self.weight_fault_config.apply_during}")
 
     def _apply_fault_warmup(self, epoch: int) -> None:
         """Update fault injection probabilities for the current warmup epoch.
@@ -535,24 +525,15 @@ class Trainer:
                 experiment_dir=self.experiment.get_experiment_dir(),
             )
 
-            # Log fault injection info
             if (
                 self.act_fault_injector is not None
                 and self.act_fault_config is not None
             ):
                 num_layers = self.act_fault_injector.get_num_layers(self.model)
-                warmup_info = ""
-                if self.act_fault_config.warmup_epochs > 0:
-                    warmup_info = (
-                        f", warmup_epochs={self.act_fault_config.warmup_epochs}, "
-                        f"warmup_schedule={self.act_fault_config.warmup_schedule}"
-                    )
-                print(
-                    f"Activation fault injection: {num_layers} layers, "
-                    f"prob={self.act_fault_config.probability}%{warmup_info}, "
-                    f"epoch_interval={self.act_fault_config.epoch_interval}, "
-                    f"step_interval={self.act_fault_config.step_interval}, "
-                    f"type={self.act_fault_config.injection_type}"
+                self.logger.log_fault_injection_setup(
+                    injector_type="activation",
+                    num_layers=num_layers,
+                    config=self.act_fault_config,
                 )
 
             if (
@@ -560,18 +541,10 @@ class Trainer:
                 and self.weight_fault_config is not None
             ):
                 num_layers = self.weight_fault_injector.get_num_layers(self.model)
-                warmup_info = ""
-                if self.weight_fault_config.warmup_epochs > 0:
-                    warmup_info = (
-                        f", warmup_epochs={self.weight_fault_config.warmup_epochs}, "
-                        f"warmup_schedule={self.weight_fault_config.warmup_schedule}"
-                    )
-                print(
-                    f"Weight fault injection: {num_layers} hooks, "
-                    f"prob={self.weight_fault_config.probability}%{warmup_info}, "
-                    f"epoch_interval={self.weight_fault_config.epoch_interval}, "
-                    f"step_interval={self.weight_fault_config.step_interval}, "
-                    f"type={self.weight_fault_config.injection_type}"
+                self.logger.log_fault_injection_setup(
+                    injector_type="weight",
+                    num_layers=num_layers,
+                    config=self.weight_fault_config,
                 )
 
         for epoch in range(self.start_epoch, epochs):
@@ -658,9 +631,8 @@ class Trainer:
                 )
 
             # Save checkpoint
-            if self.rank == 0 and self.experiment.should_save(
-                epoch=epoch, is_best=is_best
-            ):
+            should_save = self.experiment.should_save(epoch=epoch, is_best=is_best)
+            if self.rank == 0 and should_save:
                 model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
@@ -686,9 +658,11 @@ class Trainer:
 
         # Final evaluation on test set (if we used validation during training)
         if self.has_validation and self.rank == 0:
-            print("\nRunning final evaluation on test set...")
+            self.logger.log_final_evaluation_start()
             final_test_loss, final_test_acc = self.test()
-            self.logger.log_final_test(final_test_loss, final_test_acc, epochs)
+            self.logger.log_final_test(
+                loss=final_test_loss, accuracy=final_test_acc, epoch=epochs
+            )
 
         # Log completion
         if self.rank == 0:
@@ -704,7 +678,7 @@ class Trainer:
 
             experiment_dir = self.experiment.get_experiment_dir()
             if experiment_dir is not None:
-                print(f"Results saved to: {experiment_dir}")
+                self.logger.log_results_path(str(experiment_dir))
 
             # Close logger
             self.logger.close()

@@ -8,7 +8,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, TextIO, Type
+
+if TYPE_CHECKING:
+    from .fault_injection import FaultInjectionConfig
 
 
 class MetricsLogger:
@@ -212,6 +215,76 @@ class MetricsLogger:
             monitor_name: Name of the metric being monitored ("validation" or "test").
         """
         msg = f"\nTraining complete! Best {monitor_name} accuracy: {best_acc:.2f}%"
+
+        if self.console_enabled:
+            print(msg)
+
+        self._write_to_file(msg)
+
+    def log_weights_loaded(self, path: str) -> None:
+        """Log pretrained weights loading.
+
+        Args:
+            path: Path to the loaded weights.
+        """
+        messages = [
+            "",
+            "=" * 60,
+            "Loading pretrained weights",
+            "=" * 60,
+        ]
+
+        for msg in messages:
+            if self.console_enabled:
+                print(msg)
+            self._write_to_file(msg)
+
+    def log_fault_injection_setup(
+        self,
+        injector_type: str,
+        num_layers: int,
+        config: FaultInjectionConfig,
+    ) -> None:
+        """Log fault injection setup information.
+
+        Args:
+            injector_type: Type of injector ("activation" or "weight").
+            num_layers: Number of injection layers/hooks.
+            config: Fault injection configuration instance.
+        """
+        warmup_info = ""
+        if config.warmup_epochs > 0:
+            warmup_info = f", warmup_epochs={config.warmup_epochs}, warmup_schedule={config.warmup_schedule}"
+
+        msg = (
+            f"{injector_type.capitalize()} fault injection: {num_layers} {'layers' if injector_type == 'activation' else 'hooks'}, "
+            f"prob={config.probability}%{warmup_info}, "
+            f"epoch_interval={config.epoch_interval}, "
+            f"step_interval={config.step_interval}, "
+            f"type={config.injection_type}"
+        )
+
+        if self.console_enabled:
+            print(msg)
+
+        self._write_to_file(msg)
+
+    def log_final_evaluation_start(self) -> None:
+        """Log start of final evaluation on test set."""
+        msg = "\nRunning final evaluation on test set..."
+
+        if self.console_enabled:
+            print(msg)
+
+        self._write_to_file(msg)
+
+    def log_results_path(self, path: str) -> None:
+        """Log the path where results are saved.
+
+        Args:
+            path: Path to the results directory.
+        """
+        msg = f"Results saved to: {path}"
 
         if self.console_enabled:
             print(msg)
