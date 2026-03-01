@@ -72,7 +72,3 @@ scheduler:
 ## Documentation
 
 Full documentation is available in the `docs/` directory
-
-## License
-
-See [LICENSE](LICENSE) for details.
