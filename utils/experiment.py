@@ -350,10 +350,10 @@ class ExperimentManager:
             global_best_ckpt = dict(checkpoint)
             if test_acc is not None:
                 global_best_ckpt["test_acc"] = test_acc
-            
+
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(global_best_ckpt, best_path)
-            
+
             if test_acc is not None:
                 print(
                     f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)"
@@ -409,9 +409,13 @@ class ExperimentManager:
             # Log results if non-strict loading
             if not strict:
                 if missing_keys:
-                    print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
+                    print(
+                        f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}..."
+                    )
                 if unexpected_keys:
-                    print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
+                    print(
+                        f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
+                    )
 
         except RuntimeError as e:
             if strict:
@@ -461,7 +465,9 @@ class ExperimentManager:
             return None
         return self.experiment_dir / f"{phase_index}_phase_{phase_index}"
 
-    def get_phase_checkpoint_dir(self, phase_index: int, phase_name: str = "") -> Optional[Path]:
+    def get_phase_checkpoint_dir(
+        self, phase_index: int, phase_name: str = ""
+    ) -> Optional[Path]:
         """Get the checkpoint directory for a specific phase.
 
         Args:

@@ -38,7 +38,7 @@ class WarmupScheduler:
 
         # Store initial learning rates (target LR after warmup)
         self.base_lrs: List[float] = [group["lr"] for group in optimizer.param_groups]
-        
+
         # Set initial LR to first warmup value and start at epoch 1
         if warmup_epochs > 0:
             self.current_epoch: int = 1

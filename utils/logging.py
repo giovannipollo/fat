@@ -182,7 +182,11 @@ class MetricsLogger:
             experiment_dir: Experiment directory path.
             num_phases: Number of training phases.
         """
-        phase_str = f" ({num_phases} phase{'s' if num_phases > 1 else ''})" if num_phases > 1 else ""
+        phase_str = (
+            f" ({num_phases} phase{'s' if num_phases > 1 else ''})"
+            if num_phases > 1
+            else ""
+        )
         messages: List[str] = [
             f"\nStarting training {model_name} for {epochs} epochs{phase_str}...",
             f"Using device: {device}",

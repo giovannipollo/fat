@@ -45,6 +45,7 @@ class CommonActQuant(CommonQuant, ActQuantSolver):
     min_val = -1.0
     max_val = 1.0
 
+
 class CommonIntWeightPerTensorQuant(Int8WeightPerTensorFloat):
     """
     Common per-tensor weight quantizer with bit-width set to None so that it's forced to be

@@ -118,7 +118,9 @@ class ConfigValidator:
                 phase_batch_size = training.get("batch_size")
                 global_batch_size = global_training.get("batch_size")
                 if phase_batch_size is None and global_batch_size is None:
-                    self.errors.append(f"{prefix}: 'training.batch_size' is required (define in phase or globally)")
+                    self.errors.append(
+                        f"{prefix}: 'training.batch_size' is required (define in phase or globally)"
+                    )
                 elif phase_batch_size is not None:
                     if not isinstance(phase_batch_size, int) or phase_batch_size <= 0:
                         self.errors.append(
@@ -142,9 +144,7 @@ class ConfigValidator:
             elif "name" not in opt:
                 self.errors.append(f"{prefix}: 'optimizer.name' is required")
             elif "learning_rate" not in opt:
-                self.errors.append(
-                    f"{prefix}: 'optimizer.learning_rate' is required"
-                )
+                self.errors.append(f"{prefix}: 'optimizer.learning_rate' is required")
 
             sched = phase.get("scheduler")
             if not sched:

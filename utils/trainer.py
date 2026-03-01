@@ -684,7 +684,8 @@ class Trainer:
                 test_loss, test_acc = None, None
                 if self.has_validation:
                     is_periodic_test = test_frequency > 0 and (
-                        (global_epoch + 1) % test_frequency == 0 or global_epoch == epochs - 1
+                        (global_epoch + 1) % test_frequency == 0
+                        or global_epoch == epochs - 1
                     )
                     if is_best or is_periodic_test:
                         test_loss, test_acc = self.test()
@@ -704,8 +705,12 @@ class Trainer:
                         phase_name=phase.name,
                     )
 
-                if self.rank == 0 and self.experiment.should_save(global_epoch, is_best):
-                    model_to_save = self.model.module if self.is_distributed else self.model
+                if self.rank == 0 and self.experiment.should_save(
+                    global_epoch, is_best
+                ):
+                    model_to_save = (
+                        self.model.module if self.is_distributed else self.model
+                    )
                     self.experiment.save_checkpoint(
                         epoch=global_epoch,
                         model=model_to_save,
