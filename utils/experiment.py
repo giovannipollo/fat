@@ -6,21 +6,12 @@ and configuration persistence for reproducibility.
 
 from __future__ import annotations
 
-import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
 import yaml as yaml_module
 from .fault_injection import ActivationFaultInjector, WeightFaultInjector
-
 import torch
-
-try:
-    import yaml
-
-    YAML_AVAILABLE: bool = True
-except ImportError:
-    YAML_AVAILABLE = False
 
 
 class ExperimentManager:

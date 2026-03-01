@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Type
 
 import torch.nn as nn
+import torch
 
 from .losses import SqrHingeLoss
 
@@ -91,8 +92,6 @@ class LossFactory:
             if "label_smoothing" in loss_config:
                 params["label_smoothing"] = float(loss_config["label_smoothing"])
             if "weight" in loss_config:
-                import torch
-
                 params["weight"] = torch.tensor(loss_config["weight"])
             if "ignore_index" in loss_config:
                 params["ignore_index"] = int(loss_config["ignore_index"])
@@ -100,8 +99,6 @@ class LossFactory:
         # NLLLoss parameters
         elif loss_name == "nll":
             if "weight" in loss_config:
-                import torch
-
                 params["weight"] = torch.tensor(loss_config["weight"])
             if "ignore_index" in loss_config:
                 params["ignore_index"] = int(loss_config["ignore_index"])
@@ -120,8 +117,6 @@ class LossFactory:
         # BCEWithLogitsLoss parameters
         elif loss_name == "bce_with_logits":
             if "pos_weight" in loss_config:
-                import torch
-
                 params["pos_weight"] = torch.tensor(loss_config["pos_weight"])
 
         return cls.LOSSES[loss_name](**params)

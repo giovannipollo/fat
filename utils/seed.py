@@ -7,8 +7,8 @@ to ensure reproducible training results.
 from __future__ import annotations
 
 import random
-
 import torch
+import numpy as np
 
 
 def set_seed(seed: int, deterministic: bool = False) -> None:
@@ -27,13 +27,7 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
         deterministic algorithms are enforced, which may slow down training.
     """
     random.seed(seed)
-
-    try:
-        import numpy as np
-
-        np.random.seed(seed)
-    except ImportError:
-        pass
+    np.random.seed(seed)
 
     torch.manual_seed(seed)
 
