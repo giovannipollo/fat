@@ -1,15 +1,15 @@
 # FAT - Training Framework
 
-A modular PyTorch training framework for image classification, with support for standard and quantized models.
+A modular PyTorch Fault-awaretraining (FAT) framework for image classification, with support for standard and quantized models.
 
 > [!WARNING]  
 > Tested with Python 3.12.3
 
 ## Features
 
-- Multiple architectures: ResNet, VGG, MobileNet, CNV
+- Multiple architectures: ResNet, MobileNet, CNV
 - Quantization-aware training (QAT) with Brevitas
-- Multiple datasets: CIFAR-10/100, MNIST, Fashion-MNIST
+- Multiple datasets: CIFAR-10/100, MNIST, Fashion-MNIST, ImageNet
 - Configurable loss functions, optimizers, and schedulers
 - Mixed precision training (AMP)
 - TensorBoard logging
@@ -20,8 +20,8 @@ A modular PyTorch training framework for image classification, with support for 
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd training-framework
+git clone https://github.com/giovannipollo/fat
+cd fat
 
 # Create virtual environment
 python -m venv venv
@@ -42,7 +42,7 @@ python train.py
 Use a custom configuration:
 
 ```bash
-python train.py --config configs/resnet20_cifar10.yaml
+python train.py --config your_config.yaml
 ```
 
 Example configuration:
@@ -71,46 +71,7 @@ scheduler:
 
 ## Documentation
 
-Full documentation is available in the `docs/` directory. To view it locally:
-
-```bash
-# Install documentation dependencies
-pip install -r docs/requirements.txt
-
-# Build HTML documentation
-cd docs
-sphinx-build -b html . _build/html
-
-# Open in browser
-open _build/html/index.html  # macOS
-# or
-xdg-open _build/html/index.html  # Linux
-```
-
-### Documentation Contents
-
-- [Getting Started](docs/getting-started/installation.html) - Installation and quick start guide
-- [Models](docs/models/index.html) - Available architectures and how to add new ones
-- [Datasets](docs/datasets/index.html) - Supported datasets and how to add new ones
-- [Configuration](docs/configuration/index.html) - Complete configuration reference
-- [Fault Injection](docs/fault_injection/overview.html) - Comprehensive fault injection framework documentation
-- [API Reference](docs/fault_injection/api.html) - Python API documentation
-
-## Project Structure
-
-```
-fat/
-├── configs/          # YAML configuration files
-├── datasets/         # Dataset implementations
-├── models/           # Model architectures
-│   ├── standard/         # Full-precision models
-│   │   ├── resnet_cifar/     # ResNet for CIFAR (20, 32, 44, 56, 110)
-│   │   └── resnet_imagenet/  # ResNet for ImageNet (18, 34, 50, 101, 152)
-│   └── quantized/        # Quantized models (Brevitas)
-├── utils/            # Training utilities
-├── docs/             # Sphinx documentation
-└── train.py          # Main entry point
-```
+Full documentation is available in the `docs/` directory
 
 ## License
 
