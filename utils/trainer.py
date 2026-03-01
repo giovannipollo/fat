@@ -496,6 +496,9 @@ class Trainer:
 
         Returns:
             Tuple of (average_loss, accuracy).
+        
+        Raises:
+            ValueError: If no test set is available.
         """
         if self.test_loader is None:
             raise ValueError("No test set available")
