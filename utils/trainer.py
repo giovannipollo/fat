@@ -721,4 +721,4 @@ class Trainer:
             )
 
         self.model = self.model.to(self.device)
-        print(f"  Loaded model weights (optimizer/scheduler not restored)")
+        print(f"  Loaded model weights")

@@ -350,27 +350,6 @@ class ExperimentManager:
         """
         return self.experiment_dir
 
-    def cleanup_old_checkpoints(self, keep_last_n: int = 5):
-        """Remove old periodic checkpoints, keeping only the last N.
-
-        Args:
-            keep_last_n: Number of recent checkpoints to keep.
-
-        Note:
-            Does not remove best.pt or latest.pt.
-        """
-        if self.checkpoint_dir is None:
-            return
-
-        # Find all epoch checkpoints
-        checkpoints: list[Path] = sorted(self.checkpoint_dir.glob("epoch_*.pt"))
-
-        # Keep best.pt and latest.pt, remove old epoch checkpoints
-        if len(checkpoints) > keep_last_n:
-            for ckpt in checkpoints[:-keep_last_n]:
-                ckpt.unlink()
-                print(f"Removed old checkpoint: {ckpt.name}")
-
     @classmethod
     def from_config(cls, config: Dict[str, Any]) -> ExperimentManager:
         """Create an ExperimentManager from configuration.
