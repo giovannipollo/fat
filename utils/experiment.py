@@ -28,7 +28,6 @@ class ExperimentManager:
     Provides organized experiment tracking with:
 
     - Hierarchical directory organization (dataset/model_timestamp)
-    - Directory structure: experiments/<dataset>/<model_timestamp>/checkpoints/, tensorboard/
     - Config saving for reproducibility
     - Checkpoint saving/loading with best model tracking
 
@@ -43,8 +42,6 @@ class ExperimentManager:
                 best.pt
                 latest.pt
                 epoch_0010.pt
-              tensorboard/
-                events.out.tfevents.*
             resnet20_20240101_130000/
               ...
           cifar100/
@@ -79,7 +76,6 @@ class ExperimentManager:
         # Directories
         self.experiment_dir: Optional[Path] = None
         self.checkpoint_dir: Optional[Path] = None
-        self.tensorboard_dir: Optional[Path] = None
 
         if enabled:
             self._setup_experiment_dir(base_dir, experiment_name)
@@ -215,12 +211,10 @@ class ExperimentManager:
             / experiment_name
         )
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
-        self.tensorboard_dir = self.experiment_dir / "tensorboard"
 
         # Create directories
         self.experiment_dir.mkdir(parents=True, exist_ok=True)
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-        self.tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
         # Save config
         self._save_config()
@@ -419,14 +413,6 @@ class ExperimentManager:
         if not self.enabled:
             return False
         return (epoch + 1) % self.save_frequency == 0 or is_best
-
-    def get_tensorboard_dir(self) -> Optional[Path]:
-        """Get the TensorBoard log directory.
-
-        Returns:
-            Path to TensorBoard directory, or None if disabled.
-        """
-        return self.tensorboard_dir
 
     def get_experiment_dir(self) -> Optional[Path]:
         """Get the experiment directory.
