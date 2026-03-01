@@ -104,6 +104,7 @@ class ConfigValidator:
                 prefix = f"phase '{name}'"
 
             training = phase.get("training")
+            global_training = self.config.get("training", {})
             if not training:
                 self.errors.append(f"{prefix}: 'training' section is required")
             else:
@@ -114,12 +115,20 @@ class ConfigValidator:
                         f"{prefix}: 'training.epochs' must be a positive integer"
                     )
 
-                if "batch_size" not in training:
-                    self.errors.append(f"{prefix}: 'training.batch_size' is required")
-                elif not isinstance(training["batch_size"], int) or training["batch_size"] <= 0:
-                    self.errors.append(
-                        f"{prefix}: 'training.batch_size' must be a positive integer"
-                    )
+                phase_batch_size = training.get("batch_size")
+                global_batch_size = global_training.get("batch_size")
+                if phase_batch_size is None and global_batch_size is None:
+                    self.errors.append(f"{prefix}: 'training.batch_size' is required (define in phase or globally)")
+                elif phase_batch_size is not None:
+                    if not isinstance(phase_batch_size, int) or phase_batch_size <= 0:
+                        self.errors.append(
+                            f"{prefix}: 'training.batch_size' must be a positive integer"
+                        )
+                elif global_batch_size is not None:
+                    if not isinstance(global_batch_size, int) or global_batch_size <= 0:
+                        self.errors.append(
+                            f"{prefix}: 'training.batch_size' must be a positive integer"
+                        )
 
             loss = phase.get("loss")
             if not loss:
@@ -148,7 +157,6 @@ class ConfigValidator:
         ignored_keys = [
             "optimizer",
             "scheduler",
-            "training",
             "loss",
             "activation_fault_injection",
             "weight_fault_injection",
@@ -160,6 +168,13 @@ class ConfigValidator:
                     f"Top-level '{key}' is ignored when using 'phases'. "
                     f"All training parameters must be defined inside each phase."
                 )
+        global_training = self.config.get("training", {})
+        ignored_training_keys = [k for k in global_training if k != "batch_size"]
+        if ignored_training_keys:
+            self.warnings.append(
+                f"Top-level 'training' keys {ignored_training_keys} are ignored when using 'phases'. "
+                f"Only 'batch_size' can be inherited from global 'training'."
+            )
 
 
 def validate_config(config: Dict[str, Any]) -> None:
