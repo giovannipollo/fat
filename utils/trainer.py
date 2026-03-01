@@ -666,7 +666,7 @@ class Trainer:
                     epoch=epoch,
                     model=model_to_save,
                     val_acc=val_acc,
-                    best_val_acc=self.best_val_acc if self.has_validation else None,
+                    best_val_acc=self.best_val_acc,
                     test_acc=test_acc,
                     best_test_acc=self.best_test_acc,
                     is_best=is_best,
