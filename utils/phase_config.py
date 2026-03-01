@@ -34,6 +34,7 @@ class PhaseConfig:
         cls,
         phase_dict: Dict[str, Any],
         phase_index: int,
+        global_config: Dict[str, Any] | None = None,
         global_epoch_offset: int = 0,
     ) -> "PhaseConfig":
         """Create a PhaseConfig from a raw YAML dict entry.
@@ -41,6 +42,7 @@ class PhaseConfig:
         Args:
             phase_dict: Raw phase configuration from YAML.
             phase_index: 0-based position in the phases list.
+            global_config: Full config dict for inheriting batch_size.
             global_epoch_offset: Cumulative epoch count from prior phases.
 
         Returns:
@@ -49,12 +51,15 @@ class PhaseConfig:
         Raises:
             KeyError: If required fields are missing.
         """
+        global_config = global_config or {}
         training = phase_dict.get("training", {})
+        global_training = global_config.get("training", {})
+        batch_size = training.get("batch_size", global_training.get("batch_size"))
         return cls(
             name=phase_dict["name"],
             phase_index=phase_index,
             epochs=training["epochs"],
-            batch_size=training["batch_size"],
+            batch_size=batch_size,
             loss=phase_dict["loss"],
             optimizer=phase_dict["optimizer"],
             scheduler=phase_dict["scheduler"],
@@ -154,7 +159,10 @@ def parse_phases(config: Dict[str, Any]) -> List[PhaseConfig]:
     offset = 0
     for i, raw in enumerate(raw_phases):
         phase = PhaseConfig.from_dict(
-            phase_dict=raw, phase_index=i, global_epoch_offset=offset
+            phase_dict=raw,
+            phase_index=i,
+            global_config=config,
+            global_epoch_offset=offset,
         )
         phase.validate()
         phases.append(phase)

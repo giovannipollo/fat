@@ -1,6 +1,6 @@
 """Metrics logging utilities for training.
 
-Provides unified logging to TensorBoard, console, and text files
+Provides unified logging to console and text files
 for tracking training progress and metrics.
 """
 
@@ -10,27 +10,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TextIO, Type
 
-try:
-    from torch.utils.tensorboard import SummaryWriter
-
-    TENSORBOARD_AVAILABLE = True
-except ImportError:
-    SummaryWriter = None  # type: ignore
-    TENSORBOARD_AVAILABLE = False
-
 
 class MetricsLogger:
     """Handles logging of training metrics to multiple outputs.
 
     Provides unified interface for logging to:
 
-    - TensorBoard (scalar metrics)
     - Console (formatted epoch summaries)
     - Text file (training_log.txt)
 
     Example:
         ```python
-        logger = MetricsLogger.from_config(config, tensorboard_dir, experiment_dir)
+        logger = MetricsLogger.from_config(config, experiment_dir)
         logger.log_epoch(epoch, total_epochs, lr, train_loss, train_acc, val_loss, val_acc)
         logger.close()
         ```
@@ -38,8 +29,6 @@ class MetricsLogger:
 
     def __init__(
         self,
-        tensorboard_enabled: bool = False,
-        log_dir: Optional[Path] = None,
         console_enabled: bool = True,
         file_logging_enabled: bool = False,
         experiment_dir: Optional[Path] = None,
@@ -47,31 +36,14 @@ class MetricsLogger:
         """Initialize the metrics logger.
 
         Args:
-            tensorboard_enabled: Whether to enable TensorBoard logging.
-            log_dir: Directory for TensorBoard logs.
             console_enabled: Whether to print metrics to console.
             file_logging_enabled: Whether to log to a text file.
             experiment_dir: Directory for the log file.
         """
         self.console_enabled = console_enabled
-        self.tensorboard_enabled = tensorboard_enabled
         self.file_logging_enabled = file_logging_enabled
-        self.writer: Optional[Any] = None
         self.log_file: Optional[TextIO] = None
         self.log_file_path: Optional[Path] = None
-
-        # Setup TensorBoard
-        if tensorboard_enabled:
-            if not TENSORBOARD_AVAILABLE or SummaryWriter is None:
-                print(
-                    "Warning: TensorBoard not available. "
-                    "Install with: pip install tensorboard"
-                )
-                self.tensorboard_enabled = False
-            elif log_dir is not None:
-                log_dir.mkdir(parents=True, exist_ok=True)
-                self.writer = SummaryWriter(log_dir=str(log_dir))
-                print(f"TensorBoard logging enabled: {log_dir}")
 
         # Setup file logging
         if file_logging_enabled and experiment_dir is not None:
@@ -98,27 +70,6 @@ class MetricsLogger:
         if self.log_file is not None:
             self.log_file.write(message + "\n")
             self.log_file.flush()
-
-    def log_scalar(self, tag: str, value: float, step: int) -> None:
-        """Log a scalar value to TensorBoard.
-
-        Args:
-            tag: Name of the metric.
-            value: Value to log.
-            step: Current step/epoch.
-        """
-        if self.writer is not None:
-            self.writer.add_scalar(tag, value, step)
-
-    def log_scalars(self, metrics: Dict[str, float], step: int) -> None:
-        """Log multiple scalar values to TensorBoard.
-
-        Args:
-            metrics: Dictionary of metric names to values.
-            step: Current step/epoch.
-        """
-        for tag, value in metrics.items():
-            self.log_scalar(tag, value, step)
 
     def log_epoch(
         self,
@@ -172,27 +123,6 @@ class MetricsLogger:
 
         self._write_to_file(log_msg)
 
-        if self.writer is not None:
-            self.writer.add_scalar("Learning Rate", lr, epoch)
-            self.writer.add_scalar("Loss/train", train_loss, epoch)
-            self.writer.add_scalar(f"Loss/{eval_name.lower()}", eval_loss, epoch)
-            self.writer.add_scalar("Accuracy/train", train_acc, epoch)
-            self.writer.add_scalar(f"Accuracy/{eval_name.lower()}", eval_acc, epoch)
-
-            if phase_name:
-                self.writer.add_scalar(f"{phase_name}/Loss/train", train_loss, epoch)
-                self.writer.add_scalar(f"{phase_name}/Loss/{eval_name.lower()}", eval_loss, epoch)
-                self.writer.add_scalar(f"{phase_name}/Accuracy/train", train_acc, epoch)
-                self.writer.add_scalar(f"{phase_name}/Accuracy/{eval_name.lower()}", eval_acc, epoch)
-                self.writer.add_scalar(f"{phase_name}/Learning Rate", lr, epoch)
-
-            if test_loss is not None and test_acc is not None:
-                self.writer.add_scalar("Loss/test", test_loss, epoch)
-                self.writer.add_scalar("Accuracy/test", test_acc, epoch)
-                if phase_name:
-                    self.writer.add_scalar(f"{phase_name}/Loss/test", test_loss, epoch)
-                    self.writer.add_scalar(f"{phase_name}/Accuracy/test", test_acc, epoch)
-
     def log_final_test(self, loss: float, accuracy: float, epoch: int) -> None:
         """Log final test results.
 
@@ -207,10 +137,6 @@ class MetricsLogger:
             print(msg)
 
         self._write_to_file(msg)
-
-        if self.writer is not None:
-            self.writer.add_scalar("Loss/test_final", loss, epoch)
-            self.writer.add_scalar("Accuracy/test_final", accuracy, epoch)
 
     def log_best_model(
         self,
@@ -265,10 +191,6 @@ class MetricsLogger:
             messages.append("Validation set: enabled")
         if use_amp:
             messages.append("Mixed precision training (AMP): enabled")
-        if self.writer is not None:
-            messages.append(
-                f"TensorBoard logging: enabled (log_dir: {self.writer.log_dir})"
-            )
         if experiment_dir is not None:
             messages.append(f"Experiment directory: {experiment_dir}")
         messages.append("")
@@ -359,11 +281,7 @@ class MetricsLogger:
         self._write_to_file(msg)
 
     def close(self) -> None:
-        """Close the TensorBoard writer and log file."""
-        if self.writer is not None:
-            self.writer.close()
-            self.writer = None
-
+        """Close the log file."""
         if self.log_file is not None:
             self.log_file.close()
             self.log_file = None
@@ -382,7 +300,7 @@ class MetricsLogger:
         exc_val: Optional[BaseException],
         exc_tb: Optional[Any],
     ) -> bool:
-        """Context manager exit - closes the writer.
+        """Context manager exit - closes the log file.
 
         Returns:
             False (don't suppress exceptions).
@@ -394,36 +312,25 @@ class MetricsLogger:
     def from_config(
         cls: Type[MetricsLogger],
         config: Dict[str, Any],
-        tensorboard_dir: Optional[Path] = None,
         experiment_dir: Optional[Path] = None,
     ) -> MetricsLogger:
         """Create a MetricsLogger from configuration.
 
         Args:
             config: Full configuration dictionary.
-            tensorboard_dir: Override directory for TensorBoard logs.
             experiment_dir: Directory for file logging.
 
         Returns:
             Configured MetricsLogger instance.
         """
-        tensorboard_config: Dict[str, Any] = config.get("tensorboard", {})
         progress_config: Dict[str, Any] = config.get("progress", {})
         logging_config: Dict[str, Any] = config.get("logging", {})
 
-        # Determine log directory
-        log_dir: Optional[Path] = tensorboard_dir
-        if log_dir is None and tensorboard_config.get("enabled", False):
-            log_dir = Path(tensorboard_config.get("log_dir", "./runs"))
-
-        # File logging is enabled by default if experiment_dir is provided
         file_logging_enabled: bool = logging_config.get(
             "file_enabled", experiment_dir is not None
         )
 
         return cls(
-            tensorboard_enabled=tensorboard_config.get("enabled", False),
-            log_dir=log_dir,
             console_enabled=progress_config.get("enabled", True),
             file_logging_enabled=file_logging_enabled,
             experiment_dir=experiment_dir,

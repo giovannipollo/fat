@@ -6,7 +6,7 @@ Provides a complete training loop with support for:
 - Checkpoint saving/loading
 - Learning rate warmup
 - Mixed precision training (AMP)
-- TensorBoard logging
+- Console and file logging
 - Validation and test evaluation
 - Fault injection for fault-aware training (FAT)
 """
@@ -45,7 +45,7 @@ class Trainer:
     - OptimizerFactory: Creates optimizers from config
     - SchedulerFactory: Creates schedulers with warmup support
     - ExperimentManager: Handles checkpoints and experiment organization
-    - MetricsLogger: Handles TensorBoard and console logging
+    - MetricsLogger: Handles console and file logging
     - ActivationFaultInjector: Optional fault injection for fault-aware training
 
     Features:
@@ -53,7 +53,7 @@ class Trainer:
         - Checkpoint saving/loading with meaningful experiment names
         - Learning rate warmup
         - Mixed precision training (AMP)
-        - TensorBoard logging
+        - Console and file logging
         - Config saving for experiment reproducibility
         - Fault injection for fault-aware training (FAT)
 
@@ -156,8 +156,7 @@ class Trainer:
 
         # Setup metrics logger
         self.logger: MetricsLogger = MetricsLogger.from_config(
-            config,
-            tensorboard_dir=self.experiment.get_tensorboard_dir(),
+            config=config,
             experiment_dir=self.experiment.get_experiment_dir(),
         )
 

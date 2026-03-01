@@ -28,7 +28,7 @@ class ExperimentManager:
     Provides organized experiment tracking with:
 
     - Hierarchical directory organization (dataset/model_timestamp)
-    - Directory structure: experiments/<dataset>/<model_timestamp>/checkpoints/, tensorboard/
+    - Directory structure: experiments/<dataset>/<model_timestamp>/checkpoints/
     - Config saving for reproducibility
     - Checkpoint saving/loading with best model tracking
 
@@ -43,8 +43,6 @@ class ExperimentManager:
                 best.pt
                 latest.pt
                 epoch_0010.pt
-              tensorboard/
-                events.out.tfevents.*
             resnet20_20240101_130000/
               ...
           cifar100/
@@ -79,7 +77,6 @@ class ExperimentManager:
         # Directories
         self.experiment_dir: Optional[Path] = None
         self.checkpoint_dir: Optional[Path] = None
-        self.tensorboard_dir: Optional[Path] = None
 
         self._resumed_phase_index: int = 0
         self._resumed_phase_name: str = ""
@@ -231,14 +228,10 @@ class ExperimentManager:
             phase_dir = self.experiment_dir / f"{i}_{phase_name}"
             phase_dir.mkdir(parents=True, exist_ok=True)
             (phase_dir / "checkpoints").mkdir(exist_ok=True)
-            (phase_dir / "tensorboard").mkdir(exist_ok=True)
             self.phase_dirs[i] = phase_dir
 
         self.checkpoint_dir = self.experiment_dir / "checkpoints"
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-
-        self.tensorboard_dir = self.experiment_dir / "tensorboard"
-        self.tensorboard_dir.mkdir(parents=True, exist_ok=True)
 
         self._save_config()
 
@@ -488,23 +481,6 @@ class ExperimentManager:
         phase_dir.mkdir(parents=True, exist_ok=True)
         return phase_dir
 
-    def get_phase_tensorboard_dir(self, phase_index: int) -> Optional[Path]:
-        """Get the TensorBoard directory for a specific phase.
-
-        Args:
-            phase_index: Index of the phase (0-based).
-
-        Returns:
-            Path to phase TensorBoard directory, or None if disabled.
-        """
-        if not self.enabled:
-            return None
-        if hasattr(self, "phase_dirs") and phase_index in self.phase_dirs:
-            return self.phase_dirs[phase_index] / "tensorboard"
-        if self.experiment_dir is None:
-            return None
-        return self.experiment_dir / f"{phase_index}_phase_{phase_index}" / "tensorboard"
-
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
 
@@ -518,14 +494,6 @@ class ExperimentManager:
         if not self.enabled:
             return False
         return (epoch + 1) % self.save_frequency == 0 or is_best
-
-    def get_tensorboard_dir(self) -> Optional[Path]:
-        """Get the TensorBoard log directory.
-
-        Returns:
-            Path to TensorBoard directory, or None if disabled.
-        """
-        return self.tensorboard_dir
 
     def get_experiment_dir(self) -> Optional[Path]:
         """Get the experiment directory.
