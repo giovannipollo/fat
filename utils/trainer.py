@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Any, Dict, Iterator, Optional, Tuple, Union
 from pathlib import Path
+from brevitas import config as brev_config
 
 from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, SchedulerType
@@ -120,16 +121,9 @@ class Trainer:
 
         brevitas_config: Dict[str, Any] = config.get("brevitas", {})
         if brevitas_config.get("ignore_missing_keys", False):
-            try:
-                from brevitas import config as brev_config
-
-                brev_config.IGNORE_MISSING_KEYS = True
-                if self.rank == 0 or not self.is_distributed:
-                    print(
-                        "Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading"
-                    )
-            except ImportError:
-                pass
+            brev_config.IGNORE_MISSING_KEYS = True
+            if self.rank == 0 or not self.is_distributed:
+                print("Brevitas IGNORE_MISSING_KEYS enabled for float-to-quant loading")
 
         # Training state
         self.start_epoch: int = 0
