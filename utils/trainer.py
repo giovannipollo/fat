@@ -127,7 +127,8 @@ class Trainer:
 
         # Training state
         self.start_epoch: int = 0
-        self.best_acc: float = 0.0
+        self.best_val_acc: float = 0.0
+        self.best_test_acc: float = 0.0
         self.total_epochs: int = config["training"]["epochs"]
 
         # Setup loss function
@@ -186,7 +187,6 @@ class Trainer:
             self.experiment.load_weights(
                 load_weights_path, model_to_load, self.device, strict=False
             )
-            self.best_acc = 0.0
 
         self._setup_fault_injection(config)
 
@@ -499,7 +499,7 @@ class Trainer:
         """
         if self.val_loader is None:
             raise ValueError("No validation set available")
-        return self.evaluate(self.val_loader, desc="Validating")
+        return self.evaluate(self.val_loader, desc="Validation")
 
     def test(self) -> Tuple[float, float]:
         """Evaluate model on test set.
@@ -507,6 +507,8 @@ class Trainer:
         Returns:
             Tuple of (average_loss, accuracy).
         """
+        if self.test_loader is None:
+            raise ValueError("No test set available")
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
@@ -517,7 +519,6 @@ class Trainer:
         """
         epochs: int = self.total_epochs
         model_name: str = self.config["model"]["name"]
-        eval_name: str = "Val" if self.has_validation else "Test"
 
         # Test evaluation frequency (only when using validation set)
         training_config: Dict[str, Any] = self.config.get("training", {})
@@ -603,27 +604,43 @@ class Trainer:
                     self.scheduler.step()
             else:
                 lr = self.config["optimizer"]["learning_rate"]
-            # Evaluate on validation or test set
-            if self.has_validation:
-                eval_loss, eval_acc = self.validate()
-            else:
-                eval_loss, eval_acc = self.test()
 
-            # Check if this is the best model
-            is_best = eval_acc > self.best_acc
-            if is_best:
-                self.best_acc = eval_acc
+            # Evaluate on validation and/or test set
+            val_loss: Optional[float] = None
+            val_acc: Optional[float] = None
+            test_loss: Optional[float] = None
+            test_acc: Optional[float] = None
 
-            # Evaluate on test set when:
-            # 1. We find a new best model (when using validation), OR
-            # 2. It's a periodic test evaluation epoch (when using validation)
-            test_loss, test_acc = None, None
             if self.has_validation:
-                is_periodic_test = test_frequency > 0 and (
-                    (epoch + 1) % test_frequency == 0 or epoch == epochs - 1
-                )
-                if is_best or is_periodic_test:
+                val_loss, val_acc = self.validate()
+                # Check if this is the best model
+                is_best = val_acc > self.best_val_acc
+                if is_best:
+                    self.best_val_acc = val_acc
+
+                # Check if we should run test evaluation this epoch based on test_frequency
+                is_periodic_test = False
+                if test_frequency > 0 and (epoch + 1) % test_frequency == 0:
+                    is_periodic_test = True
+
+                # Check if this is the last epoch (always test at the end)
+                is_last_epoch = False
+                if epoch == epochs - 1:
+                    is_last_epoch = True
+
+                # If this is the best model so far, or if it's a periodic test epoch, or if it's the last epoch, run test evaluation
+                if is_best or is_periodic_test or is_last_epoch:
                     test_loss, test_acc = self.test()
+                    # Track best test accuracy
+                    if test_acc > self.best_test_acc:
+                        self.best_test_acc = test_acc
+            else:
+                # No validation set - use test set for monitoring
+                test_loss, test_acc = self.test()
+                # Check if this is the best model
+                is_best = test_acc > self.best_test_acc
+                if is_best:
+                    self.best_test_acc = test_acc
 
             # Log epoch metrics
             if self.rank == 0:
@@ -633,23 +650,26 @@ class Trainer:
                     lr=lr,
                     train_loss=train_loss,
                     train_acc=train_acc,
-                    eval_loss=eval_loss,
-                    eval_acc=eval_acc,
-                    eval_name=eval_name,
+                    val_loss=val_loss,
+                    val_acc=val_acc,
                     test_loss=test_loss,
                     test_acc=test_acc,
+                    is_best=is_best,
                 )
 
             # Save checkpoint
-            if self.rank == 0 and self.experiment.should_save(epoch, is_best):
+            if self.rank == 0 and self.experiment.should_save(
+                epoch=epoch, is_best=is_best
+            ):
                 model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
                     model=model_to_save,
-                    best_acc=self.best_acc,
-                    current_acc=eval_acc,
+                    val_acc=val_acc,
+                    best_val_acc=self.best_val_acc if self.has_validation else None,
+                    test_acc=test_acc,
+                    best_test_acc=self.best_test_acc,
                     is_best=is_best,
-                    test_acc=test_acc if is_best and self.has_validation else None,
                     act_fault_injector=self.act_fault_injector,
                     weight_fault_injector=self.weight_fault_injector,
                     act_fault_config=self.act_fault_config,
@@ -660,8 +680,8 @@ class Trainer:
                 if is_best:
                     self.logger.log_best_model(
                         epoch=epoch,
-                        val_acc=eval_acc,
-                        test_acc=test_acc if self.has_validation else None,
+                        val_acc=val_acc,
+                        test_acc=test_acc,
                     )
 
         # Final evaluation on test set (if we used validation during training)
@@ -672,7 +692,15 @@ class Trainer:
 
         # Log completion
         if self.rank == 0:
-            self.logger.log_training_complete(self.best_acc, eval_name)
+            if self.has_validation:
+                monitor_name = "validation"
+                best_acc = self.best_val_acc
+            else:
+                monitor_name = "test"
+                best_acc = self.best_test_acc
+            self.logger.log_training_complete(
+                best_acc=best_acc, monitor_name=monitor_name
+            )
 
             experiment_dir = self.experiment.get_experiment_dir()
             if experiment_dir is not None:

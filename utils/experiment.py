@@ -240,8 +240,9 @@ class ExperimentManager:
         self,
         epoch: int,
         model: torch.nn.Module,
-        best_acc: float,
-        current_acc: float,
+        val_acc: Optional[float],
+        best_val_acc: Optional[float],
+        best_test_acc: float,
         is_best: bool = False,
         test_acc: Optional[float] = None,
         act_fault_injector: Optional["ActivationFaultInjector"] = None,
@@ -254,10 +255,11 @@ class ExperimentManager:
         Args:
             epoch: Current epoch number (0-indexed).
             model: The model to save.
-            best_acc: Best accuracy achieved so far.
-            current_acc: Current epoch's accuracy.
+            val_acc: Current epoch's validation accuracy (None if no validation).
+            best_val_acc: Best validation accuracy achieved so far (None if no validation).
+            best_test_acc: Best test accuracy achieved so far.
             is_best: Whether this is the best model so far.
-            test_acc: Test accuracy (for best model with validation).
+            test_acc: Current epoch's test accuracy (None if not evaluated this epoch).
             act_fault_injector: Optional activation fault injector to remove before saving.
             weight_fault_injector: Optional weight fault injector to remove before saving.
             act_fault_config: Optional activation fault injection config for re-injection.
@@ -279,10 +281,20 @@ class ExperimentManager:
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
-            "best_acc": best_acc,
-            "current_acc": current_acc,
+            "best_test_acc": best_test_acc,
             "config": self.config,
         }
+        
+        # Add validation metrics if available
+        if val_acc is not None:
+            checkpoint["val_acc"] = val_acc
+        
+        if best_val_acc is not None:
+            checkpoint["best_val_acc"] = best_val_acc
+        
+        # Add test accuracy if evaluated this epoch
+        if test_acc is not None:
+            checkpoint["test_acc"] = test_acc
 
         # Save periodic checkpoint
         checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
@@ -294,19 +306,17 @@ class ExperimentManager:
 
         # Save best checkpoint
         if is_best and self.save_best:
-            # Include test accuracy in best checkpoint
-            if test_acc is not None:
-                checkpoint["test_acc"] = test_acc
-            
             best_path: Path = self.checkpoint_dir / "best.pt"
             torch.save(checkpoint, best_path)
             
-            if test_acc is not None:
+            if val_acc is not None and test_acc is not None:
                 print(
-                    f"  -> New best model saved! (val: {current_acc:.2f}%, test: {test_acc:.2f}%)"
+                    f"  -> New best model saved! (val: {val_acc:.2f}%, test: {test_acc:.2f}%)"
                 )
+            elif test_acc is not None:
+                print(f"  -> New best model saved! (test: {test_acc:.2f}%)")
             else:
-                print(f"  -> New best model saved! (acc: {current_acc:.2f}%)")
+                print(f"  -> New best model saved!")
 
         # Re-inject fault injection wrappers/hooks after saving
         if needs_act_reinject and act_fault_config is not None:

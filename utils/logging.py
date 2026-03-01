@@ -78,9 +78,8 @@ class MetricsLogger:
         lr: float,
         train_loss: float,
         train_acc: float,
-        eval_loss: float,
-        eval_acc: float,
-        eval_name: str = "Val",
+        val_loss: Optional[float],
+        val_acc: Optional[float],
         test_loss: Optional[float] = None,
         test_acc: Optional[float] = None,
         is_best: bool = False,
@@ -93,11 +92,10 @@ class MetricsLogger:
             lr: Current learning rate.
             train_loss: Training loss.
             train_acc: Training accuracy (%).
-            eval_loss: Evaluation loss (validation or test).
-            eval_acc: Evaluation accuracy (%).
-            eval_name: Name of evaluation set ("Val" or "Test").
-            test_loss: Optional test loss (when using validation).
-            test_acc: Optional test accuracy (when using validation).
+            val_loss: Validation loss (None if no validation set).
+            val_acc: Validation accuracy (%) (None if no validation set).
+            test_loss: Test loss (optional, evaluated periodically with validation).
+            test_acc: Test accuracy (%) (optional, evaluated periodically with validation).
             is_best: Whether this epoch achieved the best accuracy.
         """
         # Build log message
@@ -105,10 +103,12 @@ class MetricsLogger:
             f"Epoch [{epoch + 1}/{total_epochs}] "
             f"LR: {lr:.5f} | "
             f"Train Loss: {train_loss:.4f} | "
-            f"Train Acc: {train_acc:.2f}% | "
-            f"{eval_name} Loss: {eval_loss:.4f} | "
-            f"{eval_name} Acc: {eval_acc:.2f}%"
+            f"Train Acc: {train_acc:.2f}%"
         )
+
+        # Add validation metrics if available
+        if val_loss is not None and val_acc is not None:
+            log_msg += f" | Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.2f}%"
 
         # Add test metrics if available
         if test_loss is not None and test_acc is not None:
@@ -143,22 +143,22 @@ class MetricsLogger:
     def log_best_model(
         self,
         epoch: int,
-        val_acc: float,
+        val_acc: Optional[float],
         test_acc: Optional[float] = None,
     ) -> None:
         """Log when a new best model is saved.
 
         Args:
             epoch: Epoch number (0-indexed).
-            val_acc: Validation accuracy (or test if no validation).
-            test_acc: Optional test accuracy (when using validation).
+            val_acc: Validation accuracy (None if no validation set).
+            test_acc: Test accuracy (always available since we always evaluate test).
         """
-        if test_acc is not None:
+        if val_acc is not None and test_acc is not None:
             msg = f"  -> New best model saved at epoch {epoch + 1}! (val: {val_acc:.2f}%, test: {test_acc:.2f}%)"
+        elif test_acc is not None:
+            msg = f"  -> New best model saved at epoch {epoch + 1}! (test: {test_acc:.2f}%)"
         else:
-            msg = (
-                f"  -> New best model saved at epoch {epoch + 1}! (acc: {val_acc:.2f}%)"
-            )
+            msg = f"  -> New best model saved at epoch {epoch + 1}!"
 
         # Only write to file, console output is handled by ExperimentManager
         self._write_to_file(msg)
@@ -204,14 +204,14 @@ class MetricsLogger:
         for msg in messages:
             self._write_to_file(msg)
 
-    def log_training_complete(self, best_acc: float, eval_name: str = "Val") -> None:
+    def log_training_complete(self, best_acc: float, monitor_name: str = "validation") -> None:
         """Log training completion message.
 
         Args:
             best_acc: Best accuracy achieved (%).
-            eval_name: Name of the evaluation set.
+            monitor_name: Name of the metric being monitored ("validation" or "test").
         """
-        msg = f"\nTraining complete! Best {eval_name} accuracy: {best_acc:.2f}%"
+        msg = f"\nTraining complete! Best {monitor_name} accuracy: {best_acc:.2f}%"
 
         if self.console_enabled:
             print(msg)
