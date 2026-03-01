@@ -315,6 +315,50 @@ class ExperimentManager:
         if needs_weight_reinject and weight_fault_config is not None:
             model = weight_fault_injector.inject(model, weight_fault_config)
 
+    def load_weights(
+        self,
+        checkpoint_path: Union[str, Path],
+        model: torch.nn.Module,
+        device: torch.device = torch.device("cpu"),
+        strict: bool = False,
+    ) -> None:
+        """Load only model weights from checkpoint.
+
+        Args:
+            checkpoint_path: Path to checkpoint file (absolute or relative to experiment_dir).
+            model: Model to load weights into.
+            device: Device to load the checkpoint to.
+            strict: If False, allows loading state dict with missing/unexpected keys.
+        """
+        ckpt_file = Path(checkpoint_path)
+        if not ckpt_file.is_absolute():
+            if self.experiment_dir is not None:
+                ckpt_file = self.experiment_dir / checkpoint_path
+            else:
+                raise FileNotFoundError(
+                    f"Cannot resolve relative path: {checkpoint_path}"
+                )
+
+        if not ckpt_file.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
+
+        print(f"Loading weights from: {ckpt_file}")
+
+        ckpt = torch.load(str(ckpt_file), map_location=device)
+
+        missing_keys, unexpected_keys = model.load_state_dict(
+            ckpt["model_state_dict"], strict=strict
+        )
+
+        if missing_keys:
+            print(f"Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
+        if unexpected_keys:
+            print(
+                f"Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
+            )
+
+        print("Loaded model weights")
+
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
 

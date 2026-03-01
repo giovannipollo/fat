@@ -186,9 +186,12 @@ class Trainer:
         load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
         if load_weights_path:
             print("\n" + "=" * 60)
-            print("Loading pretrained weights (no training state)")
+            print("Loading pretrained weights")
             print("=" * 60)
-            self._load_weights_only(load_weights_path)
+            model_to_load = self.model.module if self.is_distributed else self.model
+            self.experiment.load_weights(
+                load_weights_path, model_to_load, self.device, strict=False
+            )
             self.best_acc = 0.0
 
         self._setup_fault_injection(config)
@@ -683,41 +686,3 @@ class Trainer:
 
             # Close logger
             self.logger.close()
-
-    def _load_weights_only(self, checkpoint_path: str) -> None:
-        """Load only model weights from checkpoint.
-
-        Args:
-            checkpoint_path: Path to checkpoint file.
-        """
-
-        ckpt_file = Path(checkpoint_path)
-        if not ckpt_file.is_absolute():
-            if self.experiment.experiment_dir is not None:
-                ckpt_file = self.experiment.experiment_dir / checkpoint_path
-            else:
-                raise FileNotFoundError(
-                    f"Cannot resolve relative path: {checkpoint_path}"
-                )
-
-        if not ckpt_file.exists():
-            raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
-
-        print(f"Loading weights from: {ckpt_file}")
-
-        ckpt = torch.load(str(ckpt_file), map_location="cpu")
-
-        model_to_load = self.model.module if self.is_distributed else self.model
-        missing_keys, unexpected_keys = model_to_load.load_state_dict(
-            ckpt["model_state_dict"], strict=False
-        )
-
-        if missing_keys:
-            print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
-        if unexpected_keys:
-            print(
-                f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
-            )
-
-        self.model = self.model.to(self.device)
-        print(f"  Loaded model weights")
