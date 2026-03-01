@@ -10,6 +10,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple, Union
+import yaml as yaml_module
 from .fault_injection import ActivationFaultInjector, WeightFaultInjector
 
 import torch
@@ -227,19 +228,11 @@ class ExperimentManager:
         if self.experiment_dir is None:
             return
 
-        if YAML_AVAILABLE:
-            import yaml as yaml_module
-
-            config_path: Path = self.experiment_dir / "config.yaml"
-            with open(config_path, "w") as f:
-                yaml_module.dump(
-                    self.config, f, default_flow_style=False, sort_keys=False
-                )
-        else:
-            # Fallback: save as simple text representation
-            config_path = self.experiment_dir / "config.txt"
-            with open(config_path, "w") as f:
-                f.write(str(self.config))
+        config_path: Path = self.experiment_dir / "config.yaml"
+        with open(config_path, "w") as f:
+            yaml_module.dump(
+                self.config, f, default_flow_style=False, sort_keys=False
+            )
 
         print(f"Config saved to: {config_path}")
 
@@ -249,7 +242,6 @@ class ExperimentManager:
         model: torch.nn.Module,
         best_acc: float,
         current_acc: float,
-        scaler: Optional[Any] = None,
         is_best: bool = False,
         test_acc: Optional[float] = None,
         act_fault_injector: Optional["ActivationFaultInjector"] = None,
@@ -264,7 +256,6 @@ class ExperimentManager:
             model: The model to save.
             best_acc: Best accuracy achieved so far.
             current_acc: Current epoch's accuracy.
-            scaler: GradScaler for AMP (optional).
             is_best: Whether this is the best model so far.
             test_acc: Test accuracy (for best model with validation).
             act_fault_injector: Optional activation fault injector to remove before saving.
@@ -292,10 +283,6 @@ class ExperimentManager:
             "current_acc": current_acc,
             "config": self.config,
         }
-
-        # Save scaler state if using AMP
-        if scaler is not None:
-            checkpoint["scaler_state_dict"] = scaler.state_dict()
 
         # Save periodic checkpoint
         checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"

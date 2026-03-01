@@ -651,7 +651,6 @@ class Trainer:
                     model=model_to_save,
                     best_acc=self.best_acc,
                     current_acc=eval_acc,
-                    scaler=self.scaler,
                     is_best=is_best,
                     test_acc=test_acc if is_best and self.has_validation else None,
                     act_fault_injector=self.act_fault_injector,
