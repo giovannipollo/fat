@@ -22,6 +22,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from typing import Any, Dict, Iterator, Optional, Tuple, Union
+from pathlib import Path
 
 from .optimizer import OptimizerFactory
 from .scheduler import SchedulerFactory, SchedulerType
@@ -142,12 +143,12 @@ class Trainer:
             self.model, config
         )
 
-        _act_fault_warmup: int = config.get(
-            "activation_fault_injection", {}
-        ).get("warmup_epochs", 0)
-        _weight_fault_warmup: int = config.get(
-            "weight_fault_injection", {}
-        ).get("warmup_epochs", 0)
+        _act_fault_warmup: int = config.get("activation_fault_injection", {}).get(
+            "warmup_epochs", 0
+        )
+        _weight_fault_warmup: int = config.get("weight_fault_injection", {}).get(
+            "warmup_epochs", 0
+        )
         _fault_warmup: int = max(_act_fault_warmup, _weight_fault_warmup)
 
         self.scheduler: SchedulerType = SchedulerFactory.create(
@@ -191,18 +192,6 @@ class Trainer:
             self.best_acc = 0.0
 
         self._setup_fault_injection(config)
-
-        # Resume from checkpoint if specified (full training state)
-        resume_path: Optional[str] = checkpoint_config.get("resume")
-        if resume_path:
-            self.start_epoch, self.best_acc = self.experiment.load_checkpoint(
-                resume_path,
-                self.model,
-                self.optimizer,
-                self.scheduler,
-                self.scaler,
-                self.device,
-            )
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
@@ -654,14 +643,12 @@ class Trainer:
                     test_acc=test_acc,
                 )
 
-            # Save checkpoint (only on rank 0)
+            # Save checkpoint
             if self.rank == 0 and self.experiment.should_save(epoch, is_best):
                 model_to_save = self.model.module if self.is_distributed else self.model
                 self.experiment.save_checkpoint(
                     epoch=epoch,
                     model=model_to_save,
-                    optimizer=self.optimizer,
-                    scheduler=self.scheduler,
                     best_acc=self.best_acc,
                     current_acc=eval_acc,
                     scaler=self.scaler,
@@ -704,7 +691,6 @@ class Trainer:
         Args:
             checkpoint_path: Path to checkpoint file.
         """
-        from pathlib import Path
 
         ckpt_file = Path(checkpoint_path)
         if not ckpt_file.is_absolute():

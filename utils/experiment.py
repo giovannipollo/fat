@@ -1,6 +1,6 @@
 """Experiment manager for checkpoints and experiment organization.
 
-Handles experiment directory structure, checkpoint saving/loading,
+Handles experiment directory structure, checkpoint saving,
 and configuration persistence for reproducibility.
 """
 
@@ -29,7 +29,7 @@ class ExperimentManager:
 
     - Hierarchical directory organization (dataset/model_timestamp)
     - Config saving for reproducibility
-    - Checkpoint saving/loading with best model tracking
+    - Checkpoint saving with best model tracking
 
     Directory Structure::
 
@@ -247,8 +247,6 @@ class ExperimentManager:
         self,
         epoch: int,
         model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Any,
         best_acc: float,
         current_acc: float,
         scaler: Optional[Any] = None,
@@ -264,8 +262,6 @@ class ExperimentManager:
         Args:
             epoch: Current epoch number (0-indexed).
             model: The model to save.
-            optimizer: The optimizer state.
-            scheduler: The scheduler state (can be None).
             best_acc: Best accuracy achieved so far.
             current_acc: Current epoch's accuracy.
             scaler: GradScaler for AMP (optional).
@@ -292,8 +288,6 @@ class ExperimentManager:
         checkpoint: Dict[str, Any] = {
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "scheduler_state_dict": scheduler.state_dict() if scheduler else None,
             "best_acc": best_acc,
             "current_acc": current_acc,
             "config": self.config,
@@ -333,72 +327,6 @@ class ExperimentManager:
 
         if needs_weight_reinject and weight_fault_config is not None:
             model = weight_fault_injector.inject(model, weight_fault_config)
-
-    def load_checkpoint(
-        self,
-        checkpoint_path: Union[str, Path],
-        model: torch.nn.Module,
-        optimizer: torch.optim.Optimizer,
-        scheduler: Any,
-        scaler: Optional[Any] = None,
-        device: torch.device = torch.device("cpu"),
-        strict: bool = True,
-    ) -> Tuple[int, float]:
-        """Load a model checkpoint.
-
-        Args:
-            checkpoint_path: Path to the checkpoint file.
-            model: Model to load state into.
-            optimizer: Optimizer to load state into.
-            scheduler: Scheduler to load state into (can be None).
-            scaler: GradScaler for AMP (optional).
-            device: Device to load the checkpoint to.
-            strict: If False, allows loading state dict with missing/unexpected keys.
-                    Useful for loading float checkpoints into quantized models.
-
-        Returns:
-            Tuple of (start_epoch, best_acc).
-        """
-        checkpoint_path = Path(checkpoint_path)
-        if not checkpoint_path.exists():
-            print(f"Warning: Checkpoint not found at {checkpoint_path}")
-            return 0, 0.0
-
-        print(f"Loading checkpoint from {checkpoint_path}")
-        checkpoint: Dict[str, Any] = torch.load(checkpoint_path, map_location=device)
-
-        # Load model state dict with strict parameter
-        try:
-            missing_keys, unexpected_keys = model.load_state_dict(
-                checkpoint["model_state_dict"], strict=strict
-            )
-
-            # Log results if non-strict loading
-            if not strict:
-                if missing_keys:
-                    print(f"  Missing keys ({len(missing_keys)}): {missing_keys[:5]}...")
-                if unexpected_keys:
-                    print(f"  Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}...")
-
-        except RuntimeError as e:
-            if strict:
-                raise
-            print(f"Warning: Non-strict loading encountered error: {e}")
-
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-        if scheduler and checkpoint.get("scheduler_state_dict"):
-            scheduler.load_state_dict(checkpoint["scheduler_state_dict"])
-
-        # Load scaler state if using AMP
-        if scaler is not None and "scaler_state_dict" in checkpoint:
-            scaler.load_state_dict(checkpoint["scaler_state_dict"])
-
-        start_epoch: int = checkpoint["epoch"] + 1
-        best_acc: float = checkpoint.get("best_acc", 0.0)
-
-        print(f"Resumed from epoch {start_epoch}, best acc: {best_acc:.2f}%")
-        return start_epoch, best_acc
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.
