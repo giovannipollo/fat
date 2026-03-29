@@ -240,6 +240,10 @@ class ExperimentManager:
         weight_fault_injector: Optional["WeightFaultInjector"] = None,
         act_fault_config: Optional[Any] = None,
         weight_fault_config: Optional[Any] = None,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[Any] = None,
+        scaler: Optional[Any] = None,
+        fault_injection_state: Optional[Dict[str, Any]] = None,
     ):
         """Save a model checkpoint.
 
@@ -286,6 +290,18 @@ class ExperimentManager:
         # Add test accuracy if evaluated this epoch
         if test_acc is not None:
             checkpoint["test_acc"] = test_acc
+
+        if optimizer is not None:
+            checkpoint["optimizer_state_dict"] = optimizer.state_dict()
+
+        if scheduler is not None:
+            checkpoint["scheduler_state_dict"] = scheduler.state_dict()
+
+        if scaler is not None:
+            checkpoint["scaler_state_dict"] = scaler.state_dict()
+
+        if fault_injection_state is not None:
+            checkpoint["fault_injection_state"] = fault_injection_state
 
         # Save periodic checkpoint
         checkpoint_path: Path = self.checkpoint_dir / f"epoch_{epoch:04d}.pt"
@@ -358,7 +374,70 @@ class ExperimentManager:
                 f"Unexpected keys ({len(unexpected_keys)}): {unexpected_keys[:5]}..."
             )
 
-        print("Loaded model weights")
+    def resume_from_checkpoint(
+        self,
+        checkpoint_path: Union[str, Path],
+        model: torch.nn.Module,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[Any],
+        scaler: Optional[Any],
+        device: torch.device,
+    ) -> Tuple[int, float, float, Optional[Dict[str, Any]]]:
+        """Resume training state from a checkpoint.
+
+        Restores model weights, optimizer state, scheduler state,
+        AMP scaler state, and best-accuracy bookkeeping.
+
+        Args:
+            checkpoint_path: Path to the .pt file.
+            model: Model whose state_dict will be overwritten.
+            optimizer: Optimizer whose state_dict will be overwritten.
+            scheduler: LR scheduler (may be None).
+            scaler: AMP GradScaler (may be None).
+            device: Device to map tensors to when loading.
+
+        Returns:
+            Tuple of (start_epoch, best_val_acc, best_test_acc, fault_injection_state).
+        """
+        ckpt_file = Path(checkpoint_path)
+        if not ckpt_file.is_absolute():
+            if self.experiment_dir is not None:
+                ckpt_file = self.experiment_dir / checkpoint_path
+            else:
+                raise FileNotFoundError(
+                    f"Cannot resolve relative checkpoint path: {checkpoint_path}"
+                )
+
+        if not ckpt_file.exists():
+            raise FileNotFoundError(f"Checkpoint not found: {ckpt_file}")
+
+        ckpt = torch.load(str(ckpt_file), map_location=device, weights_only=False)
+
+        if "model_state_dict" not in ckpt:
+            raise KeyError(
+                f"Checkpoint at {ckpt_file} does not contain 'model_state_dict'."
+            )
+        model.load_state_dict(ckpt["model_state_dict"], strict=False)
+
+        if "optimizer_state_dict" in ckpt:
+            optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+
+        if scheduler is not None:
+            if "scheduler_state_dict" in ckpt:
+                scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+
+        if scaler is not None:
+            if "scaler_state_dict" in ckpt:
+                scaler.load_state_dict(ckpt["scaler_state_dict"])
+
+        saved_epoch: int = ckpt.get("epoch", 0)
+        best_val_acc: float = ckpt.get("best_val_acc", 0.0)
+        best_test_acc: float = ckpt.get("best_test_acc", 0.0)
+        fault_injection_state = ckpt.get("fault_injection_state", None)
+
+        start_epoch = saved_epoch + 1
+
+        return start_epoch, best_val_acc, best_test_acc, fault_injection_state
 
     def should_save(self, epoch: int, is_best: bool = False) -> bool:
         """Check if a checkpoint should be saved at this epoch.

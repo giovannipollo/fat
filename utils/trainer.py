@@ -177,16 +177,47 @@ class Trainer:
 
         checkpoint_config: Dict[str, Any] = config.get("checkpoint", {})
 
-        # Load model weights only (no training state) if specified
+        resume_path: Optional[str] = checkpoint_config.get("resume")
         load_weights_path: Optional[str] = checkpoint_config.get("load_weights")
-        if load_weights_path:
-            self.logger.log_weights_loaded(load_weights_path)
+
+        _saved_fault_injection_state: Optional[Dict[str, Any]] = None
+
+        if resume_path:
+            model_to_resume = self.model.module if self.is_distributed else self.model
+            (
+                self.start_epoch,
+                self.best_val_acc,
+                self.best_test_acc,
+                _saved_fault_injection_state,
+            ) = self.experiment.resume_from_checkpoint(
+                checkpoint_path=resume_path,
+                model=model_to_resume,
+                optimizer=self.optimizer,
+                scheduler=self.scheduler,
+                scaler=self.scaler,
+                device=self.device,
+            )
+            self.logger.log_resume(
+                checkpoint_path=resume_path,
+            )
+            model_to_resume.to(self.device)
+
+        elif load_weights_path:
             model_to_load = self.model.module if self.is_distributed else self.model
             self.experiment.load_weights(
                 load_weights_path, model_to_load, self.device, strict=False
             )
+            self.logger.log_weights_loaded(load_weights_path)
+            model_to_load.to(self.device)
+
+        if resume_path or load_weights_path:
+            test_loss, test_acc = self.test()
+            self.logger.log_initial_test(loss=test_loss, accuracy=test_acc)
 
         self._setup_fault_injection(config)
+
+        if _saved_fault_injection_state is not None:
+            self._restore_fault_injection_state(_saved_fault_injection_state)
 
     def _setup_fault_injection(self, config: Dict[str, Any]) -> None:
         """Setup fault injection if configured.
@@ -236,6 +267,61 @@ class Trainer:
                     num_layers=num_layers,
                     config=self.weight_fault_config,
                 )
+
+    def _restore_fault_injection_state(self, state: Dict[str, Any]) -> None:
+        """Restore fault injection warmup progress from a checkpoint.
+
+        Called after _setup_fault_injection() during a resume to re-apply
+        the saved probability so the warmup schedule continues from where
+        training was interrupted.
+
+        Args:
+            state: The 'fault_injection_state' dict from the checkpoint.
+        """
+        act_state = state.get("activation")
+        if (
+            act_state is not None
+            and self.act_fault_injector is not None
+            and self.act_fault_config is not None
+        ):
+            saved_prob_target = act_state.get("probability", None)
+            if (
+                saved_prob_target is not None
+                and saved_prob_target != self.act_fault_config.probability
+            ):
+                print(
+                    f"WARNING: Checkpoint activation probability target "
+                    f"({saved_prob_target}%) differs from current config "
+                    f"({self.act_fault_config.probability}%). "
+                    f"Using saved probability for this epoch; subsequent epochs "
+                    f"will follow current config warmup schedule."
+                )
+            saved_prob = act_state.get(
+                "current_probability", self.act_fault_config.probability
+            )
+            self.act_fault_injector.update_probability(model=self.model, probability=saved_prob)
+
+        weight_state = state.get("weight")
+        if (
+            weight_state is not None
+            and self.weight_fault_injector is not None
+            and self.weight_fault_config is not None
+        ):
+            saved_prob_target = weight_state.get("probability", None)
+            if (
+                saved_prob_target is not None
+                and saved_prob_target != self.weight_fault_config.probability
+            ):
+                print(
+                    f"WARNING: Checkpoint weight probability target "
+                    f"({saved_prob_target}%) differs from current config "
+                    f"({self.weight_fault_config.probability}%). "
+                    f"Using saved probability for this epoch."
+                )
+            saved_prob = weight_state.get(
+                "current_probability", self.weight_fault_config.probability
+            )
+            self.weight_fault_injector.update_probability(model=self.model, probability=saved_prob)
 
     def _apply_fault_warmup(self, epoch: int) -> None:
         """Update fault injection probabilities for the current warmup epoch.
@@ -631,12 +717,40 @@ class Trainer:
                     test_loss=test_loss,
                     test_acc=test_acc,
                     is_best=is_best,
+                    act_fault_config=self.act_fault_config,
+                    weight_fault_config=self.weight_fault_config,
                 )
 
             # Save checkpoint
             should_save = self.experiment.should_save(epoch=epoch, is_best=is_best)
             if self.rank == 0 and should_save:
                 model_to_save = self.model.module if self.is_distributed else self.model
+
+                _fault_injection_state: Optional[Dict[str, Any]] = None
+                if (
+                    self.act_fault_injector is not None
+                    or self.weight_fault_injector is not None
+                ):
+                    _fault_injection_state = {}
+                    if self.act_fault_config is not None:
+                        _fault_injection_state["activation"] = {
+                            "current_probability": self.act_fault_config.get_warmup_probability(
+                                epoch
+                            ),
+                            "warmup_epochs": self.act_fault_config.warmup_epochs,
+                            "warmup_schedule": self.act_fault_config.warmup_schedule,
+                            "probability": self.act_fault_config.probability,
+                        }
+                    if self.weight_fault_config is not None:
+                        _fault_injection_state["weight"] = {
+                            "current_probability": self.weight_fault_config.get_warmup_probability(
+                                epoch
+                            ),
+                            "warmup_epochs": self.weight_fault_config.warmup_epochs,
+                            "warmup_schedule": self.weight_fault_config.warmup_schedule,
+                            "probability": self.weight_fault_config.probability,
+                        }
+
                 self.experiment.save_checkpoint(
                     epoch=epoch,
                     model=model_to_save,
@@ -649,6 +763,10 @@ class Trainer:
                     weight_fault_injector=self.weight_fault_injector,
                     act_fault_config=self.act_fault_config,
                     weight_fault_config=self.weight_fault_config,
+                    optimizer=self.optimizer,
+                    scheduler=self.scheduler,
+                    scaler=self.scaler,
+                    fault_injection_state=_fault_injection_state,
                 )
 
                 # Log best model to file

@@ -86,6 +86,8 @@ class MetricsLogger:
         test_loss: Optional[float] = None,
         test_acc: Optional[float] = None,
         is_best: bool = False,
+        act_fault_config: Optional[FaultInjectionConfig] = None,
+        weight_fault_config: Optional[FaultInjectionConfig] = None,
     ) -> None:
         """Log metrics for an epoch.
 
@@ -100,11 +102,25 @@ class MetricsLogger:
             test_loss: Test loss (optional, evaluated periodically with validation).
             test_acc: Test accuracy (%) (optional, evaluated periodically with validation).
             is_best: Whether this epoch achieved the best accuracy.
+            act_fault_config: Activation fault injection config (optional).
+            weight_fault_config: Weight fault injection config (optional).
         """
         # Build log message
+        if act_fault_config is not None:
+            activations_fault_probability = act_fault_config.get_warmup_probability(epoch=epoch)
+        else:
+            activations_fault_probability = 0.0
+
+        if weight_fault_config is not None:
+            weight_fault_probability = weight_fault_config.get_warmup_probability(epoch=epoch)
+        else:
+            weight_fault_probability = 0.0
+
         log_msg = (
             f"Epoch [{epoch + 1}/{total_epochs}] "
             f"LR: {lr:.5f} | "
+            f"Act Fault Prob: {activations_fault_probability:.4f} | "
+            f"Weights Fault Prob: {weight_fault_probability:.4f} | "
             f"Train Loss: {train_loss:.4f} | "
             f"Train Acc: {train_acc:.2f}%"
         )
@@ -143,6 +159,20 @@ class MetricsLogger:
 
         self._write_to_file(msg)
 
+    def log_initial_test(self, loss: float, accuracy: float) -> None:
+        """Log initial test results before training.
+
+        Args:
+            loss: Initial test loss.
+            accuracy: Initial test accuracy (%).
+        """
+        msg = f"Initial Test Loss: {loss:.4f} | Initial Test Accuracy: {accuracy:.2f}%"
+
+        if self.console_enabled:
+            print(msg)
+
+        self._write_to_file(msg)
+        
     def log_best_model(
         self,
         epoch: int,
@@ -230,10 +260,31 @@ class MetricsLogger:
         messages = [
             "",
             "=" * 60,
-            "Loading pretrained weights",
+            f"Loading pretrained weights from checkpoint: {path}",
             "=" * 60,
         ]
 
+        for msg in messages:
+            if self.console_enabled:
+                print(msg)
+            self._write_to_file(msg)
+
+    def log_resume(
+        self,
+        checkpoint_path: str,
+        
+    ) -> None:
+        """Log resume from checkpoint.
+
+        Args:
+            checkpoint_path: Path to the checkpoint being resumed from.
+        """
+        messages = [
+            "",
+            "=" * 60,
+            f"Resuming training from checkpoint: {checkpoint_path}",
+            "=" * 60,
+        ]
         for msg in messages:
             if self.console_enabled:
                 print(msg)
