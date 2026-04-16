@@ -42,6 +42,7 @@ class ConfigValidator:
         """
         # Validate base config sections
         self._validate_required_sections()
+        self._validate_seed_section()
 
         # Report errors
         if self.errors:
@@ -67,6 +68,31 @@ class ConfigValidator:
 
         if "epochs" not in self.config.get("training", {}):
             self.errors.append("Missing 'training.epochs'")
+
+    def _validate_seed_section(self) -> None:
+        """Validate optional seed section values."""
+        seed_cfg = self.config.get("seed", {})
+        if not seed_cfg.get("enabled", False):
+            return
+
+        train_seed = seed_cfg.get("value")
+        val_seed = seed_cfg.get("val_seed")
+        test_seed = seed_cfg.get("test_seed")
+
+        for name, seed_value in (("val_seed", val_seed), ("test_seed", test_seed)):
+            if seed_value is None:
+                continue
+
+            if not isinstance(seed_value, int) or seed_value < 0:
+                self.errors.append(
+                    f"seed.{name} must be a non-negative integer, got {seed_value!r}"
+                )
+
+            if seed_value == train_seed:
+                self.warnings.append(
+                    f"seed.{name} ({seed_value}) equals seed.value ({train_seed}); "
+                    "consider using distinct seeds for training and evaluation"
+                )
 
 
 def validate_config(config: Dict[str, Any]) -> None:

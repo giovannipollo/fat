@@ -30,6 +30,7 @@ from .scheduler import SchedulerFactory, SchedulerType
 from .experiment import ExperimentManager
 from .logging import MetricsLogger
 from .loss import LossFactory
+from .seed import save_rng_state, set_eval_seed, restore_rng_state
 from .fault_injection import (
     FaultInjectionConfig,
     ActivationFaultInjector,
@@ -130,6 +131,13 @@ class Trainer:
         self.best_val_acc: float = 0.0
         self.best_test_acc: float = 0.0
         self.total_epochs: int = config["training"]["epochs"]
+
+        # Eval seed configuration
+        seed_cfg: Dict[str, Any] = config.get("seed", {})
+        self._eval_seeding_enabled: bool = seed_cfg.get("enabled", False)
+        _train_seed_value: int = seed_cfg.get("value", 42)
+        self._val_seed: int = seed_cfg.get("val_seed", _train_seed_value + 1)
+        self._test_seed: int = seed_cfg.get("test_seed", _train_seed_value + 2)
 
         # Setup loss function
         self.criterion: nn.Module = LossFactory.create(config)
@@ -575,6 +583,16 @@ class Trainer:
         """
         if self.val_loader is None:
             raise ValueError("No validation set available")
+
+        if self._eval_seeding_enabled:
+            snapshot = save_rng_state()
+            set_eval_seed(self._val_seed)
+            try:
+                result = self.evaluate(self.val_loader, desc="Validation")
+            finally:
+                restore_rng_state(snapshot)
+            return result
+
         return self.evaluate(self.val_loader, desc="Validation")
 
     def test(self) -> Tuple[float, float]:
@@ -588,6 +606,16 @@ class Trainer:
         """
         if self.test_loader is None:
             raise ValueError("No test set available")
+
+        if self._eval_seeding_enabled:
+            snapshot = save_rng_state()
+            set_eval_seed(self._test_seed)
+            try:
+                result = self.evaluate(self.test_loader, desc="Testing")
+            finally:
+                restore_rng_state(snapshot)
+            return result
+
         return self.evaluate(self.test_loader, desc="Testing")
 
     def train(self) -> None:
@@ -613,6 +641,12 @@ class Trainer:
                 use_amp=self.use_amp,
                 experiment_dir=self.experiment.get_experiment_dir(),
             )
+
+            if self._eval_seeding_enabled:
+                print(
+                    f"Eval seeds active - val_seed: {self._val_seed}, "
+                    f"test_seed: {self._test_seed}"
+                )
 
             if (
                 self.act_fault_injector is not None

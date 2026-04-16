@@ -90,6 +90,12 @@ def get_dataset(config: Dict[str, Any]) -> BaseDataset:
     
     dataset_class: Type[BaseDataset] = DATASETS[dataset_name]
     dataset_config: Dict[str, Any] = config["dataset"]
+    seed_config: Dict[str, Any] = config.get("seed", {})
+
+    dataset_seed: int = dataset_config.get("seed", 42)
+    train_seed_value: int = seed_config.get("value", dataset_seed)
+    val_seed: int = seed_config.get("val_seed", train_seed_value + 1)
+    test_seed: int = seed_config.get("test_seed", train_seed_value + 2)
     
     return dataset_class(
         root=dataset_config["root"],
@@ -97,7 +103,9 @@ def get_dataset(config: Dict[str, Any]) -> BaseDataset:
         num_workers=dataset_config["num_workers"],
         download=dataset_config.get("download", True),
         val_split=dataset_config.get("val_split", None),
-        seed=dataset_config.get("seed", 42),
+        seed=dataset_seed,
+        val_seed=val_seed,
+        test_seed=test_seed,
     )
 
 

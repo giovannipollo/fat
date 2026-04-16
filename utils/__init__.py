@@ -7,7 +7,7 @@ and the main Trainer class.
 
 from .device import get_device
 from .config import load_config
-from .seed import set_seed
+from .seed import set_seed, save_rng_state, restore_rng_state, set_eval_seed
 from .trainer import Trainer
 
 # Modular components
@@ -32,6 +32,9 @@ __all__ = [
     "get_device",
     "load_config",
     "set_seed",
+    "save_rng_state",
+    "restore_rng_state",
+    "set_eval_seed",
     "Trainer",
     # Modular components
     "OptimizerFactory",

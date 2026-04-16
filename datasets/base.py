@@ -89,6 +89,8 @@ class BaseDataset(ABC):
         download: bool = True,
         val_split: Optional[float] = None,
         seed: int = 42,
+        val_seed: Optional[int] = None,
+        test_seed: Optional[int] = None,
     ):
         """Initialize the dataset.
         
@@ -99,7 +101,12 @@ class BaseDataset(ABC):
             download: Whether to download dataset if not present.
             val_split: Fraction of training data for validation (0.0-1.0), 
                 None to disable.
-            seed: Random seed for reproducible validation split.
+            seed: Random seed for reproducible validation split and training
+                DataLoader shuffle.
+            val_seed: Fixed seed for validation DataLoader worker
+                initialization. Falls back to seed + 1.
+            test_seed: Fixed seed for test DataLoader worker
+                initialization. Falls back to seed + 2.
         """
         self.root: str = root
         self.batch_size: int = batch_size
@@ -107,6 +114,8 @@ class BaseDataset(ABC):
         self.download: bool = download
         self.val_split: Optional[float] = val_split
         self.seed: int = seed
+        self.val_seed: int = val_seed if val_seed is not None else seed + 1
+        self.test_seed: int = test_seed if test_seed is not None else seed + 2
 
         # Dataset instances (set by _load_all_datasets)
         self.train_dataset: Union[Dataset[Any], Subset[Any]]
@@ -256,9 +265,12 @@ class BaseDataset(ABC):
         # Check if running in distributed mode
         is_distributed = "RANK" in os.environ and "WORLD_SIZE" in os.environ
 
-        # Create a seeded generator for reproducible shuffling
-        # This ensures the same batch order across runs with num_workers > 0
-        generator: torch.Generator = torch.Generator().manual_seed(self.seed)
+        # Create seeded generators
+        # train_generator controls training shuffle order.
+        # val/test generators control DataLoader worker base seeds.
+        train_generator: torch.Generator = torch.Generator().manual_seed(self.seed)
+        val_generator: torch.Generator = torch.Generator().manual_seed(self.val_seed)
+        test_generator: torch.Generator = torch.Generator().manual_seed(self.test_seed)
 
         # Use DistributedSampler for training in distributed mode
         if is_distributed:
@@ -281,7 +293,7 @@ class BaseDataset(ABC):
                 batch_size=self.batch_size,
                 shuffle=True,
                 num_workers=self.num_workers,
-                generator=generator,
+                generator=train_generator,
                 worker_init_fn=_worker_init_fn,
             )
 
@@ -292,6 +304,7 @@ class BaseDataset(ABC):
                 batch_size=self.batch_size,
                 shuffle=False,
                 num_workers=self.num_workers,
+                generator=val_generator,
                 worker_init_fn=_worker_init_fn,
             )
 
@@ -300,6 +313,7 @@ class BaseDataset(ABC):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
+            generator=test_generator,
             worker_init_fn=_worker_init_fn,
         )
 
