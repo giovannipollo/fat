@@ -91,6 +91,8 @@ class ImageNetDataset(BaseDataset):
         download: bool = False,
         val_split: float | None = None,
         seed: int = 42,
+        val_seed: int | None = None,
+        test_seed: int | None = None,
     ):
         """Initialize the ImageNet dataset.
 
@@ -101,6 +103,8 @@ class ImageNetDataset(BaseDataset):
             download: Ignored (ImageNet cannot be auto-downloaded).
             val_split: Ignored (ImageNet has a dedicated validation set).
             seed: Random seed for reproducible data loading.
+            val_seed: Seed for validation DataLoader workers.
+            test_seed: Seed for test DataLoader workers.
 
         Raises:
             FileNotFoundError: If train/ or val/ directories do not exist.
@@ -128,9 +132,11 @@ class ImageNetDataset(BaseDataset):
             root=root,
             batch_size=batch_size,
             num_workers=num_workers,
-            download=False,  # Always False for ImageNet
-            val_split=None,  # ImageNet has dedicated val set
+            download=False,
+            val_split=None,
             seed=seed,
+            val_seed=val_seed,
+            test_seed=test_seed,
         )
 
     def _build_train_transform(self) -> transforms.Compose:

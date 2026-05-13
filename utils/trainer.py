@@ -17,7 +17,7 @@ import os
 import torch
 import torch.distributed as dist
 import torch.nn as nn
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data import DataLoader
 from tqdm import tqdm
@@ -161,7 +161,7 @@ class Trainer:
         # Mixed precision training (AMP)
         amp_config: Dict[str, Any] = config.get("amp", {})
         self.use_amp: bool = amp_config.get("enabled", False) and device.type == "cuda"
-        self.scaler: Optional[GradScaler] = GradScaler() if self.use_amp else None
+        self.scaler: Optional[GradScaler] = GradScaler("cuda") if self.use_amp else None
 
         # Setup experiment manager for checkpoints
         self.experiment: ExperimentManager = ExperimentManager.from_config(config)
@@ -470,7 +470,7 @@ class Trainer:
 
             # Forward pass with optional AMP
             if self.use_amp and self.scaler is not None:
-                with autocast():
+                with autocast("cuda"):
                     outputs = self.model(inputs)
                     loss = self.criterion(outputs, labels)
 
@@ -556,7 +556,7 @@ class Trainer:
 
             # Use AMP for inference too (optional, for consistency)
             if self.use_amp:
-                with autocast():
+                with autocast("cuda"):
                     outputs = self.model(inputs)
                     loss = self.criterion(outputs, labels)
             else:
