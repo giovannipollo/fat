@@ -1,0 +1,46 @@
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "imagenet"
+  root: "path/to/imagenet"  # Must contain train/ and val/ subdirectories
+  download: false 
+  num_workers: 24
+
+model:
+  name: "quant_resnet50"
+
+quantization:
+  in_weight_bit_width: 8
+  weight_bit_width: 8
+  act_bit_width: 8
+
+training:
+  batch_size: 32
+  epochs: 90
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  momentum: 0.9
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 90
+  warmup_epochs: 0
+  
+progress:
+  enabled: true
+
+brevitas:
+  ignore_missing_keys: true
+
+checkpoint:
+  enabled: true
+  dir: "./experiments"
+  save_frequency: 10
+  save_best: true
+  load_weights: "/path/to/best.pt"
