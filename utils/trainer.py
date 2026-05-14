@@ -107,7 +107,7 @@ class Trainer:
 
         self.model: nn.Module = model.to(device)
         if self.is_distributed:
-            self.model = DDP(self.model, device_ids=[local_rank])
+            self.model = DDP(self.model, device_ids=[local_rank], find_unused_parameters=True)
             self.rank = int(os.environ["RANK"])
             self.world_size = int(os.environ["WORLD_SIZE"])
         else:
@@ -219,8 +219,9 @@ class Trainer:
             model_to_load.to(self.device)
 
         if resume_path or load_weights_path:
-            test_loss, test_acc = self.test()
-            self.logger.log_initial_test(loss=test_loss, accuracy=test_acc)
+            if self.rank == 0:
+                test_loss, test_acc = self.test()
+                self.logger.log_initial_test(loss=test_loss, accuracy=test_acc)
 
         self._setup_fault_injection(config)
 
