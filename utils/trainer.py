@@ -708,6 +708,11 @@ class Trainer:
             test_loss: Optional[float] = None
             test_acc: Optional[float] = None
 
+            if self.act_fault_injector is not None and self.act_fault_config is not None:
+                self.act_fault_injector.update_probability(model=self.model, probability=self.act_fault_config.probability)
+            if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+                self.weight_fault_injector.update_probability(model=self.model, probability=self.weight_fault_config.probability)
+
             if self.has_validation:
                 val_loss, val_acc = self.validate()
                 # Check if this is the best model
@@ -738,6 +743,12 @@ class Trainer:
                 is_best = test_acc > self.best_test_acc
                 if is_best:
                     self.best_test_acc = test_acc
+
+            
+            if self.act_fault_injector is not None and self.act_fault_config is not None:
+                self.act_fault_injector.update_probability(model=self.model, probability=self.act_fault_config.get_warmup_probability(epoch))
+            if self.weight_fault_injector is not None and self.weight_fault_config is not None:
+                self.weight_fault_injector.update_probability(model=self.model, probability=self.weight_fault_config.get_warmup_probability(epoch))
 
             # Log epoch metrics
             if self.rank == 0:
