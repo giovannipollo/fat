@@ -175,7 +175,6 @@ class QuantMobileNetV1(nn.Module):
         self.linear = qnn.QuantLinear(
             in_features=1024,
             out_features=num_classes,
-            bias=False,
             weight_quant=CommonIntWeightPerTensorQuant,
             weight_bit_width=last_layer_bit_width
         )
