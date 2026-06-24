@@ -8,6 +8,7 @@ from __future__ import annotations
 from .cnv import CNV
 from .mobilenet.mobilenetv1 import MobileNetV1CIFAR
 from .mobilenet.mobilenetv1_finn import MobileNetV1FinnCIFAR
+from .mobilenet.mobilenetv1_large import MobileNetV1LargeCIFAR
 from .resnet import (
     BasicBlock as CIFARBasicBlock,
     ResNetCIFAR,
@@ -22,6 +23,7 @@ __all__ = [
     "CNV",
     "MobileNetV1CIFAR",
     "MobileNetV1FinnCIFAR",
+    "MobileNetV1LargeCIFAR",
     "CIFARBasicBlock",
     "ResNetCIFAR",
     "ResNet20",
