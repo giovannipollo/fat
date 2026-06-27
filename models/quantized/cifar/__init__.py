@@ -16,6 +16,7 @@ from .resnet import (
 )
 from .mobilenet.mobilenetv1_finn import QuantMobileNetV1Finn
 from .mobilenet.mobilenetv1 import QuantMobileNetV1
+from .mobilenet.mobilenetv1_large import QuantMobileNetV1Large
 from .cnv import QuantCNV
 
 __all__ = [
@@ -28,5 +29,6 @@ __all__ = [
     "QuantResNet110",
     "QuantMobileNetV1Finn",
     "QuantMobileNetV1",
+    "QuantMobileNetV1Large",
     "QuantCNV",
 ]

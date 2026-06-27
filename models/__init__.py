@@ -22,6 +22,7 @@ from .standard import (
     CNV,
     MobileNetV1CIFAR,
     MobileNetV1FinnCIFAR,
+    MobileNetV1LargeCIFAR,
     MobileNetV1ImageNet,
     ResNet20,
     ResNet32,
@@ -48,6 +49,7 @@ from .quantized import (
     QuantResNet152,
     QuantMobileNetV1CIFAR,
     QuantMobileNetV1FinnCIFAR,
+    QuantMobileNetV1LargeCIFAR,
     QuantMobileNetV1ImageNet,
     QuantMobileNetV1FinnImageNet,
 )
@@ -101,6 +103,10 @@ DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
         "cifar10": "MobileNetV1FinnCIFAR",
         "cifar100": "MobileNetV1FinnCIFAR",
     },
+    "mobilenetv1_large": {
+        "cifar10": "MobileNetV1LargeCIFAR",
+        "cifar100": "MobileNetV1LargeCIFAR",
+    },
     "quant_mobilenetv1": {
         "cifar10": "QuantMobileNetV1CIFAR",
         "cifar100": "QuantMobileNetV1CIFAR",
@@ -110,16 +116,22 @@ DATASET_VARIANTS: Dict[str, Dict[str, str]] = {
         "cifar10": "QuantMobileNetV1FinnCIFAR",
         "cifar100": "QuantMobileNetV1FinnCIFAR",
         "imagenet": "QuantMobileNetV1FinnImageNet",
-    }
+    },
+    "quant_mobilenetv1_large": {
+        "cifar10": "QuantMobileNetV1LargeCIFAR",
+        "cifar100": "QuantMobileNetV1LargeCIFAR",
+    },
 }
 """Mapping of model variants by dataset. Used to resolve base model names to implementation classes based on dataset."""
 
 INTERNAL_REGISTRY: Dict[str, ModelType] = {
     "MobileNetV1CIFAR": MobileNetV1CIFAR,
     "MobileNetV1FinnCIFAR": MobileNetV1FinnCIFAR,
+    "MobileNetV1LargeCIFAR": MobileNetV1LargeCIFAR,
     "MobileNetV1ImageNet": MobileNetV1ImageNet,
     "QuantMobileNetV1CIFAR": QuantMobileNetV1CIFAR,
     "QuantMobileNetV1FinnCIFAR": QuantMobileNetV1FinnCIFAR,
+    "QuantMobileNetV1LargeCIFAR": QuantMobileNetV1LargeCIFAR,
     "QuantMobileNetV1ImageNet": QuantMobileNetV1ImageNet,
     "QuantMobileNetV1FinnImageNet": QuantMobileNetV1FinnImageNet,
 }
