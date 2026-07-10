@@ -35,6 +35,6 @@ progress:
 
 checkpoint:
   enabled: true
-  dir: "./experiments"
+  dir: "/path/to/experiments"
   save_frequency: 50
   save_best: true

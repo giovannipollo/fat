@@ -10,7 +10,7 @@ dataset:
   num_workers: 8
 
 model:
-  name: "mobilenetv1"
+  name: "mobilenetv1_large"
 
 loss:
   name: "sqr_hinge"
@@ -20,10 +20,10 @@ training:
   epochs: 200
 
 optimizer:
-  name: "sgd"
-  learning_rate: 0.1
+  name: "adam"
+  learning_rate: 0.001
   momentum: 0.9
-  weight_decay: 0.0005
+  weight_decay: 0.0
 
 scheduler:
   name: "cosine"

@@ -1,7 +1,3 @@
-# CNV (Compact Neural Vision) on CIFAR-10
-# A compact convolutional network designed for efficient inference
-# Expected accuracy: ~88-90% after 200 epochs
-
 seed:
   enabled: true
   value: 42
@@ -16,18 +12,15 @@ dataset:
 model:
   name: "cnv"
 
-loss:
-  name: "sqr_hinge"
-
 training:
   batch_size: 64
   epochs: 200
 
 optimizer:
   name: "adam"
-  learning_rate: 0.01
+  learning_rate: 0.001
   momentum: 0.9
-  weight_decay: 0.0
+  weight_decay: 0.0001
 
 scheduler:
   name: "cosine"
@@ -42,6 +35,6 @@ progress:
 
 checkpoint:
   enabled: true
-  dir: "./experiments"
+  dir: "/path/to/experiments"
   save_frequency: 50
   save_best: true
