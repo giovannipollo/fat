@@ -1,0 +1,52 @@
+seed:
+  enabled: true
+  value: 42
+  deterministic: false
+
+dataset:
+  name: "cifar10"
+  root: "./data"
+  download: true
+  num_workers: 4
+
+model:
+  name: "quant_mobilenetv1_large"
+
+loss:
+  name: "sqr_hinge"
+
+quantization:
+  in_weight_bit_width: 8 
+  weight_bit_width: 2
+  act_bit_width: 2
+
+training:
+  batch_size: 128
+  epochs: 200
+
+optimizer:
+  name: "adam"
+  learning_rate: 0.001
+  momentum: 0.9
+  weight_decay: 0.0
+
+scheduler:
+  name: "cosine"
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false
+
+progress:
+  enabled: true
+
+brevitas:
+  ignore_missing_keys: true
+  
+checkpoint:
+  enabled: true
+  dir: "/path/to/experiments"
+  save_frequency: 20
+  save_best: true
+  load_weights: "/path/to/checkpoint.pt"
