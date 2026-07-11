@@ -12,35 +12,35 @@ dataset:
 model:
   name: "quant_resnet20"
 
-# Quantization settings (Brevitas)
 quantization:
-  in_weight_bit_width: 8  # Bit width for input quantization
-  weight_bit_width: 8   # Bit width for weight quantization
-  act_bit_width: 8      # Bit width for activation quantization
-
-loss:
-  name: "sqr_hinge"
+  in_weight_bit_width: 8
+  weight_bit_width: 8
+  act_bit_width: 8
 
 training:
   batch_size: 256
-  epochs: 300
+  epochs: 100
 
 optimizer:
-  name: "adam"
+  name: sgd
   learning_rate: 0.01
   momentum: 0.9
-  weight_decay: 0.0
+  weight_decay: 0.0005
 
 scheduler:
   name: "cosine"
-  T_max: 300
+  T_max: 100
   warmup_epochs: 0
 
 progress:
   enabled: true
 
+brevitas:
+  ignore_missing_keys: true
+
 checkpoint:
   enabled: true
-  dir: "./experiments"
+  dir: "/path/to/experiments"
   save_frequency: 50
   save_best: true
+  load_weights: "/path/to/checkpoint.pt"

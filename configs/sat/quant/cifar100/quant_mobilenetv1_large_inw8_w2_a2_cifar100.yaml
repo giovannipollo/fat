@@ -7,30 +7,36 @@ dataset:
   name: "cifar100"
   root: "./data"
   download: true
-  num_workers: 4
+  num_workers: 8
 
 model:
-  name: "quant_resnet20"
+  name: "quant_mobilenetv1_large"
 
 quantization:
   in_weight_bit_width: 8
-  weight_bit_width: 4
-  act_bit_width: 4
+  weight_bit_width: 2
+  act_bit_width: 2
 
 training:
-  batch_size: 256
-  epochs: 100
+  batch_size: 64
+  epochs: 200
+
+loss:
+  name: "sqr_hinge"
 
 optimizer:
-  name: "sgd"
-  learning_rate: 0.01
+  name: "adam"
+  learning_rate: 0.001
   momentum: 0.9
-  weight_decay: 0.0005
-  
+  weight_decay: 0.0
+
 scheduler:
   name: "cosine"
-  T_max: 100
-  warmup_epochs: 0
+  T_max: 200
+  warmup_epochs: 5
+
+amp:
+  enabled: false
 
 progress:
   enabled: true
@@ -41,6 +47,6 @@ brevitas:
 checkpoint:
   enabled: true
   dir: "/path/to/experiments"
-  save_frequency: 50
+  save_frequency: 20
   save_best: true
   load_weights: "/path/to/checkpoint.pt"
