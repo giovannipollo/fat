@@ -5,9 +5,9 @@ seed:
 
 dataset:
   name: "imagenet"
-  root: "path/to/imagenet"  # Must contain train/ and val/ subdirectories
+  root: "/path/to/imagenet"  # Must contain train/ and val/ subdirectories
   download: false 
-  num_workers: 24
+  num_workers: 16
 
 model:
   name: "quant_resnet50"
@@ -40,7 +40,7 @@ brevitas:
 
 checkpoint:
   enabled: true
-  dir: "./experiments"
+  dir: "/path/to/experiments"
   save_frequency: 10
   save_best: true
-  load_weights: "/path/to/best.pt"
+  load_weights: "/path/to/checkpoint.pt"
