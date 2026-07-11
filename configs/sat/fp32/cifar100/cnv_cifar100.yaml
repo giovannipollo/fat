@@ -1,3 +1,6 @@
+# Quantized CNV (Compact Neural Vision) on CIFAR-10
+# 8-bit quantization-aware training (QAT) using Brevitas
+
 seed:
   enabled: true
   value: 42
@@ -10,25 +13,22 @@ dataset:
   num_workers: 4
 
 model:
-  name: "resnet20"
-
+  name: "cnv"
+  
 training:
-  batch_size: 128
-  epochs: 200
+  batch_size: 64
+  epochs: 300
 
 optimizer:
-  name: "sgd"
-  learning_rate: 0.1
+  name: "adam"
+  learning_rate: 0.001 
   momentum: 0.9
-  weight_decay: 0.0005
+  weight_decay: 0.0001
 
 scheduler:
   name: "cosine"
-  T_max: 200
-  warmup_epochs: 5
-
-amp:
-  enabled: false
+  T_max: 300
+  warmup_epochs: 0
 
 progress:
   enabled: true

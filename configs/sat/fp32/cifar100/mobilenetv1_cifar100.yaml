@@ -7,20 +7,23 @@ dataset:
   name: "cifar100"
   root: "./data"
   download: true
-  num_workers: 4
+  num_workers: 8
 
 model:
-  name: "resnet20"
+  name: "mobilenetv1"
 
 training:
-  batch_size: 128
+  batch_size: 64
   epochs: 200
 
+loss:
+  name: "sqr_hinge"
+
 optimizer:
-  name: "sgd"
-  learning_rate: 0.1
+  name: "adam"
+  learning_rate: 0.001
   momentum: 0.9
-  weight_decay: 0.0005
+  weight_decay: 0.0
 
 scheduler:
   name: "cosine"
@@ -36,5 +39,5 @@ progress:
 checkpoint:
   enabled: true
   dir: "/path/to/experiments"
-  save_frequency: 50
+  save_frequency: 20
   save_best: true
